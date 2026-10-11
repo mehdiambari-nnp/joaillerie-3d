@@ -1,21 +1,26 @@
 /* Joaillerie 3D — thème « joaillerie » : crème chaud / encre / champagne. Mobile d'abord (iPhone). */
 :root {
-  --bg: #e9e6e4; --surface: #f5f3f1; --surface-2: #e3dfdd; --ink: #17161a; --muted: #7b7680;
-  --line: #d4cfcc; --accent: #a98650; --accent-ink: #fff; --focus: #5b6cf0; --danger: #b3261e;
-  --stage-a: #e7e4e5; --stage-b: #b4b0b5; --shadow: 0 10px 34px rgba(30, 24, 36, .14);
+  /* Clair : ivoire / champagne / bronze doux */
+  --bg: #f4efe6; --surface: #fbf8f2; --surface-2: #ece4d6; --ink: #2b2520; --muted: #8b7f70;
+  --line: #e0d6c5; --accent: #9a7440; --accent-ink: #fffaf0; --focus: #8a6a3a; --danger: #a8372c;
+  --stage-a: #f8f3ea; --stage-b: #d6c8b2; --shadow: 0 10px 34px rgba(80, 60, 30, .14);
   --radius: 14px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
   --serif: 'Cormorant Garamond', ui-serif, 'New York', Georgia, 'Times New Roman', serif;
   --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, Roboto, sans-serif;
+  color-scheme: light;
 }
+/* Sombre : noir chaud / or champagne */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #0b0c10; --surface: #13151a; --surface-2: #1c1f26; --ink: #ece8e2; --muted: #8e8b96; --line: #262932;
-    --accent: #c9a56a; --accent-ink: #14110a; --stage-a: #2b2d34; --stage-b: #0b0c10; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
+    --bg: #0d0c0b; --surface: #151412; --surface-2: #1f1d1a; --ink: #efe9df; --muted: #968d80; --line: #2a2723;
+    --accent: #c9a56a; --accent-ink: #14110a; --focus: #d9b97c; --stage-a: #2e2b27; --stage-b: #0d0c0b; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
+    color-scheme: dark;
   }
 }
 :root[data-theme='dark'] {
-  --bg: #0b0c10; --surface: #13151a; --surface-2: #1c1f26; --ink: #ece8e2; --muted: #8e8b96; --line: #262932;
-  --accent: #c9a56a; --accent-ink: #14110a; --stage-a: #2b2d34; --stage-b: #0b0c10; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
+  --bg: #0d0c0b; --surface: #151412; --surface-2: #1f1d1a; --ink: #efe9df; --muted: #968d80; --line: #2a2723;
+  --accent: #c9a56a; --accent-ink: #14110a; --focus: #d9b97c; --stage-a: #2e2b27; --stage-b: #0d0c0b; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
+  color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.4 var(--sans); overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
@@ -395,3 +400,16 @@ dialog { border-radius: 20px; }
 .app[data-present='1'] .parts { display: none; }
 .peye[aria-pressed='true'] { border-color: transparent; background: none; color: var(--muted); opacity: .7; }
 .peye { width: 34px; }
+
+/* Thème : bouton soleil / lune ; plein écran masqué en mode client */
+.app[data-mode='client'] [data-a=present] { display: none !important; }
+.app[data-mode='client'] .hud-right [data-a=theme] { display: inline-grid !important; }
+/* l'icône montre le mode vers lequel on bascule : lune en clair, soleil en sombre */
+[data-a=theme] .i-sun { display: none; }
+:root[data-theme='dark'] [data-a=theme] .i-sun { display: inline; }
+:root[data-theme='dark'] [data-a=theme] .i-moon { display: none; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme='light']) [data-a=theme] .i-sun { display: inline; } :root:not([data-theme='light']) [data-a=theme] .i-moon { display: none; } }
+@media (max-height: 860px) { .hud-right { gap: 6px; } .hud-right .icon-btn { width: 40px; height: 40px; } }
+.app:has(.acc.open) .hint { display: none; }
+/* Vue 3D épurée : ni bandeau d'aide ni taille/diamètre (conservés dans les exports) */
+.hint, .hud-chip { display: none !important; }

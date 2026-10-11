@@ -58,12 +58,7 @@ await page.evaluate(() => __rc.ui.openShare()); await shot(page, '20-partage-lie
 await page.evaluate(() => __rc.ui.openRecap()); await shot(page, '21-fiche-recap'); await close(page);
 await page.evaluate(() => __rc.ui.openVariants()); await shot(page, '22-variantes'); await close(page);
 await page.click('button[data-a=ar]'); await shot(page, '23-ar-desktop', { wait: 2500 }); await close(page);
-// atelier
-await page.click('button[data-mode=atelier]');
-await page.evaluate(() => __rc.app.selectZone('z-body')); await shot(page, '24-atelier-zone');
-await page.evaluate(() => __rc.app.setHidden(__rc.app.zoneById('z-claw').pieceIds, true)); await shot(page, '25-atelier-griffes-masquees');
-await page.evaluate(() => __rc.app.setHidden(__rc.app.zoneById('z-claw').pieceIds, false));
-await page.evaluate(() => { __rc.ui.openReport(); }); await shot(page, '26-atelier-rapport-import'); await close(page);
+
 await page.click('button[data-mode=vitrine]');
 // mode présentation + sombre
 await page.evaluate(() => __rc.ui.setPresent(true)); await shot(page, '27-mode-presentation'); await page.evaluate(() => __rc.ui.setPresent(false));

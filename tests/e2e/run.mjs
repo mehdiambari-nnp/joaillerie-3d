@@ -92,15 +92,8 @@ await page.evaluate(() => { __rc.app.redo(); });
 const afterRedo = await page.evaluate(() => JSON.stringify(__rc.app.assign));
 ok(before !== afterUndo && before === afterRedo, 'annuler / rétablir');
 
-// ---------- 2. Atelier ----------
-step('Atelier');
-await page.click('button[data-mode=atelier]');
-await page.waitForTimeout(300);
-await page.evaluate((z) => __rc.app.selectZone(z), metalZones[0]);
-await page.waitForTimeout(300);
-ok(await page.locator('[data-r=zname]').count() > 0, 'éditeur de zone affiché');
-await page.screenshot({ path: OUT + 'e2e-atelier.png' });
-await page.click('button[data-mode=vitrine]');
+// ---------- 2. Modes : plus d'Atelier ----------
+ok(await page.locator('button[data-mode=atelier]').count() === 0, 'mode Atelier retiré');
 
 // ---------- 3. Partage + projet GLB + AR ----------
 step('Partage / projet / AR');

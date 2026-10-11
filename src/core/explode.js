@@ -25,8 +25,7 @@ export class Exploder {
     if (!root) return;
     // remettre d'abord chaque mesh à sa position d'origine : les boîtes et positions de base se mesurent à l'état assemblé
     for (const [id, b] of this.base) { const p = app.pieceById(id); if (p) p.mesh.position.copy(b); }
-    this.tweens.clear();
-    this.base.clear(); this.offsets.clear();
+    this.base.clear(); this.offsets.clear(); // les animations en cours sont conservées (elles ne dépendent que des ids)
     root.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
     const boxes = new Map();

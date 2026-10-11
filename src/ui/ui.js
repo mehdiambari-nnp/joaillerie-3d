@@ -12,7 +12,7 @@ import { frenchRingSize } from '../import/zones.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
 
-const BG = { light: '#d3d0d2', dark: '#16171c', transparent: null };
+const BG = { light: '#e9e0d0', dark: '#16140f', transparent: null };
 
 // Icônes au trait (cohérentes, sans emoji)
 const ic = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
@@ -23,6 +23,8 @@ const ICON = {
   full: ic('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
   undo: ic('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/>'),
   redo: ic('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 12h3"/>'),
+  sun: ic('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+  moon: ic('<path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/>'),
   eye: ic('<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff: ic('<path d="M2 12s3.6-6.5 10-6.5c2 0 3.7.6 5.1 1.5M22 12s-3.6 6.5-10 6.5c-2 0-3.7-.6-5.1-1.5M4 4l16 16"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
   explode: ic('<rect x="9" y="9" width="6" height="6" rx="1"/><path d="M12 3v3M10.5 4.5 12 3l1.5 1.5M12 21v-3M10.5 19.5 12 21l1.5-1.5M3 12h3M4.5 10.5 3 12l1.5 1.5M21 12h-3M19.5 10.5 21 12l-1.5 1.5"/>'),
@@ -38,7 +40,7 @@ export class UI {
     this.app = app;
     this.svc = services; // { openFile(file), reimport(patch) }
     const saved = prefs.get('mode', 'vitrine');
-    this.mode = saved === 'atelier' ? 'atelier' : 'vitrine';
+    this.mode = 'vitrine'; // le mode Atelier a été retiré
     this.locked = false; // lien client : l'interface ne peut pas quitter le mode client
     this.customHex = { metal: '#d8b45a', gem: '#4a7de0' };
     this.tab = 'metals';
@@ -61,7 +63,6 @@ export class UI {
         <div class="seg" role="group" aria-label="Mode">
           <button data-mode="client">${t('modeClient')}</button>
           <button data-mode="vitrine">${t('modeVitrine')}</button>
-          <button data-mode="atelier">${t('modeAtelier')}</button>
         </div>
         <button class="btn small client-exit" data-a="exit-client">${t('exitPreview')}</button>
       </header>
@@ -74,6 +75,7 @@ export class UI {
             <button class="icon-btn" data-pop-btn="env" aria-label="${t('environment')}" title="${t('environment')}">${ICON.light}</button>
             <button class="icon-btn" data-a="explode" aria-pressed="false" aria-label="${t('explode')}" title="${t('explode')}">${ICON.explode}</button>
             <button class="icon-btn" data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">${ICON.rotate}</button>
+            <button class="icon-btn" data-a="theme" aria-label="${t('theme')}" title="${t('theme')}"><span class="i-sun">${ICON.sun}</span><span class="i-moon">${ICON.moon}</span></button>
             <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}">${ICON.full}</button>
           </div>
           <div class="dock">
@@ -466,6 +468,7 @@ export class UI {
       case 'similar': app.selectSimilar(); break;
       case 'clearsel': app.clearSelection(); break;
       case 'autorotate': this.autorotate = !(el.getAttribute('aria-pressed') === 'true'); el.setAttribute('aria-pressed', String(this.autorotate)); app.viewer.setAutoRotate(this.autorotate); break;
+      case 'theme': this.toggleTheme(); break;
       case 'present': this.setPresent(this.el.dataset.present !== '1'); break;
       case 'present-exit': this.setPresent(false); break;
       case 'exit-client': if (!this.locked) this.setMode(prefs.get('mode', 'vitrine') === 'atelier' ? 'atelier' : 'vitrine'); break;
@@ -487,6 +490,25 @@ export class UI {
   }
 
   /** Plein écran : sur iPhone (pas d'API Fullscreen) l'interface se réduit à la vue 3D + un bouton de sortie visible. */
+  initTheme() {
+    let th = null; try { th = localStorage.getItem('rc:theme'); } catch {}
+    if (th === 'light' || th === 'dark') document.documentElement.dataset.theme = th;
+    this._syncThemeColor();
+  }
+  toggleTheme() {
+    const dark = document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches);
+    const next = dark ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem('rc:theme', next); } catch {}
+    this._syncThemeColor();
+    this.app.viewer._applyBackground();
+    this.renderAll?.();
+  }
+  _syncThemeColor() {
+    const m = document.querySelector('meta[name=theme-color]');
+    if (m) m.content = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || m.content;
+  }
+
   setPresent(on) {
     this.el.dataset.present = on ? '1' : '0';
     $('[data-a=present]', this.root).setAttribute('aria-pressed', String(on));
@@ -498,6 +520,7 @@ export class UI {
   }
 
   setMode(m) {
+    if (m === 'client' && this.el.dataset.present === '1') this.setPresent(false);
     if (this.locked) m = 'client';
     this.mode = m;
     if (m !== 'client') prefs.set('mode', m);

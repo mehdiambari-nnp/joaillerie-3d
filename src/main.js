@@ -28,6 +28,7 @@ async function boot() {
   let pending = parseShareHash(location.hash); // configuration d'un lien de partage
 
   const ui = new UI(root, app, svc);
+  ui.initTheme(); app.viewer._applyBackground();
   if (pending?.client) ui.lockClient(); // lien client : interface épurée et verrouillée
   window.__rc = { app, ui, THREE }; // pratique pour le débogage et les tests E2E
 
