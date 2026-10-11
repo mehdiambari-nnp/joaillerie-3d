@@ -9,7 +9,7 @@ export const ENVIRONMENTS = [
   { id: 'studio', name: 'Atelier', group: 'studio' },
   { id: 'softbox', name: 'Softbox', group: 'studio' },
   { id: 'daylight', name: 'Jour', group: 'studio' },
-  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr', tint: [1.14, 1.0, 0.76] },
+  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr', tint: [1.14, 1.0, 0.76], studio: { hdr: 0.55, boxes: 1 } },
   { id: 'venice', name: 'Coucher de soleil', group: 'hdri', url: 'hdr/venice-sunset.hdr' },
   { id: 'quarry', name: 'Ciel couvert', group: 'hdri', url: 'hdr/quarry.hdr' },
   { id: 'spruit', name: 'Aube', group: 'hdri', url: 'hdr/spruit-sunrise.hdr' },
@@ -60,6 +60,17 @@ function buildStudio() {
   return s;
 }
 
+/** Boîtes à lumière de studio ajoutées à un HDRI : reflets larges, doux et nets sur les métaux (comme en photo de bijou). */
+function addSoftboxes(s, k = 1) {
+  const warm = 0xfff0dc, white = 0xffffff, cool = 0xeaf2ff;
+  const top = light(24, 18, 9 * k, warm); top.position.set(0, 28, 2); top.rotation.x = Math.PI / 2; s.add(top);
+  const left = light(7, 30, 8 * k, warm); left.position.set(-27, 5, 8); left.lookAt(0, 3, 0); s.add(left);
+  const right = light(7, 30, 6 * k, cool); right.position.set(27, 4, -6); right.lookAt(0, 3, 0); s.add(right);
+  const front = light(34, 7, 3 * k, white); front.position.set(0, 2, 28); front.lookAt(0, 2, 0); s.add(front);
+  const back = light(30, 8, 4 * k, white); back.position.set(0, 3, -28); back.lookAt(0, 3, 0); s.add(back);
+  const fill = light(36, 36, 0.9 * k, 0xfff4e6); fill.position.set(0, -24, 0); fill.rotation.x = Math.PI / 2; s.add(fill);
+}
+
 function buildSoftbox() {
   const s = new THREE.Scene();
   s.add(new THREE.Mesh(new THREE.BoxGeometry(60, 40, 60), new THREE.MeshBasicMaterial({ color: 0x6c6c72, side: THREE.BackSide })));
@@ -100,7 +111,9 @@ export function getEnvironment(renderer, id) {
         // balance des blancs chaude pour l'éclairage seulement (le fond 360° reste fidèle) : l'or n'est plus verdâtre
         // quand il reflète un ciel bleu
         const sc = new THREE.Scene();
-        sc.add(new THREE.Mesh(new THREE.SphereGeometry(50, 64, 32).scale(1, 1, -1), new THREE.MeshBasicMaterial({ map: equirect, color: new THREE.Color(...def.tint) })));
+        const k = def.studio?.hdr ?? 1;
+        sc.add(new THREE.Mesh(new THREE.SphereGeometry(50, 64, 32).scale(1, 1, -1), new THREE.MeshBasicMaterial({ map: equirect, color: new THREE.Color(...def.tint).multiplyScalar(k) })));
+        if (def.studio) addSoftboxes(sc, def.studio.boxes);
         rt = pmrem.fromScene(sc, 0);
       } else rt = pmrem.fromEquirectangular(equirect);
       out = { texture: rt.texture, background: equirect, equirect: true };

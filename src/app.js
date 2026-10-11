@@ -1,5 +1,6 @@
 // Cœur applicatif : relie le viewer, le modèle importé, les zones, les affectations de matériaux,
 // la sélection et l'historique. Aucune dépendance au DOM de l'interface (testable / réutilisable).
+import { buildGemData, disposeGemData } from './materials/gem.js';
 import * as THREE from 'three';
 import { Viewer } from './core/viewer.js';
 import { Picker } from './selection/picker.js';
@@ -75,6 +76,7 @@ export class Configurator extends Emitter {
   _disposeModel() {
     for (const p of this.pieces) {
       p.mesh.geometry.disposeBoundsTree?.();
+      disposeGemData(p.gemData);
       p.mesh.geometry.dispose();
       p.mesh.material?.dispose?.();
     }
@@ -98,7 +100,8 @@ export class Configurator extends Emitter {
     const cur = piece.mesh.material;
     if (!cur.userData?.rc || cur.userData.kind !== piece.kind) {
       cur.dispose?.();
-      const m = createMaterial(piece.kind, a);
+      if (piece.kind === 'gem' && piece.gemData === undefined) piece.gemData = buildGemData(this.viewer.renderer, piece.mesh);
+      const m = createMaterial(piece.kind, a, piece.kind === 'gem' ? piece.gemData : null);
       m.userData.rc = true; m.userData.kind = piece.kind;
       piece.mesh.material = m;
       return;

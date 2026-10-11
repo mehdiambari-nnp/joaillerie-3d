@@ -1,5 +1,6 @@
 // Fabrique de matériaux three.js + transitions douces (~200 ms) pour un rendu « temps réel ».
 import * as THREE from 'three';
+import { installGemShader, updateGemUniforms } from './gem.js';
 import { resolveMetal, resolveGem } from './library.js';
 
 let hammeredNormal = null;
@@ -93,7 +94,7 @@ function metalNormal(p) {
 }
 
 /** Crée un matériau neuf pour une affectation. */
-export function createMaterial(kind, a) {
+export function createMaterial(kind, a, gemData = null) {
   if (kind === 'gem') {
     const g = gemParams(a);
     const m = new THREE.MeshPhysicalMaterial({
@@ -102,6 +103,7 @@ export function createMaterial(kind, a) {
       roughness: g.roughness ?? 0.02,
       envMapIntensity: 1.6,
     });
+    if (gemData) installGemShader(m, gemData);
     configureGem(m, g);
     return m;
   }
@@ -114,6 +116,11 @@ export function createMaterial(kind, a) {
 }
 
 function configureGem(m, g) {
+  if (m.userData.gemU) {
+    const flat = !g.opaque;
+    if (m.flatShading !== flat) { m.flatShading = flat; m.needsUpdate = true; }
+    updateGemUniforms(m, g);
+  }
   // pierres incolores : léger caractère « chrome » (reflets nets des facettes) en plus de la réfraction
   m.metalness = g.sparkle ? 0.15 : 0;
   m.envMapIntensity = g.sparkle ? 2.2 : 1.6;
@@ -121,6 +128,10 @@ function configureGem(m, g) {
     m.transmission = 0; m.thickness = 0; m.ior = 1.5; m.dispersion = 0;
     m.iridescence = g.iridescence ?? 0; m.iridescenceIOR = 1.4;
     m.clearcoat = 1; m.clearcoatRoughness = 0.03;
+  } else if (m.userData.gemU) {
+    // ray-tracing interne (src/materials/gem.js) : plus de transmission écran, la pierre calcule sa réfraction
+    m.transmission = 0; m.thickness = 0; m.ior = Math.min(2.333, g.ior);
+    m.specularIntensity = 1; m.iridescence = 0; m.clearcoat = 0;
   } else {
     m.transmission = 1;
     m.thickness = 6; // mm (scène en millimètres) : décale la réfraction, donne de la profondeur
@@ -140,7 +151,7 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
   let toColor, toRough, toAtt = null;
   if (kind === 'gem') {
     const g = gemParams(a);
-    const wasOpaque = material.transmission === 0;
+    const wasOpaque = material.userData.gemU ? material.userData.gemU.uGemOn.value === 0 : material.transmission === 0;
     configureGem(material, g);
     if (wasOpaque !== !!g.opaque) material.needsUpdate = true;
     toColor = new THREE.Color(g.color); toRough = g.roughness ?? 0.02;

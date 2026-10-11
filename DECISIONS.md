@@ -55,3 +55,10 @@
 - **Rendu (PBR)** : MeshPhysicalMaterial (métal metalness 1, pierres en transmission/IOR/dispersion) + éclairage par image HDRI (IBL). Le HDRI « Ville, plein soleil » reçoit une balance des blancs chaude pour l'éclairage seulement (le fond reste fidèle) : l'or est moins verdâtre quand il reflète le ciel bleu.
 - **Barre d'outils de vue** : explosion + plein écran en ligne en bas à droite ; libellé « Quitter le plein écran » supprimé (le bouton plein écran devient l'icône « réduire » en mode plein écran).
 - **Clic 3D sur une pierre** : 1er clic = toute la partie ; 2e clic (partie entière sélectionnée) = isole la pierre touchée ; clics suivants = ajoute / retire la pierre touchée.
+
+## Itération 7 — rendu physique des pierres et des métaux
+- **Cause du rendu « plat » vs concurrent** : surtout l'éclairage (HDRI de ciel sans sources franches) et la transmission écran de three.js, qui ne sait pas faire de réflexions internes. Le HDRI n'était qu'en partie fautif.
+- **Pierres = ray tracing intérieur** (`src/materials/gem.js`) : pour chaque pierre, une cube-map des normales de facettes et des distances est rendue une fois depuis son centre. Le shader (greffé sur MeshPhysicalMaterial) suit le rayon : réfraction (Snell), jusqu'à 6 rebonds internes (4 sur mobile), réflexion totale interne, Fresnel, dispersion sur 3 indices (R/G/B), absorption Beer–Lambert pour la couleur. Normales plates par facette.
+- **Valeurs physiques** : IOR diamant 2,42 (borné à 2,6), rubis/saphir 1,77, émeraude 1,58… ; dispersion diamant 0,044 (écart B–R), amplifiée ×1,5 pour le rendu temps réel.
+- **Éclairage** : HDRI « Ville » à balance chaude + softboxes procédurales (haut chaud, bandes latérales chaude/froide, fond) composées dans la scène PMREM → reflets doux et contrastés sur l'or, comme en studio.
+- **Limites connues** : non testé sur iPhone réel (coût : 3 traces × rebonds par pixel de pierre) ; l'export GLB/AR utilise les matériaux de substitution (le shader n'est pas exportable) ; légère scintillation sur les diamants.
