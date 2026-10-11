@@ -1,6 +1,7 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
 import { METALS, FINISHES, GEMS, byId, describeAssignment } from '../materials/library.js';
+import { ENVIRONMENTS } from '../core/environments.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl } from '../state/store.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
@@ -290,7 +291,13 @@ export class UI {
     const vw = tgt.closest('[data-view]');
     if (vw) { app.viewer.setView(JSON.parse(vw.dataset.view)); return; }
     const env = tgt.closest('[data-env]');
-    if (env) { app.viewer.setEnvironment(env.dataset.env); this.renderEnvPop(); return; }
+    if (env) {
+      const id = env.dataset.env;
+      const hdr = ENVIRONMENTS.find((e) => e.id === id)?.group === 'hdri';
+      if (hdr) this.toast(t('envLoading'), 1500);
+      app.viewer.setEnvironment(id).then(() => { if (!hdr && this.bg === 'env') this.setBg('light'); this.renderEnvPop(); }).catch(() => this.toast(t('envError')));
+      return;
+    }
     const bg = tgt.closest('[data-bg]');
     if (bg) { this.setBg(bg.dataset.bg); return; }
     const a = tgt.closest('[data-a]')?.dataset.a;
@@ -300,6 +307,7 @@ export class UI {
   onInput(e) {
     const r = e.target.dataset.r;
     if (r === 'envrot') this.app.viewer.setEnvironmentRotation(+e.target.value);
+    if (r === 'bgblur') this.app.viewer.setBackground('env', { blur: +e.target.value });
     if (r === 'exposure') this.app.viewer.setExposure(+e.target.value);
   }
 
@@ -355,8 +363,8 @@ export class UI {
   setBg(k) {
     this.bg = k;
     this.viewport.classList.remove('bg-dark', 'bg-transparent');
-    if (k === 'dark') this.viewport.classList.add('bg-dark');
     if (k === 'transparent') this.viewport.classList.add('bg-transparent');
+    this.app.viewer.setBackground(k);
     this.renderEnvPop();
   }
 
@@ -386,12 +394,19 @@ export class UI {
 
   renderEnvPop() {
     const vw = this.app.viewer;
-    const envs = [['studio', 'Studio'], ['softbox', 'Softbox'], ['daylight', 'Jour']];
+    const btn = (e) => `<button class="btn small ${vw.envId === e.id ? 'primary' : ''}" data-env="${e.id}">${esc(e.name)}</button>`;
+    const isHdri = ENVIRONMENTS.find((e) => e.id === vw.envId)?.group === 'hdri';
+    const bgs = [['light', t('bgLight')], ['dark', t('bgDark')], ['transparent', t('bgTransparent')], ...(isHdri ? [['env', t('bgEnv')]] : [])];
     $('[data-pop=env]', this.root).innerHTML = `
-      <h4>${t('environment')}</h4><div class="row">${envs.map(([id, n]) => `<button class="btn small ${vw.envId === id ? 'primary' : ''}" data-env="${id}">${n}</button>`).join('')}</div>
+      <h4>${t('environment')}</h4>
+      <div class="row">${ENVIRONMENTS.filter((e) => e.group === 'studio').map(btn).join('')}</div>
+      <h4 class="sub">${t('envHdri')}</h4>
+      <div class="row">${ENVIRONMENTS.filter((e) => e.group === 'hdri').map(btn).join('')}</div>
       <label>${t('envRotation')}<input type="range" min="0" max="360" value="${Math.round((vw.scene.environmentRotation.y * 180) / Math.PI)}" data-r="envrot"></label>
       <label>${t('exposure')}<input type="range" min="0.6" max="1.6" step="0.05" value="${vw.renderer.toneMappingExposure}" data-r="exposure"></label>
-      <h4 style="margin-top:10px">${t('background')}</h4><div class="row">${['light', 'dark', 'transparent'].map((k) => `<button class="btn small ${this.bg === k ? 'primary' : ''}" data-bg="${k}">${t('bg' + k[0].toUpperCase() + k.slice(1))}</button>`).join('')}</div>`;
+      <h4 style="margin-top:10px">${t('background')}</h4>
+      <div class="row">${bgs.map(([k, n]) => `<button class="btn small ${this.bg === k ? 'primary' : ''}" data-bg="${k}">${esc(n)}</button>`).join('')}</div>
+      ${this.bg === 'env' ? `<label>${t('bgBlur')}<input type="range" min="0" max="1" step="0.05" value="${vw.bgBlur}" data-r="bgblur"></label>` : ''}`;
   }
 
   // ---------- Dialogues ----------

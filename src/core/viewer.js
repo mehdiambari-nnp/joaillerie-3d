@@ -1,7 +1,7 @@
 // Visionneuse 3D « façon Sketchfab » : rendu à la demande, orbite, vues, capture, environnements.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { createEnvironment } from './environments.js';
+import { getEnvironment, disposeEnvironments } from './environments.js';
 
 const HIGHLIGHT = new THREE.Color(0x6f8cff);
 
@@ -32,6 +32,13 @@ export class Viewer {
 
     this.envId = null;
     this.envTexture = null;
+    this.envBackground = null;
+    this._envToken = 0;
+    this.bgMode = 'light'; // 'light' | 'dark' | 'transparent' | 'env'
+    this.bgBlur = 0.35;
+    this._hq = false;
+    this._lastRender = 0;
+    this.onEnvironment = [];
     this.autoRotateEnabled = false;
     this._autoRotateResume = 0;
     this.needsRender = true;
@@ -52,6 +59,7 @@ export class Viewer {
     this._ro.observe(container);
     this.resize();
     this.setEnvironment('studio');
+    matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener?.('change', () => this.bgMode === 'light' && this._applyBackground());
     this._loop = this._loop.bind(this);
     requestAnimationFrame(this._loop);
   }
@@ -93,17 +101,73 @@ export class Viewer {
 
   invalidate() { this.needsRender = true; }
 
-  setEnvironment(id) {
+  /** Charge (si besoin) et applique un environnement ; renvoie une promesse (HDRI : téléchargement). */
+  async setEnvironment(id) {
     if (this.envId === id) return;
-    this.envTexture?.dispose();
-    this.envTexture = createEnvironment(this.renderer, id);
-    this.scene.environment = this.envTexture;
+    const token = ++this._envToken;
+    const env = await getEnvironment(this.renderer, id);
+    if (token !== this._envToken) return; // une sélection plus récente a pris le relais
     this.envId = id;
+    this.envTexture = env.texture;
+    this.envBackground = env.background;
+    this.scene.environment = env.texture;
+    this._applyBackground();
+    for (const f of this.onEnvironment) f(id);
     this.invalidate();
   }
 
   setEnvironmentRotation(deg) {
-    this.scene.environmentRotation.y = (deg * Math.PI) / 180;
+    const r = (deg * Math.PI) / 180;
+    this.scene.environmentRotation.y = r;
+    this.scene.backgroundRotation.y = r;
+    this.invalidate();
+  }
+
+  /**
+   * Fond de la scène. Les pierres transparentes réfractent ce fond : il doit donc exister dans la scène 3D
+   * (dégradé du studio, ou scène 360°), sinon les diamants paraissent pâles et grisâtres.
+   */
+  setBackground(mode, { blur } = {}) {
+    this.bgMode = mode;
+    if (blur != null) this.bgBlur = blur;
+    this._applyBackground();
+  }
+
+  _stageTexture(dark) {
+    const css = getComputedStyle(document.documentElement);
+    const a = dark ? '#34312c' : (css.getPropertyValue('--stage-a').trim() || '#f7f4ee');
+    const b = dark ? '#0c0b0a' : (css.getPropertyValue('--stage-b').trim() || '#ddd5c6');
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const g = c.getContext('2d');
+    const grd = g.createRadialGradient(256, 180, 16, 256, 220, 380);
+    grd.addColorStop(0, a); grd.addColorStop(1, b);
+    g.fillStyle = grd; g.fillRect(0, 0, 512, 512);
+    // bruit léger : supprime les anneaux de dégradé (banding) après tone mapping
+    const img = g.getImageData(0, 0, 512, 512), d = img.data;
+    for (let i = 0; i < d.length; i += 4) { const n = (Math.random() - 0.5) * 3.2; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+    g.putImageData(img, 0, 0);
+    const t = new THREE.CanvasTexture(c);
+    t.colorSpace = THREE.SRGBColorSpace;
+    return t;
+  }
+
+  _applyBackground() {
+    const sc = this.scene;
+    if (this._bgTex) { this._bgTex.dispose(); this._bgTex = null; }
+    sc.backgroundBlurriness = 0;
+    if (this.bgMode === 'env' && this.envBackground) {
+      sc.background = this.envBackground;
+      sc.backgroundBlurriness = this.bgBlur;
+      this._shadow.visible = false;
+    } else if (this.bgMode === 'transparent') {
+      sc.background = null;
+      this._shadow.visible = true;
+    } else {
+      this._bgTex = this._stageTexture(this.bgMode === 'dark');
+      sc.background = this._bgTex;
+      this._shadow.visible = true;
+    }
     this.invalidate();
   }
 
@@ -193,8 +257,19 @@ export class Viewer {
     for (const f of this.onFrame) if (f(now)) this.needsRender = true;
     if (this.needsRender || moved || this.controls.autoRotate) {
       this.needsRender = false;
+      if (this._hq) this._setHQ(false); // pendant le mouvement : résolution normale (fluidité, batterie)
+      this._lastRender = now;
+      this.renderer.render(this.scene, this.camera);
+    } else if (!this._hq && !this.anim && now - this._lastRender > 400 && (window.devicePixelRatio || 1) > this.maxPixelRatio) {
+      this._setHQ(true); // à l'arrêt : une image fixe en pleine résolution de l'écran
       this.renderer.render(this.scene, this.camera);
     }
+  }
+
+  _setHQ(on) {
+    this._hq = on;
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, on ? 3 : this.maxPixelRatio));
+    this.renderer.setSize(this.container.clientWidth || 1, this.container.clientHeight || 1, false);
   }
 
   /** Capture PNG (échelle ×k, fond transparent ou rempli). */
@@ -217,7 +292,7 @@ export class Viewer {
 
   dispose() {
     this._ro.disconnect();
-    this.envTexture?.dispose();
+    disposeEnvironments();
     this.renderer.dispose();
   }
 }

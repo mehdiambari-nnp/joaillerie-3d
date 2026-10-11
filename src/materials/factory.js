@@ -79,13 +79,16 @@ export function createMaterial(kind, a) {
 }
 
 function configureGem(m, g) {
+  // pierres incolores : léger caractère « chrome » (reflets nets des facettes) en plus de la réfraction
+  m.metalness = g.sparkle ? 0.15 : 0;
+  m.envMapIntensity = g.sparkle ? 2.2 : 1.6;
   if (g.opaque) {
     m.transmission = 0; m.thickness = 0; m.ior = 1.5; m.dispersion = 0;
     m.iridescence = g.iridescence ?? 0; m.iridescenceIOR = 1.4;
     m.clearcoat = 1; m.clearcoatRoughness = 0.03;
   } else {
     m.transmission = 1;
-    m.thickness = 4; // mm (scène en millimètres)
+    m.thickness = 6; // mm (scène en millimètres) : décale la réfraction, donne de la profondeur
     m.ior = Math.min(2.333, g.ior);
     m.dispersion = g.dispersion ?? 0;
     m.attenuationColor = new THREE.Color(g.att);

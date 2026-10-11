@@ -22,9 +22,9 @@ export const FINISHES = [
 
 // ior est plafonné à 2,333 par three.js (diamant 2,42 et moissanite 2,65 sont donc approchés).
 export const GEMS = [
-  { id: 'diamond', name: 'Diamant', color: '#ffffff', ior: 2.42, dispersion: 0.4, att: '#ffffff', attDist: 1e3, swatch: '#f4f8ff' },
-  { id: 'moissanite', name: 'Moissanite', color: '#fffdf6', ior: 2.65, dispersion: 0.6, att: '#fffbe8', attDist: 60, swatch: '#f6f3e6' },
-  { id: 'cz', name: 'Oxyde de zirconium', color: '#ffffff', ior: 2.15, dispersion: 0.5, att: '#ffffff', attDist: 1e3, swatch: '#eef3ff' },
+  { id: 'diamond', name: 'Diamant', sparkle: true, color: '#f2f6ff', ior: 2.42, dispersion: 0.4, att: '#ffffff', attDist: 1e3, swatch: '#f4f8ff' },
+  { id: 'moissanite', name: 'Moissanite', sparkle: true, color: '#f8f8f0', ior: 2.65, dispersion: 0.6, att: '#fffbe8', attDist: 60, swatch: '#f6f3e6' },
+  { id: 'cz', name: 'Oxyde de zirconium', sparkle: true, color: '#f2f6ff', ior: 2.15, dispersion: 0.5, att: '#ffffff', attDist: 1e3, swatch: '#eef3ff' },
   { id: 'sapphire', name: 'Saphir bleu', color: '#7da2ff', ior: 1.77, dispersion: 0.05, att: '#0c2a9a', attDist: 3, swatch: '#1f3fae' },
   { id: 'sapphire-pink', name: 'Saphir rose', color: '#ffb6d2', ior: 1.77, dispersion: 0.05, att: '#e0407e', attDist: 5, swatch: '#e86a9c' },
   { id: 'sapphire-yellow', name: 'Saphir jaune', color: '#fff0a0', ior: 1.77, dispersion: 0.05, att: '#f0b800', attDist: 5, swatch: '#f2c91e' },

@@ -238,6 +238,7 @@ export class TryOn {
     if (!res) return;
     const pose = computeRingPose({ lm: res.lm, wl: res.wl, label: res.label, width: this.vw, height: this.vh, fovLongDeg: this.fov, finger: this.finger, flip: this.flip });
     if (!pose) return;
+    this.lastDetect = { lm: res.lm, wl: res.wl, label: res.label, score: res.score, pose };
     const ts = now / 1000;
     const p = this.filters.pos.filter(pose.position.toArray(), ts);
     const a = new THREE.Vector3(...this.filters.axis.filter(pose.axis.toArray(), ts)).normalize();

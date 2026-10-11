@@ -12,10 +12,12 @@ export const FINGERS = {
   pinky: [17, 18],
 };
 
-// Segments rigides de la paume servant à estimer l'échelle (px par mètre).
-const SCALE_PAIRS = [[0, 5], [0, 17], [5, 17], [0, 9], [0, 13], [9, 10], [13, 14], [5, 6]];
+// Longueurs réelles moyennes (adulte, mètres) de segments rigides de la paume. Les « world landmarks » de MediaPipe
+// ne sont pas à l'échelle réelle (mains ~30 % trop petites, doigts compressés) : on s'en sert uniquement pour les
+// directions (relief), et l'échelle vient de la taille de la paume dans l'image, comparée à ces moyennes.
+const PALM_REF = [[0, 5, 0.098], [0, 9, 0.095], [0, 13, 0.09], [0, 17, 0.083], [5, 17, 0.078]];
 
-const toCam = (w) => new THREE.Vector3(w.x, -w.y, -w.z);
+const median = (a) => { const s = [...a].sort((x, y) => x - y); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 /** Distance focale en pixels pour un champ de vision donné sur le grand côté de l'image. */
 export function focalPx(width, height, fovLongDeg) {
@@ -24,46 +26,53 @@ export function focalPx(width, height, fovLongDeg) {
 
 /**
  * @param lm  21 points {x,y,z} normalisés (image)
- * @param wl  21 points {x,y,z} en mètres (monde)
- * @param label 'Left' | 'Right' : étiquette MediaPipe (image NON retournée → étiquettes inversées)
+ * @param wl  21 points {x,y,z} « monde » MediaPipe (utilisés pour le relief uniquement)
+ * @param label 'Left' | 'Right' : conservé pour compatibilité, non utilisé (voir ci-dessous)
  * @returns { position: Vector3 (m), quaternion, axis: Vector3, top: Vector3, depth, pxPerMeter } | null
+ *
+ * Le dessus de la bague est toujours orienté vers la caméra : on présente la bague avec le dos de la main visible.
+ * L'étiquette gauche/droite de MediaPipe ne distingue pas le dos de la paume (un dos de main gauche ressemble à
+ * une paume de main droite dans l'image), elle ne peut donc pas servir à choisir le côté.
  */
 export function computeRingPose({
-  lm, wl, label = 'Left', width, height, fovLongDeg = 66, finger = 'ring', along = 0.38, flip = false,
+  lm, wl, width, height, fovLongDeg = 66, finger = 'ring', along = 0.36, flip = false, sizeRef = 1,
 }) {
   if (!lm || !wl || lm.length < 21 || wl.length < 21) return null;
   const f = focalPx(width, height, fovLongDeg);
+  const px = (a, b) => Math.hypot((lm[a].x - lm[b].x) * width, (lm[a].y - lm[b].y) * height);
 
-  // 1. Échelle (px/m) : somme des longueurs image / somme des longueurs monde (projection xy)
-  let sumPx = 0, sumM = 0;
-  const refZ = [];
-  for (const [a, b] of SCALE_PAIRS) {
-    const dpx = Math.hypot((lm[a].x - lm[b].x) * width, (lm[a].y - lm[b].y) * height);
-    const dm = Math.hypot(wl[a].x - wl[b].x, wl[a].y - wl[b].y);
-    if (dm < 0.004) continue;
-    sumPx += dpx; sumM += dm;
-    refZ.push(wl[a].z, wl[b].z);
+  // 1. Échelle : pixels par mètre (médiane des segments de paume, robuste à une mesure aberrante)
+  const ratios = PALM_REF.map(([a, b, ref]) => px(a, b) / (ref * sizeRef));
+  const pxPerMeter = median(ratios);
+  if (!(pxPerMeter > 50)) return null;
+  const depth = f / pxPerMeter; // mètres
+
+  // 2. Relief : le monde MediaPipe est ramené à l'échelle de l'image via la paume (rapport de pixels, sans unité)
+  let palmPx = 0, palmWorldXY = 0;
+  for (const [a, b] of PALM_REF) {
+    palmPx += px(a, b);
+    palmWorldXY += Math.hypot(wl[a].x - wl[b].x, wl[a].y - wl[b].y);
   }
-  if (sumM < 1e-6 || sumPx < 1) return null;
-  const pxPerMeter = sumPx / sumM; // la correction de taille utilisateur s'applique à l'échelle de la bague, pas à la profondeur
-  const depthCenter = f / pxPerMeter;
-  const meanRefZ = refZ.reduce((s, v) => s + v, 0) / refZ.length;
+  const kw = palmWorldXY > 1e-6 ? palmPx / palmWorldXY : 0;
+  // vecteur a→b en « pixels caméra » : x droite, y haut, z vers la caméra
+  const vec = (a, b) => new THREE.Vector3(
+    (lm[b].x - lm[a].x) * width,
+    -(lm[b].y - lm[a].y) * height,
+    -(wl[b].z - wl[a].z) * kw,
+  );
 
-  // 2. Position sur le doigt (entre MCP et PIP)
+  // 3. Position sur le doigt (entre MCP et PIP), perspective inverse
   const [ia, ib] = FINGERS[finger] ?? FINGERS.ring;
-  const px = (lm[ia].x * (1 - along) + lm[ib].x * along) * width;
-  const py = (lm[ia].y * (1 - along) + lm[ib].y * along) * height;
-  const wz = wl[ia].z * (1 - along) + wl[ib].z * along;
-  const depth = depthCenter + (wz - meanRefZ); // mètres
-  const position = new THREE.Vector3(((px - width / 2) / f) * depth, (-(py - height / 2) / f) * depth, -depth);
+  const cx = (lm[ia].x * (1 - along) + lm[ib].x * along) * width;
+  const cy = (lm[ia].y * (1 - along) + lm[ib].y * along) * height;
+  const position = new THREE.Vector3(((cx - width / 2) / f) * depth, (-(cy - height / 2) / f) * depth, -depth);
 
-  // 3. Axe du doigt (vers le bout) et dessus de la bague = dos de la main
-  const axis = toCam(wl[ib]).sub(toCam(wl[ia])).normalize();
-  const v0 = toCam(wl[0]);
-  const n = new THREE.Vector3().crossVectors(toCam(wl[5]).sub(v0), toCam(wl[17]).sub(v0));
-  const physicalRight = label === 'Left'; // image non retournée : étiquette inversée
-  const palm = n.multiplyScalar(physicalRight ? 1 : -1).normalize();
-  let top = palm.clone().negate(); // dos de la main
+  // 4. Axe du doigt (vers le bout) et dessus de la bague = dos de la main, tourné vers la caméra
+  const axis = vec(ia, ib).normalize();
+  const n = new THREE.Vector3().crossVectors(vec(0, 5), vec(0, 17)).normalize();
+  if (n.z < 0) n.negate();
+  // le relief estimé est bruité : on le tempère avec « face à la caméra » (+z)
+  const top = n.multiplyScalar(0.6).add(new THREE.Vector3(0, 0, 0.4));
   top.addScaledVector(axis, -top.dot(axis));
   if (top.lengthSq() < 1e-6) top.set(0, 0, 1).addScaledVector(axis, -axis.z);
   top.normalize();

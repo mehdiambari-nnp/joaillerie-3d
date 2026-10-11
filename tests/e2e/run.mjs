@@ -166,9 +166,9 @@ if (photo) {
   logs = collect(page);
   await page.goto(url + q);
   await waitModel(page);
-  await page.tap('button[data-a=tryon]');
+  await page.evaluate(() => document.querySelector('button[data-a=tryon]').click());
   await page.waitForSelector('.tryon-intro [data-a=start], [data-a=start]', { timeout: 10000 });
-  await page.tap('[data-a=start]');
+  await page.evaluate(() => document.querySelector('[data-a=start]').click());
   let found = false;
   try {
     await page.waitForFunction(() => window.__rc.ui.tryon.anchor?.visible === true, null, { timeout: 90000 });

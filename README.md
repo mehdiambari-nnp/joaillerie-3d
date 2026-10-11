@@ -34,3 +34,6 @@ Repère normalisé : mm, axe du doigt = +Z, dessus (pierres) = +Y. Décisions : 
 - USDZ : les pierres sont approximées (matériau standard, pas de transmission) — limite d'AR Quick Look. Fichiers AR lourds (GLB ≈ 7 Mo, USDZ ≈ 23 Mo sur la maquette) : décimation à prévoir.
 - Essayage : échelle indicative (± quelques %), un seul doigt à la fois, FOV caméra estimé (réglable).
 - Le fichier `assets/test/MAQUETTE_GEMV.fbx` est privé : ne pas publier. Voir `assets/LICENSES.md`.
+
+## Crédits
+Environnements HDR : [Poly Haven](https://polyhaven.com) (CC0).

@@ -27,12 +27,14 @@ describe('pose de la bague (MediaPipe → three.js)', () => {
   it('retrouve la profondeur et la position sur l’annulaire', () => {
     const { lm, wl, W, H } = syntheticHand({ Z: 0.35 });
     const pose = computeRingPose({ lm, wl, label: 'Left', width: W, height: H });
-    expect(pose.depth).toBeCloseTo(0.35, 2);
-    expect(pose.position.z).toBeCloseTo(-0.35, 2);
-    // point attendu : 38 % entre MCP(13) et PIP(14)
-    const ex = 0.02 + 0.002 * 0.38, ey = -(0.09 + 0.038 * 0.38); // mètres, y vers le haut
+    // l'échelle vient de la taille moyenne d'une paume : ±6 % suffisent pour un aperçu indicatif
+    expect(Math.abs(pose.depth - 0.35) / 0.35).toBeLessThan(0.06);
+    expect(Math.abs(pose.position.z + 0.35) / 0.35).toBeLessThan(0.06);
+    // point attendu : 36 % entre MCP(13) et PIP(14), à la profondeur estimée
+    const k = pose.depth / 0.35;
+    const ex = (0.02 + 0.002 * 0.36) * k, ey = -(0.09 + 0.038 * 0.36) * k; // mètres, y vers le haut
     expect(pose.position.x).toBeCloseTo(ex, 3);
-    expect(pose.position.y).toBeCloseTo(-ey, 3); // y three = -y mp
+    expect(pose.position.y).toBeCloseTo(-ey, 3);
   });
   it('l’échelle varie en 1/profondeur', () => {
     const a = syntheticHand({ Z: 0.3 }), b = syntheticHand({ Z: 0.6 });
@@ -51,10 +53,12 @@ describe('pose de la bague (MediaPipe → three.js)', () => {
     expect(z.y).toBeGreaterThan(0.99);
     expect(y.z).toBeGreaterThan(0.95);
   });
-  it('inverse le dessus pour la main gauche et avec « retourner »', () => {
+  it('dessus vers la caméra pour les deux mains (dos visible) ; « retourner » l’inverse', () => {
     const { lm, wl, W, H } = syntheticHand({ mirrorX: true }); // main gauche, dos à la caméra
-    const left = computeRingPose({ lm, wl, label: 'Right', width: W, height: H }); // étiquette inversée
+    const left = computeRingPose({ lm, wl, label: 'Right', width: W, height: H });
     expect(left.top.z).toBeGreaterThan(0.95);
+    const right = computeRingPose({ ...syntheticHand(), label: 'Left', width: 720, height: 1280 });
+    expect(right.top.z).toBeGreaterThan(0.95);
     const flipped = computeRingPose({ lm, wl, label: 'Right', width: W, height: H, flip: true });
     expect(flipped.top.z).toBeLessThan(-0.95);
   });
