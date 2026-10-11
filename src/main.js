@@ -1,8 +1,6 @@
 // Point d'entrée : crée le configurateur, l'interface, charge la bague de démo (ou le fichier demandé).
+import './config/theme.js'; // marque blanche : polices + palettes du thème (themes/<client>/theme.json)
 import { FEATURES } from './config/features.js';
-import '@fontsource/cormorant-garamond/latin-400.css';
-import '@fontsource/cormorant-garamond/latin-500.css';
-import '@fontsource/cormorant-garamond/latin-600.css';
 import './style.css';
 import * as THREE from 'three';
 import { Configurator } from './app.js';

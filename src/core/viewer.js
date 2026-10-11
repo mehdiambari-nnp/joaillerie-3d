@@ -136,8 +136,8 @@ export class Viewer {
 
   _stageTexture(dark) {
     const css = getComputedStyle(document.documentElement);
-    const a = dark ? '#2e2b27' : (css.getPropertyValue('--stage-a').trim() || '#e7e4e5');
-    const b = dark ? '#0d0c0b' : (css.getPropertyValue('--stage-b').trim() || '#b4b0b5');
+    const a = css.getPropertyValue('--stage-a').trim() || (dark ? '#2e2b27' : '#e7e4e5');
+    const b = css.getPropertyValue('--stage-b').trim() || (dark ? '#0d0c0b' : '#b4b0b5');
     const c = document.createElement('canvas');
     c.width = 512; c.height = 512;
     const g = c.getContext('2d');

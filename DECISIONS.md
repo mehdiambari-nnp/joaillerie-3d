@@ -62,3 +62,9 @@
 - **Valeurs physiques** : IOR diamant 2,42 (borné à 2,6), rubis/saphir 1,77, émeraude 1,58… ; dispersion diamant 0,044 (écart B–R), amplifiée ×1,5 pour le rendu temps réel.
 - **Éclairage** : HDRI « Ville » à balance chaude + softboxes procédurales (haut chaud, bandes latérales chaude/froide, fond) composées dans la scène PMREM → reflets doux et contrastés sur l'or, comme en studio.
 - **Limites connues** : non testé sur iPhone réel (coût : 3 traces × rebonds par pixel de pierre) ; l'export GLB/AR utilise les matériaux de substitution (le shader n'est pas exportable) ; légère scintillation sur les diamants.
+
+## Itération 8 — marque blanche (thèmes clients)
+- **Un dossier par client** (`themes/<client>/theme.json` + logos + icônes). Le thème est choisi **au build** (`THEME=<client>`, défaut `domuse`) : un site Netlify par client, aucune identité d'un client dans le bundle d'un autre.
+- Mise en œuvre : plugin Vite `config/vite-theme.js` (module virtuel `virtual:theme`, `<title>`/meta, manifest et icônes générés) ; `src/config/theme.js` injecte palettes clair/sombre + polices en variables CSS ; textes surchargeables par thème ; flags de fonctionnalités surchargeables.
+- Charte Domuse : bordeaux `#31161f`, beige `#e5e1c8`, gris-bleu `#7d8e98`, papier Arena `#f0ece9` ; Inter seule (la typo des intitulés « Couleurs / Papiers » est écartée) ; clair = beige, sombre = bordeaux. Logos vectorisés (potrace) depuis les JPG fournis (`scripts/trace-logo.py`) : à remplacer par les fichiers d'origine si disponibles.
+- Cormorant Garamond retiré ; `public/manifest.webmanifest` et `public/icons` remplacés par la génération depuis le thème. `themes/exemple` : thème de démonstration sans logo (repli texte).

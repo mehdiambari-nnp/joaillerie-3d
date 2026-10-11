@@ -1,0 +1,75 @@
+{
+  "id": "domuse",
+  "brand": {
+    "name": "Domuse",
+    "tagline": "Atelier Paris",
+    "description": "Domuse, atelier de joaillerie à Paris — configurez votre bague en 3D, changez métaux et pierres en temps réel, essayez-la sur votre main.",
+    "shareTitle": "Domuse"
+  },
+  "logos": {
+    "monogram": "monogram.svg",
+    "wordmark": "wordmark.svg",
+    "lockup": "lockup.svg"
+  },
+  "header": {
+    "logo": "wordmark",
+    "logoHeightPx": 26,
+    "logoHeightClientPx": 34,
+    "showTagline": false
+  },
+  "fonts": {
+    "sans": "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "display": "'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+    "packages": [
+      "@fontsource/inter/latin-400.css",
+      "@fontsource/inter/latin-500.css",
+      "@fontsource/inter/latin-600.css"
+    ]
+  },
+  "colors": {
+    "_note": "Charte : bordeaux #31161f, beige #e5e1c8, noir #000, gris-bleu #7d8e98, papier Arena #f0ece9.",
+    "light": {
+      "bg": "#e5e1c8",
+      "surface": "#f0ece9",
+      "surface2": "#d9d4b9",
+      "ink": "#31161f",
+      "muted": "#5d6d78",
+      "line": "#c9c4a8",
+      "accent": "#31161f",
+      "accentInk": "#e5e1c8",
+      "focus": "#31161f",
+      "danger": "#9c2f2f",
+      "stageA": "#f0ece9",
+      "stageB": "#cbc6aa",
+      "shadow": "0 10px 34px rgba(49, 22, 31, .16)"
+    },
+    "dark": {
+      "bg": "#190b10",
+      "surface": "#31161f",
+      "surface2": "#3e1f2a",
+      "ink": "#e5e1c8",
+      "muted": "#9aa8b1",
+      "line": "#4d2a37",
+      "accent": "#e5e1c8",
+      "accentInk": "#31161f",
+      "focus": "#e5e1c8",
+      "danger": "#e07a7a",
+      "stageA": "#4a2431",
+      "stageB": "#12070b",
+      "shadow": "0 10px 34px rgba(0, 0, 0, .55)"
+    }
+  },
+  "defaultScheme": "system",
+  "features": {},
+  "texts": {
+    "fr": {
+      "onboardTitle": "Bienvenue chez Domuse"
+    },
+    "en": {}
+  },
+  "pwa": {
+    "name": "Domuse",
+    "shortName": "Domuse",
+    "icon": "icons/icon-512.png"
+  }
+}

@@ -2,6 +2,7 @@ import { defineConfig } from 'vite';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 import fs from 'node:fs';
 import path from 'node:path';
+import themePlugin from './config/vite-theme.js';
 
 // En dev uniquement : sert assets/test/* sous /test-assets (le FBX de test n'est JAMAIS copié dans le build publié).
 const testAssets = () => ({
@@ -20,7 +21,7 @@ const testAssets = () => ({
 const useHttps = !process.env.E2E;
 export default defineConfig(({ command }) => ({
   base: './',
-  plugins: [testAssets(), ...(command === 'serve' && useHttps ? [basicSsl()] : [])],
+  plugins: [themePlugin(), testAssets(), ...(command === 'serve' && useHttps ? [basicSsl()] : [])],
   server: { host: true, port: 5173 },
   build: {
     target: 'es2022',

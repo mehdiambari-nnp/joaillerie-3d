@@ -1,6 +1,7 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
 import { FEATURES } from '../config/features.js';
+import theme, { brandHTML } from '../config/theme.js';
 import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
@@ -61,7 +62,7 @@ export class UI {
     this.root.innerHTML = `
     <div class="app" data-mode="${this.mode}">
       <header class="topbar">
-        <div class="brand">${MARK}<span class="name">${t('app')}</span><span class="sub">Joaillerie</span></div>
+        <div class="brand">${brandHTML(MARK)}</div>
         <div class="spacer"></div>
         <button class="icon-btn theme-btn" data-a="theme" aria-label="${t('theme')}" title="${t('theme')}"><span class="i-sun">${ICON.sun}</span><span class="i-moon">${ICON.moon}</span></button>
         <div class="seg" role="group" aria-label="Mode">
@@ -524,7 +525,8 @@ export class UI {
   /** Plein écran : sur iPhone (pas d'API Fullscreen) l'interface se réduit à la vue 3D + un bouton de sortie visible. */
   initTheme() {
     let th = null; try { th = localStorage.getItem('rc:theme'); } catch {}
-    if (th === 'light' || th === 'dark') document.documentElement.dataset.theme = th;
+    if (th !== 'light' && th !== 'dark') th = theme.defaultScheme === 'light' || theme.defaultScheme === 'dark' ? theme.defaultScheme : null;
+    if (th) document.documentElement.dataset.theme = th;
     this._syncThemeColor();
   }
   toggleTheme() {

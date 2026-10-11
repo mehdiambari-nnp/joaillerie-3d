@@ -1,6 +1,8 @@
-// Textes externalisés. FR par défaut, EN prévu (navigator.language).
+// Textes externalisés. FR par défaut, EN prévu (navigator.language). Le thème client peut surcharger n'importe quelle clé (theme.texts).
+import theme from 'virtual:theme';
+const BRAND = theme.brand.name;
 const fr = {
-  app: 'Domuse',
+  app: BRAND,
   open: 'Ouvrir un fichier',
   modeAtelier: 'Atelier', modeVitrine: 'Joaillier', modeClient: 'Client',
   customColor: 'Teinte libre', hue: 'Teinte', intensity: 'Intensité', lightness: 'Clarté', hexLabel: 'Code couleur',
@@ -53,7 +55,7 @@ const fr = {
   errorFormat: 'Format non reconnu. Formats acceptés : FBX, GLB/GLTF, OBJ.',
   errorGeneric: 'Impossible de lire ce fichier.',
   webgl: 'Votre navigateur ne supporte pas WebGL2.',
-  onboardTitle: 'Bienvenue chez Domuse', onboardBody: 'Faites tourner la bague avec un doigt, pincez pour zoomer, touchez une partie pour changer son matériau.',
+  onboardTitle: `Bienvenue chez ${BRAND}`, onboardBody: 'Faites tourner la bague avec un doigt, pincez pour zoomer, touchez une partie pour changer son matériau.',
   gotIt: 'Compris',
   pieces: 'pièces', triangles: 'triangles',
 };
@@ -85,6 +87,6 @@ const en = {
   onboardTitle: 'Welcome', onboardBody: 'Drag to rotate, pinch to zoom, tap a part to change its material.', gotIt: 'Got it',
 };
 const lang = (typeof navigator !== 'undefined' && navigator.language || 'fr').toLowerCase().startsWith('en') ? 'en' : 'fr';
-const dict = lang === 'en' ? en : fr;
+const dict = { ...(lang === 'en' ? en : fr), ...(theme.texts?.[lang] || {}) };
 export const t = (k) => dict[k] ?? fr[k] ?? k;
 export const LANG = lang;
