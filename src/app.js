@@ -137,7 +137,15 @@ export class Configurator extends Emitter {
   _onPick(id, { shift }) {
     if (!this.interactive) return;
     if (!id) { if (!shift && !this.multi) this.clearSelection(); return; }
-    const target = this.granularity === 'zone' ? (this.zoneOfPiece(id)?.pieceIds ?? [id]) : [id];
+    const zone = this.granularity === 'zone' ? this.zoneOfPiece(id) : null;
+    // 1er clic : toute la partie ; clic suivant dans une partie déjà (en partie) sélectionnée : on bascule la pièce visée
+    if (zone && zone.pieceIds.length > 1 && zone.pieceIds.some((x) => this.selection.has(x))) {
+      this.selection.has(id) ? this.selection.delete(id) : this.selection.add(id);
+      this._refreshHighlight();
+      this.emit('selection');
+      return;
+    }
+    const target = zone ? zone.pieceIds : [id];
     const multi = shift || this.multi;
     if (multi) {
       const allIn = target.every((t) => this.selection.has(t));
