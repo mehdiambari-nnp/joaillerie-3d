@@ -1,6 +1,6 @@
 // Textes externalisés. FR par défaut, EN prévu (navigator.language).
 const fr = {
-  app: 'Joaillerie 3D',
+  app: 'Domuse',
   open: 'Ouvrir un fichier',
   modeAtelier: 'Atelier', modeVitrine: 'Joaillier', modeClient: 'Client',
   customColor: 'Teinte libre', hue: 'Teinte', intensity: 'Intensité', lightness: 'Clarté', hexLabel: 'Code couleur',
@@ -49,7 +49,7 @@ const fr = {
   errorFormat: 'Format non reconnu. Formats acceptés : FBX, GLB/GLTF, OBJ.',
   errorGeneric: 'Impossible de lire ce fichier.',
   webgl: 'Votre navigateur ne supporte pas WebGL2.',
-  onboardTitle: 'Bienvenue', onboardBody: 'Faites tourner la bague avec un doigt, pincez pour zoomer, touchez une partie pour changer son matériau.',
+  onboardTitle: 'Bienvenue chez Domuse', onboardBody: 'Faites tourner la bague avec un doigt, pincez pour zoomer, touchez une partie pour changer son matériau.',
   gotIt: 'Compris',
   pieces: 'pièces', triangles: 'triangles',
 };

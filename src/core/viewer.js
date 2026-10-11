@@ -58,7 +58,8 @@ export class Viewer {
     this._ro = new ResizeObserver(() => this.resize());
     this._ro.observe(container);
     this.resize();
-    this.setEnvironment('studio');
+    // reflets de base : studio immédiat, puis HDRI « ville, plein soleil » dès qu'il est chargé
+    this.setEnvironment('studio').then(() => this.setEnvironment('overpass')).catch(() => {});
     matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener?.('change', () => this.bgMode === 'light' && this._applyBackground());
     this._loop = this._loop.bind(this);
     requestAnimationFrame(this._loop);
@@ -135,8 +136,8 @@ export class Viewer {
 
   _stageTexture(dark) {
     const css = getComputedStyle(document.documentElement);
-    const a = dark ? '#34312c' : (css.getPropertyValue('--stage-a').trim() || '#f7f4ee');
-    const b = dark ? '#0c0b0a' : (css.getPropertyValue('--stage-b').trim() || '#ddd5c6');
+    const a = dark ? '#2b2d34' : (css.getPropertyValue('--stage-a').trim() || '#e7e4e5');
+    const b = dark ? '#0b0c10' : (css.getPropertyValue('--stage-b').trim() || '#b4b0b5');
     const c = document.createElement('canvas');
     c.width = 512; c.height = 512;
     const g = c.getContext('2d');

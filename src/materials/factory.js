@@ -109,7 +109,7 @@ export function createMaterial(kind, a) {
   const m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 1, roughness: p.roughness, envMapIntensity: 1.2 });
   m.anisotropy = p.anisotropy;
   m.normalMap = metalNormal(p);
-  m.normalScale.set(p.brushed ? 0.1 : 0.6, p.brushed ? 0.1 : 0.6);
+  m.normalScale.set(p.brushed ? 0.04 : 0.6, p.brushed ? 0.04 : 0.6);
   return m;
 }
 
@@ -150,7 +150,7 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
     const p = metalParams(a);
     material.anisotropy = p.anisotropy;
     material.normalMap = metalNormal(p);
-    material.normalScale.set(p.brushed ? 0.1 : 0.6, p.brushed ? 0.1 : 0.6);
+    material.normalScale.set(p.brushed ? 0.04 : 0.6, p.brushed ? 0.04 : 0.6);
     material.needsUpdate = true;
     toColor = p.color; toRough = p.roughness;
   }

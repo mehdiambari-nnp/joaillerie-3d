@@ -1,21 +1,21 @@
 /* Joaillerie 3D — thème « joaillerie » : crème chaud / encre / champagne. Mobile d'abord (iPhone). */
 :root {
-  --bg: #f3efe8; --surface: #fbf9f5; --surface-2: #ece7de; --ink: #1d1b18; --muted: #7a7469;
-  --line: #ddd6c9; --accent: #a6823a; --accent-ink: #fff; --focus: #2f6bff; --danger: #b3261e;
-  --stage-a: #f7f4ee; --stage-b: #ddd5c6; --shadow: 0 6px 24px rgba(40, 30, 10, .12);
+  --bg: #e9e6e4; --surface: #f5f3f1; --surface-2: #e3dfdd; --ink: #17161a; --muted: #7b7680;
+  --line: #d4cfcc; --accent: #a98650; --accent-ink: #fff; --focus: #5b6cf0; --danger: #b3261e;
+  --stage-a: #e7e4e5; --stage-b: #b4b0b5; --shadow: 0 10px 34px rgba(30, 24, 36, .14);
   --radius: 14px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
-  --serif: ui-serif, 'New York', Georgia, 'Times New Roman', serif;
-  --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto, sans-serif;
+  --serif: 'Cormorant Garamond', ui-serif, 'New York', Georgia, 'Times New Roman', serif;
+  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, Roboto, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #151412; --surface: #1d1b18; --surface-2: #272420; --ink: #f1ece2; --muted: #9a9385; --line: #34302a;
-    --accent: #cfa855; --accent-ink: #1a1408; --stage-a: #26231f; --stage-b: #11100e; --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+    --bg: #0b0c10; --surface: #13151a; --surface-2: #1c1f26; --ink: #ece8e2; --muted: #8e8b96; --line: #262932;
+    --accent: #c9a56a; --accent-ink: #14110a; --stage-a: #2b2d34; --stage-b: #0b0c10; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
   }
 }
 :root[data-theme='dark'] {
-  --bg: #151412; --surface: #1d1b18; --surface-2: #272420; --ink: #f1ece2; --muted: #9a9385; --line: #34302a;
-  --accent: #cfa855; --accent-ink: #1a1408; --stage-a: #26231f; --stage-b: #11100e; --shadow: 0 6px 24px rgba(0, 0, 0, .5);
+  --bg: #0b0c10; --surface: #13151a; --surface-2: #1c1f26; --ink: #ece8e2; --muted: #8e8b96; --line: #262932;
+  --accent: #c9a56a; --accent-ink: #14110a; --stage-a: #2b2d34; --stage-b: #0b0c10; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.4 var(--sans); overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
@@ -212,4 +212,71 @@ html, body { overflow-x: hidden; }
   .brand { font-size: 16px; } .brand .mark { font-size: 17px; }
   .seg button { padding: 6px 9px; font-size: 12.5px; }
   .topbar .icon-btn { width: 34px; height: 34px; font-size: 15px; }
+}
+
+/* ================= Domuse : passe « chic » (pierre, lilas gris, or sourd, serif éditorial) ================= */
+.topbar { background: color-mix(in srgb, var(--surface) 82%, transparent); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+.brand { gap: 9px; align-items: baseline; }
+.brand .mark { color: var(--accent); align-self: center; }
+.brand .name { font: 500 25px/1 var(--serif); letter-spacing: .22em; text-transform: uppercase; padding-left: .1em; }
+.brand .sub { font: 400 10.5px/1 var(--sans); letter-spacing: .32em; text-transform: uppercase; color: var(--muted); align-self: center; margin-top: 3px; }
+.seg { background: transparent; border: 1px solid var(--line); padding: 2px; }
+.seg button { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; padding: 7px 13px; transition: background .2s, color .2s; }
+.seg button[aria-pressed='true'] { background: var(--ink); color: var(--bg); }
+.btn { background: transparent; border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent); letter-spacing: .04em; font-size: 13px; transition: background .2s, border-color .2s, color .2s; }
+.btn:hover { border-color: var(--ink); }
+.btn.primary { background: var(--ink); border-color: var(--ink); color: var(--bg); font-weight: 500; letter-spacing: .1em; text-transform: uppercase; font-size: 12px; }
+.btn.primary:hover { background: color-mix(in srgb, var(--ink) 88%, var(--accent)); }
+.btn.small { font-size: 12px; }
+.icon-btn { background: color-mix(in srgb, var(--surface) 78%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border-color: color-mix(in srgb, var(--ink) 14%, transparent); color: var(--ink); transition: background .2s, border-color .2s; }
+.icon-btn:hover { border-color: var(--ink); }
+.icon-btn svg { display: block; }
+.topbar .icon-btn { background: transparent; border-color: transparent; }
+.topbar .icon-btn:hover { border-color: var(--line); }
+.hud-chip { font-size: 11.5px; letter-spacing: .06em; background: color-mix(in srgb, var(--surface) 70%, transparent); border-color: transparent; }
+.viewport { background: radial-gradient(120% 90% at 50% 32%, var(--stage-a), var(--stage-b)); }
+.viewport.bg-dark { background: radial-gradient(120% 90% at 50% 35%, #2b2d34, #0b0c10); }
+.panel { background: var(--surface); border-top: 1px solid var(--line); }
+.p-section { border-bottom: 1px solid var(--line); padding: 12px 0; }
+.p-head h3 { font: 500 10.5px var(--sans); letter-spacing: .24em; color: var(--muted); }
+.tabs { background: transparent; border: 1px solid var(--line); }
+.tabs button { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; }
+.tabs button[aria-selected='true'] { background: var(--ink); color: var(--bg); box-shadow: none; }
+.zchip { background: transparent; border-color: var(--line); font-size: 13px; letter-spacing: .02em; transition: border-color .2s, background .2s; }
+.zchip i { border: 0; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .16), 0 1px 3px rgba(0, 0, 0, .18); }
+.zchip[aria-pressed='true'] { border-color: var(--ink); box-shadow: none; background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.ball .b { border-width: 0; box-shadow: 0 3px 10px rgba(30, 24, 36, .22), inset 0 0 0 1px rgba(0, 0, 0, .06); }
+.ball span.n { font-size: 10px; letter-spacing: .06em; }
+.ball[aria-pressed='true'] .b { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ink); }
+.dot[aria-pressed='true'] span { box-shadow: 0 0 0 2px var(--surface), 0 0 0 3.5px var(--ink); }
+.palette-title { font-size: 11px; letter-spacing: .04em; }
+.palette-title:empty { display: none; }
+.custom { background: transparent; }
+.custom label { letter-spacing: .16em; font-size: 10.5px; }
+dialog { border-radius: 20px; }
+.dlg-h h2 { font: 500 28px var(--serif); letter-spacing: .02em; }
+.toast { background: var(--ink); color: var(--bg); letter-spacing: .02em; }
+.tryon-intro h2 { font: 500 30px var(--serif); }
+.drop { font-family: var(--serif); font-weight: 500; }
+.hint { font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; background: color-mix(in srgb, var(--surface) 70%, transparent); border-color: transparent; }
+.actions { gap: 8px; }
+.pop { border-radius: 16px; background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+.pop h4 { letter-spacing: .2em; font-size: 10.5px; }
+.present-exit { font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; }
+
+/* Client : élégance minimale */
+.app[data-mode='client'] .topbar { justify-content: center; border-bottom: 0; background: transparent; padding-top: calc(16px + var(--safe-t)); padding-bottom: 6px; position: absolute; left: 0; right: 0; z-index: 4; pointer-events: none; }
+.app[data-mode='client'] .topbar > * { pointer-events: auto; }
+.app[data-mode='client'] .brand .name { font-size: 30px; }
+.app[data-mode='client'] { grid-template-rows: minmax(0, 1fr); }
+.app[data-mode='client'] .client-exit { position: absolute; right: 12px; top: calc(14px + var(--safe-t)); }
+.app[data-mode='client'] .panel { background: transparent; border-top: 0; padding-bottom: calc(18px + var(--safe-b)); }
+.app[data-mode='client'] .hud-right { top: auto; bottom: 14px; right: 12px; flex-direction: row; }
+.app[data-mode='client'] .hud-right .icon-btn { background: transparent; border-color: color-mix(in srgb, var(--ink) 20%, transparent); }
+.app[data-mode='client'] .main { grid-template-rows: minmax(0, 1fr) auto; }
+.app[data-mode='client'] .viewport { margin-top: 0; }
+@media (max-width: 520px) {
+  .brand .name { font-size: 21px; letter-spacing: .18em; }
+  .brand .sub { display: none; }
+  .seg button { padding: 6px 8px; font-size: 10.5px; letter-spacing: .08em; }
 }

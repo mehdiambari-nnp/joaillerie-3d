@@ -39,6 +39,8 @@ await page.evaluate(() => { __rc.app.viewer.setAutoRotate(false); __rc.app.viewe
 await page.waitForTimeout(900);
 const box = await page.locator('canvas').first().boundingBox();
 // point écran d'un sommet réel de la pièce du corps le plus proche de la caméra (déterministe)
+await page.evaluate(() => { __rc.app.viewer.setAutoRotate(false); });
+await page.waitForTimeout(300);
 const target = await page.evaluate(() => {
   const T = __rc.THREE, v = __rc.app.viewer, cam = v.camera;
   const p = __rc.app.pieces.find((x) => x.role === 'body') || __rc.app.pieces[0];

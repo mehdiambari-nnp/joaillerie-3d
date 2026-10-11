@@ -12,7 +12,20 @@ import { frenchRingSize } from '../import/zones.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
 
-const BG = { light: '#efeae1', dark: '#17161a', transparent: null };
+const BG = { light: '#d3d0d2', dark: '#16171c', transparent: null };
+
+// Icônes au trait (cohérentes, sans emoji)
+const ic = (d) => `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const ICON = {
+  views: ic('<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/>'),
+  light: ic('<circle cx="12" cy="12" r="3.8"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>'),
+  rotate: ic('<path d="M20 12a8 8 0 1 1-2.7-6"/><path d="M20 4.5V9h-4.5"/>'),
+  full: ic('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
+  undo: ic('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/>'),
+  redo: ic('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 12h3"/>'),
+  open: ic('<path d="M12 16V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 20h14"/>'),
+};
+const MARK = `<svg class="mark" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 4h11L22 9.5 12 21 2 9.5z"/><path d="M2 9.5h20M9 4 7.5 9.5 12 21l4.5-11.5L15 4"/></svg>`;
 
 export class UI {
   constructor(root, app, services) {
@@ -37,29 +50,29 @@ export class UI {
     this.root.innerHTML = `
     <div class="app" data-mode="${this.mode}">
       <header class="topbar">
-        <div class="brand"><span class="mark">◇</span><span>${t('app')}</span></div>
+        <div class="brand">${MARK}<span class="name">${t('app')}</span><span class="sub">Joaillerie</span></div>
         <div class="spacer"></div>
         <div class="seg" role="group" aria-label="Mode">
           <button data-mode="client">${t('modeClient')}</button>
           <button data-mode="vitrine">${t('modeVitrine')}</button>
           <button data-mode="atelier">${t('modeAtelier')}</button>
         </div>
-        <button class="btn small client-exit" data-a="exit-client">✕ ${t('exitPreview')}</button>
-        <button class="icon-btn" data-a="undo" aria-label="${t('undo')}" title="${t('undo')}">↶</button>
-        <button class="icon-btn" data-a="redo" aria-label="${t('redo')}" title="${t('redo')}">↷</button>
-        <button class="icon-btn" data-a="open" aria-label="${t('open')}" title="${t('open')}">⤒</button>
+        <button class="btn small client-exit" data-a="exit-client">${t('exitPreview')}</button>
+        <button class="icon-btn" data-a="undo" aria-label="${t('undo')}" title="${t('undo')}">${ICON.undo}</button>
+        <button class="icon-btn" data-a="redo" aria-label="${t('redo')}" title="${t('redo')}">${ICON.redo}</button>
+        <button class="icon-btn" data-a="open" aria-label="${t('open')}" title="${t('open')}">${ICON.open}</button>
       </header>
       <main class="main">
         <section class="viewport" id="viewport">
           <div class="viewer-mount"></div>
           <div class="hud-chip" data-r="info"></div>
           <div class="hud-right">
-            <button class="icon-btn" data-pop-btn="views" aria-label="${t('views')}" title="${t('views')}">◫</button>
-            <button class="icon-btn" data-pop-btn="env" aria-label="${t('environment')}" title="${t('environment')}">☀</button>
-            <button class="icon-btn" data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">⟳</button>
-            <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}">⛶</button>
+            <button class="icon-btn" data-pop-btn="views" aria-label="${t('views')}" title="${t('views')}">${ICON.views}</button>
+            <button class="icon-btn" data-pop-btn="env" aria-label="${t('environment')}" title="${t('environment')}">${ICON.light}</button>
+            <button class="icon-btn" data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">${ICON.rotate}</button>
+            <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}">${ICON.full}</button>
           </div>
-          <button class="btn present-exit" data-a="present-exit" aria-label="${t('exitPresent')}">✕ ${t('exitPresent')}</button>
+          <button class="btn present-exit" data-a="present-exit" aria-label="${t('exitPresent')}">${t('exitPresent')}</button>
           <div class="pop" data-pop="views" hidden></div>
           <div class="pop" data-pop="env" hidden></div>
           <div class="hint" data-r="hint">${t('tapHint')}</div>
@@ -92,12 +105,12 @@ export class UI {
           </div>
           <div class="p-section atelier-only" data-r="atelier"></div>
           <nav class="actions" aria-label="Actions">
-            <button class="btn" data-a="variants">❖ ${t('variants')}</button>
-            <button class="btn" data-a="share">↗ ${t('share')}</button>
-            <button class="btn" data-a="photo">◎ ${t('photo')}</button>
-            <button class="btn" data-a="recap">☰ ${t('recap')}</button>
-            <button class="btn" data-a="ar">◈ ${t('ar')}</button>
-            <button class="btn primary" data-a="tryon">☝ ${t('tryon')}</button>
+            <button class="btn" data-a="variants">${t('variants')}</button>
+            <button class="btn" data-a="share">${t('share')}</button>
+            <button class="btn" data-a="photo">${t('photo')}</button>
+            <button class="btn" data-a="recap">${t('recap')}</button>
+            <button class="btn" data-a="ar">${t('ar')}</button>
+            <button class="btn primary" data-a="tryon">${t('tryon')}</button>
           </nav>
         </aside>
       </main>

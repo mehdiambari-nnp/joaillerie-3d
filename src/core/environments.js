@@ -9,9 +9,9 @@ export const ENVIRONMENTS = [
   { id: 'studio', name: 'Atelier', group: 'studio' },
   { id: 'softbox', name: 'Softbox', group: 'studio' },
   { id: 'daylight', name: 'Jour', group: 'studio' },
+  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr' },
   { id: 'venice', name: 'Coucher de soleil', group: 'hdri', url: 'hdr/venice-sunset.hdr' },
   { id: 'quarry', name: 'Ciel couvert', group: 'hdri', url: 'hdr/quarry.hdr' },
-  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr' },
   { id: 'spruit', name: 'Aube', group: 'hdri', url: 'hdr/spruit-sunrise.hdr' },
 ];
 
