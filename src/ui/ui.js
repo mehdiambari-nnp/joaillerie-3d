@@ -60,6 +60,7 @@ export class UI {
       <header class="topbar">
         <div class="brand">${MARK}<span class="name">${t('app')}</span><span class="sub">Joaillerie</span></div>
         <div class="spacer"></div>
+        <button class="icon-btn theme-btn" data-a="theme" aria-label="${t('theme')}" title="${t('theme')}"><span class="i-sun">${ICON.sun}</span><span class="i-moon">${ICON.moon}</span></button>
         <div class="seg" role="group" aria-label="Mode">
           <button data-mode="client">${t('modeClient')}</button>
           <button data-mode="vitrine">${t('modeVitrine')}</button>
@@ -75,7 +76,6 @@ export class UI {
             <button class="icon-btn" data-pop-btn="env" aria-label="${t('environment')}" title="${t('environment')}">${ICON.light}</button>
             <button class="icon-btn" data-a="explode" aria-pressed="false" aria-label="${t('explode')}" title="${t('explode')}">${ICON.explode}</button>
             <button class="icon-btn" data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">${ICON.rotate}</button>
-            <button class="icon-btn" data-a="theme" aria-label="${t('theme')}" title="${t('theme')}"><span class="i-sun">${ICON.sun}</span><span class="i-moon">${ICON.moon}</span></button>
             <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}">${ICON.full}</button>
           </div>
           <div class="dock">
@@ -197,16 +197,30 @@ export class UI {
     const chosen = zones.filter(isOn);
     const summary = !chosen.length ? t('partsPick') : chosen.length === 1 ? chosen[0].name : chosen.length === zones.length ? t('partsAll') : chosen.length <= 2 ? chosen.map((z) => z.name).join(', ') : `${chosen.length} ${t('partsCount')}`;
     const stack = chosen.slice(0, 3).map((z) => `<i style="--sw:${this.swatchOf(z)}"></i>`).join('') || '<i class="empty"></i>';
+    const subOpen = (this.subOpen ||= new Set());
     const rows = zones.map((z) => {
       const on = isOn(z), hid = z.pieceIds.every((id) => app.hidden.has(id));
       const can = ex?.has(z.id), exp = ex?.isExploded(z.id);
+      const multi = z.pieceIds.length > 1, open = multi && subOpen.has(z.id);
+      const word = z.type === 'gem' ? t('stoneN') : t('pieceN');
+      const subs = open ? z.pieceIds.map((id, i) => {
+        const pon = sel.has(id), phid = app.hidden.has(id);
+        return `<li class="prow sub ${phid ? 'is-hidden' : ''}">
+          <button class="pmain" role="option" data-piece="${esc(id)}" aria-selected="${pon}">
+            <i class="psw" style="--sw:${swatchOf(z.type === 'gem' ? 'gem' : 'metal', app.assign[id])}"></i><span class="pn">${word} ${i + 1}</span><span class="pcheck" aria-hidden="true"></span>
+          </button>
+          <button class="pexp peye" data-eyep="${esc(id)}" aria-pressed="${phid}" aria-label="${phid ? t('show') : t('hide')}" title="${phid ? t('show') : t('hide')}">${phid ? ICON.eyeOff : ICON.eye}</button>
+          <span class="pexp-gap"></span>
+        </li>`;
+      }).join('') : '';
       return `<li class="prow ${hid ? 'is-hidden' : ''}">
+        ${multi ? `<button class="pexp pfold" data-fold="${esc(z.id)}" aria-expanded="${open}" aria-label="${t('eachOne')}" title="${t('eachOne')}">${CHEV}</button>` : '<span class="pexp-gap pfold-gap"></span>'}
         <button class="pmain" role="option" data-zone="${esc(z.id)}" aria-selected="${on}">
-          <i class="psw" style="--sw:${this.swatchOf(z)}"></i><span class="pn">${esc(z.name)}</span><span class="pcheck" aria-hidden="true"></span>
+          <i class="psw" style="--sw:${this.swatchOf(z)}"></i><span class="pn">${esc(z.name)}${multi ? ` <small>${z.pieceIds.length}</small>` : ''}</span><span class="pcheck" aria-hidden="true"></span>
         </button>
         <button class="pexp peye" data-eye="${esc(z.id)}" aria-pressed="${hid}" aria-label="${hid ? t('show') : t('hide')}" title="${hid ? t('show') : t('hide')}">${hid ? ICON.eyeOff : ICON.eye}</button>
         ${can ? `<button class="pexp" data-explode="${esc(z.id)}" aria-pressed="${!!exp}" aria-label="${exp ? t('assemblePart') : t('explodePart')}" title="${exp ? t('assemblePart') : t('explodePart')}">${ICON.explode}</button>` : '<span class="pexp-gap"></span>'}
-      </li>`;
+      </li>${subs}`;
     }).join('');
     host.innerHTML = `<section class="acc ${this.acc.zones ? 'open' : ''}" data-accsec="zones">
       <button class="acc-h" data-acc="zones" aria-expanded="${this.acc.zones}">
@@ -372,6 +386,18 @@ export class UI {
   onClick(e) {
     const app = this.app;
     const tgt = e.target;
+    const fold = tgt.closest('[data-fold]');
+    if (fold) { const k = fold.dataset.fold; this.subOpen ||= new Set(); this.subOpen.has(k) ? this.subOpen.delete(k) : this.subOpen.add(k); this.acc = { zones: true, mat: false, custom: false }; this.renderZones(); return; }
+    const eyep = tgt.closest('[data-eyep]');
+    if (eyep) { app.setHidden([eyep.dataset.eyep], !app.hidden.has(eyep.dataset.eyep)); return; }
+    const pc = tgt.closest('[data-piece]');
+    if (pc) {
+      const id = pc.dataset.piece;
+      this._listTap = true; this.acc = { zones: true, mat: false, custom: false };
+      app.selection.has(id) ? app.select([...app.selection].filter((x) => x !== id)) : app.select([id], true);
+      this._listTap = false; app.viewer.invalidate();
+      return;
+    }
     const eye = tgt.closest('[data-eye]');
     if (eye) { const z = app.zones.find((zz) => zz.id === eye.dataset.eye); if (z) app.setHidden(z.pieceIds, !z.pieceIds.every((id) => app.hidden.has(id))); return; }
     const ex1 = tgt.closest('[data-explode]');

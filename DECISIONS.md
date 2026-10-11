@@ -42,3 +42,4 @@
 - **Mode Atelier retiré** (modes restants : Client / Joaillier). **Plein écran** masqué en mode client. **Thème clair/sombre** : palette ivoire-champagne-bronze (clair) et noir chaud-or (sombre), bouton lune/soleil dans la colonne d'outils, choix mémorisé, sinon réglage du système.
 - Éclatement : les animations en cours ne sont plus annulées quand on masque/affiche une partie (cause probable du bug « reste éclaté » si on enchaîne vite).
 - Bandeau d'aide et infos taille/diamètre retirés de la vue 3D (restent dans les exports).
+- **Sélection pièce par pièce** : chaque partie à plusieurs pièces se déplie (chevron) en sous-lignes Pierre 1, 2… avec coche et œil. Bouton clair/sombre déplacé dans la barre du haut, à gauche du sélecteur Client / Joaillier.

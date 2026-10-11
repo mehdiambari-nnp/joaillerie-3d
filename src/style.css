@@ -403,7 +403,6 @@ dialog { border-radius: 20px; }
 
 /* Thème : bouton soleil / lune ; plein écran masqué en mode client */
 .app[data-mode='client'] [data-a=present] { display: none !important; }
-.app[data-mode='client'] .hud-right [data-a=theme] { display: inline-grid !important; }
 /* l'icône montre le mode vers lequel on bascule : lune en clair, soleil en sombre */
 [data-a=theme] .i-sun { display: none; }
 :root[data-theme='dark'] [data-a=theme] .i-sun { display: inline; }
@@ -413,3 +412,16 @@ dialog { border-radius: 20px; }
 .app:has(.acc.open) .hint { display: none; }
 /* Vue 3D épurée : ni bandeau d'aide ni taille/diamètre (conservés dans les exports) */
 .hint, .hud-chip { display: none !important; }
+
+/* Sélection pièce par pièce (sous-lignes repliables) */
+.pfold, .pfold-gap { width: 30px; }
+.pfold svg { width: 15px; height: 15px; transition: transform .3s; transform: rotate(-90deg); }
+.pfold[aria-expanded='true'] svg { transform: rotate(0deg); }
+.pn small { font: 500 12px var(--sans); color: var(--muted); margin-left: 4px; letter-spacing: .04em; }
+.prow.sub { border-top: 0; padding-left: 30px; background: color-mix(in srgb, var(--surface-2) 45%, transparent); }
+.prow.sub .pn { font-size: 16.5px; }
+.prow.sub .psw { width: 18px; height: 18px; }
+
+.theme-btn { width: 36px; height: 36px; flex: none; }
+.app[data-mode='client'] .theme-btn { position: absolute; right: 12px; top: calc(14px + var(--safe-t)); display: inline-flex !important; z-index: 5; }
+.app[data-mode='client']:not([data-locked='1']) .theme-btn { right: 190px; }
