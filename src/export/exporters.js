@@ -12,16 +12,22 @@ export async function withoutHighlight(app, fn) {
   try { return await fn(); } finally { app.selection = sel; app.hover = hov; app._refreshHighlight(); }
 }
 
+/** Range la vue éclatée le temps d'un export (le fichier exporté contient toujours la bague assemblée). */
+async function assembled(app, fn) {
+  const resume = app.exploder?.suspend?.();
+  try { return await fn(); } finally { resume?.(); }
+}
+
 /** Projet complet : un seul .glb contenant le modèle normalisé ET la configuration (scene.extras). */
 export async function exportProjectGLB(app) {
-  return withoutHighlight(app, async () => {
+  return assembled(app, () => withoutHighlight(app, async () => {
     const scene = new THREE.Scene();
     scene.name = 'ring-project';
     scene.userData.ringConfig = app.config();
     scene.add(app.viewer.root.clone(true));
     const buf = await new GLTFExporter().parseAsync(scene, { binary: true, onlyVisible: false });
     return new Blob([buf], { type: 'model/gltf-binary' });
-  });
+  }));
 }
 
 /**
@@ -57,22 +63,22 @@ export function buildARScene(app, scaleMode = 'real') {
 }
 
 export async function exportARGLB(app, scaleMode) {
-  return withoutHighlight(app, async () => {
+  return assembled(app, () => withoutHighlight(app, async () => {
     const scene = buildARScene(app, scaleMode);
     const buf = await new GLTFExporter().parseAsync(scene, { binary: true, onlyVisible: true });
     return new Blob([buf], { type: 'model/gltf-binary' });
-  });
+  }));
 }
 
 export async function exportARUSDZ(app, scaleMode) {
-  return withoutHighlight(app, async () => {
+  return assembled(app, () => withoutHighlight(app, async () => {
     const scene = buildARScene(app, scaleMode);
     const buf = await new USDZExporter().parseAsync(scene, {
       ar: { anchoring: { type: 'plane' }, planeAnchoring: { alignment: 'horizontal' } },
       includeAnchoringProperties: true, quickLookCompatible: true, maxTextureSize: 1024,
     });
     return new Blob([buf], { type: 'model/vnd.usdz+zip' });
-  });
+  }));
 }
 
 export function download(blob, filename) {

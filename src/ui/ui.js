@@ -23,8 +23,11 @@ const ICON = {
   full: ic('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
   undo: ic('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/>'),
   redo: ic('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 12h3"/>'),
+  explode: ic('<rect x="9" y="9" width="6" height="6" rx="1"/><path d="M12 3v3M10.5 4.5 12 3l1.5 1.5M12 21v-3M10.5 19.5 12 21l1.5-1.5M3 12h3M4.5 10.5 3 12l1.5 1.5M21 12h-3M19.5 10.5 21 12l-1.5 1.5"/>'),
   open: ic('<path d="M12 16V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 20h14"/>'),
 };
+const CHEV = ic('<path d="m6 9 6 6 6-6"/>').replace('class=""','').replace('<svg ','<svg class="chev" ');
+const MORE = ic('<circle cx="5" cy="12" r="1.1"/><circle cx="12" cy="12" r="1.1"/><circle cx="19" cy="12" r="1.1"/>');
 const MARK = `<svg class="mark" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 4h11L22 9.5 12 21 2 9.5z"/><path d="M2 9.5h20M9 4 7.5 9.5 12 21l4.5-11.5L15 4"/></svg>`;
 
 export class UI {
@@ -37,6 +40,7 @@ export class UI {
     this.locked = false; // lien client : l'interface ne peut pas quitter le mode client
     this.customHex = { metal: '#d8b45a', gem: '#4a7de0' };
     this.tab = 'metals';
+    this.acc = { zones: false, mat: true, custom: false }; // accordéons de la feuille matière
     this.thumbs = { metals: {}, finishes: {}, gems: {} };
     this.bg = 'light';
     this.build();
@@ -58,9 +62,6 @@ export class UI {
           <button data-mode="atelier">${t('modeAtelier')}</button>
         </div>
         <button class="btn small client-exit" data-a="exit-client">${t('exitPreview')}</button>
-        <button class="icon-btn" data-a="undo" aria-label="${t('undo')}" title="${t('undo')}">${ICON.undo}</button>
-        <button class="icon-btn" data-a="redo" aria-label="${t('redo')}" title="${t('redo')}">${ICON.redo}</button>
-        <button class="icon-btn" data-a="open" aria-label="${t('open')}" title="${t('open')}">${ICON.open}</button>
       </header>
       <main class="main">
         <section class="viewport" id="viewport">
@@ -69,8 +70,14 @@ export class UI {
           <div class="hud-right">
             <button class="icon-btn" data-pop-btn="views" aria-label="${t('views')}" title="${t('views')}">${ICON.views}</button>
             <button class="icon-btn" data-pop-btn="env" aria-label="${t('environment')}" title="${t('environment')}">${ICON.light}</button>
+            <button class="icon-btn" data-a="explode" aria-pressed="false" aria-label="${t('explode')}" title="${t('explode')}">${ICON.explode}</button>
             <button class="icon-btn" data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">${ICON.rotate}</button>
             <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}">${ICON.full}</button>
+          </div>
+          <div class="dock">
+            <button class="icon-btn" data-a="undo" aria-label="${t('undo')}" title="${t('undo')}">${ICON.undo}</button>
+            <button class="icon-btn" data-a="redo" aria-label="${t('redo')}" title="${t('redo')}">${ICON.redo}</button>
+            <button class="icon-btn" data-a="open" aria-label="${t('open')}" title="${t('open')}">${ICON.open}</button>
           </div>
           <button class="btn present-exit" data-a="present-exit" aria-label="${t('exitPresent')}">${t('exitPresent')}</button>
           <div class="pop" data-pop="views" hidden></div>
@@ -80,37 +87,14 @@ export class UI {
           <div class="progress" hidden><div class="bar"><i></i></div><span></span></div>
         </section>
         <aside class="panel">
-          <div class="p-section zones">
-            <div class="p-head"><h3>${t('zones')}</h3>
-              <div class="tools" style="margin:0">
-                <button class="btn small" data-a="multi" aria-pressed="false">${t('multi')}</button>
-                <button class="btn small" data-a="fine" aria-pressed="false">${t('fine')}</button>
-              </div></div>
-            <div class="zone-chips" data-r="zones"></div>
-            <div class="tools" data-r="seltools"></div>
-          </div>
-          <div class="p-section mats">
-            <div class="p-head"><h3>${t('materials')}</h3>
-              <div class="tabs" role="tablist">
-                <button role="tab" data-tab="metals">${t('metals')}</button>
-                <button role="tab" data-tab="gems">${t('gems')}</button>
-              </div></div>
-            <p class="palette-title" data-r="ptitle"></p>
-            <div class="palette" data-r="palette" role="listbox"></div>
-            <div class="custom" data-r="custom" hidden></div>
-            <div data-r="finishes-wrap">
-              <p class="palette-title">${t('finishes')}</p>
-              <div class="palette" data-r="finishes"></div>
-            </div>
-          </div>
+          <div class="parts" data-r="parts"></div>
+          <div class="mats" data-r="mats"></div>
           <div class="p-section atelier-only" data-r="atelier"></div>
           <nav class="actions" aria-label="Actions">
-            <button class="btn" data-a="variants">${t('variants')}</button>
-            <button class="btn" data-a="share">${t('share')}</button>
-            <button class="btn" data-a="photo">${t('photo')}</button>
-            <button class="btn" data-a="recap">${t('recap')}</button>
-            <button class="btn" data-a="ar">${t('ar')}</button>
             <button class="btn primary" data-a="tryon">${t('tryon')}</button>
+            <button class="btn" data-a="ar">${t('ar')}</button>
+            <button class="btn" data-a="photo">${t('photo')}</button>
+            <button class="btn more-btn" data-a="more" aria-label="${t('more')}" title="${t('more')}">${MORE}</button>
           </nav>
         </aside>
       </main>
@@ -137,6 +121,8 @@ export class UI {
     window.addEventListener('dragleave', (e) => { if (!e.relatedTarget) $('.drop', this.root).hidden = true; });
     window.addEventListener('drop', (e) => { e.preventDefault(); $('.drop', this.root).hidden = true; const f = e.dataTransfer?.files?.[0]; if (f) this.svc.openFile(f); });
     window.addEventListener('keydown', (e) => this.onKey(e));
+    app.on('selection', () => { if (!this._listTap) this.acc = { zones: false, mat: true, custom: false }; });
+    app.on('explode', () => this.renderZones());
     for (const ev of ['model', 'zones', 'selection', 'config', 'history', 'variants']) app.on(ev, () => this.renderAll());
     app.on('hover', (piece, e) => this.showTooltip(piece, e));
     document.addEventListener('pointerdown', (e) => {
@@ -176,8 +162,9 @@ export class UI {
     const h = this.app.history;
     $('[data-a=undo]', this.root).disabled = !h.canUndo;
     $('[data-a=redo]', this.root).disabled = !h.canRedo;
-    $('[data-a=multi]', this.root).setAttribute('aria-pressed', String(this.app.multi));
-    $('[data-a=fine]', this.root).setAttribute('aria-pressed', String(this.app.granularity === 'piece'));
+    const ex = this.app.exploder;
+    $('[data-a=explode]', this.root).setAttribute('aria-pressed', String(!!ex?.anyExploded));
+    $('[data-a=explode]', this.root).hidden = !ex?.explodable.length;
     $('[data-r=hint]', this.root).hidden = this.app.selection.size > 0 || !this.app.model;
   }
 
@@ -196,16 +183,40 @@ export class UI {
     return swatchOf(zone.type === 'gem' ? 'gem' : 'metal', this.app.assign[zone.pieceIds[0]]);
   }
 
+  /** Parties de la bague : liste à choix multiples (accordéon), avec éclatement partie par partie. */
   renderZones() {
-    const box = $('[data-r=zones]', this.root);
-    const sel = this.app.selection;
-    box.innerHTML = this.app.zones.map((z) => {
-      const on = z.pieceIds.length > 0 && z.pieceIds.every((id) => sel.has(id));
-      const hid = z.pieceIds.every((id) => this.app.hidden.has(id));
-      return `<button class="zchip ${hid ? 'is-hidden' : ''}" data-zone="${esc(z.id)}" aria-pressed="${on}"><i style="--sw:${this.swatchOf(z)}"></i>${esc(z.name)}</button>`;
+    const host = $('[data-r=parts]', this.root);
+    if (!host) return;
+    const app = this.app, sel = app.selection, ex = app.exploder;
+    const zones = app.zones;
+    const isOn = (z) => z.pieceIds.length > 0 && z.pieceIds.every((id) => sel.has(id));
+    const chosen = zones.filter(isOn);
+    const summary = !chosen.length ? t('partsPick') : chosen.length === 1 ? chosen[0].name : chosen.length === zones.length ? t('partsAll') : chosen.length <= 2 ? chosen.map((z) => z.name).join(', ') : `${chosen.length} ${t('partsCount')}`;
+    const stack = chosen.slice(0, 3).map((z) => `<i style="--sw:${this.swatchOf(z)}"></i>`).join('') || '<i class="empty"></i>';
+    const rows = zones.map((z) => {
+      const on = isOn(z), hid = z.pieceIds.every((id) => app.hidden.has(id));
+      const can = ex?.has(z.id), exp = ex?.isExploded(z.id);
+      return `<li class="prow ${hid ? 'is-hidden' : ''}">
+        <button class="pmain" role="option" data-zone="${esc(z.id)}" aria-selected="${on}">
+          <i class="psw" style="--sw:${this.swatchOf(z)}"></i><span class="pn">${esc(z.name)}</span><span class="pcheck" aria-hidden="true"></span>
+        </button>
+        ${can ? `<button class="pexp" data-explode="${esc(z.id)}" aria-pressed="${!!exp}" aria-label="${exp ? t('assemblePart') : t('explodePart')}" title="${exp ? t('assemblePart') : t('explodePart')}">${ICON.explode}</button>` : '<span class="pexp-gap"></span>'}
+      </li>`;
     }).join('');
-    const tools = $('[data-r=seltools]', this.root);
-    tools.innerHTML = sel.size ? `<button class="btn small" data-a="similar">${t('similar')}</button><button class="btn small" data-a="clearsel">✕</button>` : '';
+    host.innerHTML = `<section class="acc ${this.acc.zones ? 'open' : ''}" data-accsec="zones">
+      <button class="acc-h" data-acc="zones" aria-expanded="${this.acc.zones}">
+        <span class="sw-stack">${stack}</span>
+        <span class="t"><small>${t('zones')}</small><b>${esc(summary)}</b></span>${CHEV}
+      </button>
+      <div class="acc-b"><div class="acc-in">
+        <ul class="plist" role="listbox" aria-multiselectable="true" aria-label="${t('zones')}">${rows}</ul>
+        <div class="ptools">
+          <button class="link" data-a="selall">${t('selectAll')}</button>
+          <button class="link" data-a="clearsel" ${sel.size ? '' : 'disabled'}>${t('selectNone')}</button>
+          <button class="link" data-a="similar" ${sel.size ? '' : 'disabled'}>${t('similarShort')}</button>
+          <button class="link ${app.granularity === 'piece' ? 'on' : ''}" data-a="fine" aria-pressed="${app.granularity === 'piece'}">${t('fine')}</button>
+        </div>
+      </div></div></section>`;
   }
 
   allowedFor(kind) {
@@ -237,47 +248,50 @@ export class UI {
     return groups;
   }
 
+  /** Feuille « matière » : un accordéon (matière courante en en-tête) + un accordéon « teinte libre ». Rien sans sélection. */
   renderPalette() {
-    const app = this.app;
+    if (this._dragging) return; // ne pas reconstruire pendant un glissement de curseur
+    const app = this.app, host = $('[data-r=mats]', this.root);
     const kind = app.selectionKind();
-    if (kind === 'metal') this.tab = 'metals'; else if (kind === 'gem') this.tab = 'gems';
-    this.root.querySelectorAll('.tabs button').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === this.tab)));
-    const ids = [...app.selection];
-    const assigns = ids.map((i) => app.assign[i]).filter(Boolean);
+    this.el.dataset.sel = kind ? '1' : '0';
+    if (!kind) { host.innerHTML = ''; return; }
+    if (kind === 'mixed') { host.innerHTML = `<p class="mixed">${t('mixedNote')}</p>`; return; }
+    this.tab = kind === 'metal' ? 'metals' : 'gems';
+    const assigns = [...app.selection].map((i) => app.assign[i]).filter(Boolean);
     const sameM = assigns.length && assigns.every((a) => a.m === assigns[0].m) ? assigns[0].m : null;
     const sameF = assigns.length && assigns.every((a) => a.f === assigns[0].f) ? assigns[0].f : null;
-    const palette = $('[data-r=palette]', this.root);
-    const finWrap = $('[data-r=finishes-wrap]', this.root);
-    const title = $('[data-r=ptitle]', this.root);
-    const enabled = kind && kind !== 'mixed' && ((kind === 'metal' && this.tab === 'metals') || (kind === 'gem' && this.tab === 'gems'));
-    const allowed = enabled ? this.allowedFor(kind) : null;
-    let list = this.tab === 'metals' ? METALS : GEMS;
-    if (allowed) list = list.filter((x) => allowed.includes(x.id));
     const sameC = assigns.length && assigns.every((a) => a.m === CUSTOM && a.c === assigns[0].c) ? assigns[0].c : null;
+    const allowed = this.allowedFor(kind);
+    let list = kind === 'metal' ? METALS : GEMS;
+    if (allowed) list = list.filter((x) => allowed.includes(x.id));
     const customOn = !allowed || allowed.includes(CUSTOM);
-    palette.innerHTML = this.tab === 'gems'
+    const pal = kind === 'gem'
       ? this.gemDots(list, sameM) + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
-      : list.map((m) => this.ball(m, this.tab, m.id === sameM)).join('')
+      : list.map((m) => this.ball(m, 'metals', m.id === sameM)).join('')
         + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '');
-    palette.classList.toggle('gems', this.tab === 'gems');
-    palette.classList.toggle('dim', !enabled);
-    this.renderCustom(this.tab === 'gems' ? 'gem' : 'metal', enabled && customOn, sameM === CUSTOM ? sameC : null);
-    finWrap.hidden = this.tab !== 'metals';
-    $('[data-r=finishes]', this.root).innerHTML = FINISHES.map((f) => this.ball(f, 'finishes', f.id === sameF)).join('');
-    $('[data-r=finishes]', this.root).classList.toggle('dim', !enabled);
-    title.textContent = !kind ? t('nothingSelected') + ' — ' + t('tapHint')
-      : kind === 'mixed' ? t('selected') + ' : ' + t('typeMetal') + ' + ' + t('typeGem')
-      : (enabled ? `${t('selected')} : ${ids.length} ${t('pieces')}${sameM ? ' · ' + describeAssignment({ m: sameM, f: sameF, c: sameC }, kind) : ''}` : '');
+    const fin = kind === 'metal'
+      ? `<div class="finish-seg" role="group" aria-label="${t('finishes')}">${FINISHES.map((f) => `<button class="pill" data-finish="${f.id}" aria-pressed="${f.id === sameF}">${esc(f.name)}</button>`).join('')}</div>` : '';
+    const name = sameM ? describeAssignment({ m: sameM, f: sameF, c: sameC }, kind) : t('severalMaterials');
+    const sw = swatchOf(kind, assigns[0]);
+    const cHex = (sameC ?? this.customHex[kind]).toUpperCase();
+    const acc = (id, head, body) => `<section class="acc ${this.acc[id] ? 'open' : ''}" data-accsec="${id}">
+        <button class="acc-h" data-acc="${id}" aria-expanded="${this.acc[id]}">${head}${CHEV}</button>
+        <div class="acc-b"><div class="acc-in">${body}</div></div></section>`;
+    host.innerHTML = acc('mat',
+      `<i class="sw" style="--sw:${sw}"></i><span class="t"><small>${kind === 'metal' ? t('typeMetal') : t('typeGem')}</small><b>${esc(name)}</b></span>`,
+      `<div class="palette ${kind === 'gem' ? 'gems' : ''}" data-r="palette" role="listbox">${pal}</div>${fin}`)
+      + (customOn ? acc('custom',
+        `<i class="sw custom-sw" style="--sw:${sameC ?? this.customHex[kind]}"></i><span class="t"><small>${t('customColor')}</small><b class="hex">${cHex}</b></span>`,
+        '<div class="custom" data-r="custom"></div>') : '');
+    this.renderCustom(kind, customOn, sameM === CUSTOM ? sameC : null);
   }
 
   /** Sélecteur de teinte libre : couleur native + code + teinte / intensité / clarté. */
   renderCustom(kind, show, hexIn) {
     const box = $('[data-r=custom]', this.root);
-    if (this._dragging) return; // ne pas reconstruire les curseurs pendant un glissement
-    if (!show) { box.hidden = true; box.innerHTML = ''; return; }
+    if (!box || this._dragging || !show) return;
     const hex = hexIn ?? this.customHex[kind];
     const [h, s, l] = hexToHsl(hex);
-    box.hidden = false;
     box.dataset.kind = kind;
     box.innerHTML = `<div class="c-row">
         <input type="color" data-r="cpick" value="${hex}" aria-label="${t('customColor')}">
@@ -304,7 +318,7 @@ export class UI {
     this._dragging = live;
     this.app.applyToSelection({ m: CUSTOM, c: hex }, { record: !live, animate: false });
     const box = $('[data-r=custom]', this.root);
-    if (box && !box.hidden) {
+    if (box) {
       if (source !== 'pick') $('[data-r=cpick]', box).value = hex;
       if (source !== 'hex') $('[data-r=chex]', box).value = hex.toUpperCase();
       if (source === 'pick' || source === 'hex') {
@@ -353,12 +367,17 @@ export class UI {
   onClick(e) {
     const app = this.app;
     const tgt = e.target;
+    const ex1 = tgt.closest('[data-explode]');
+    if (ex1) { app.exploder.toggleZone(ex1.dataset.explode); this.renderAll(); return; }
     const zone = tgt.closest('[data-zone]');
     if (zone) {
+      // liste à choix multiples : chaque ligne ajoute / retire sa partie de la sélection
       const z = app.zoneById(zone.dataset.zone);
       const allIn = z.pieceIds.every((id) => app.selection.has(id));
-      if (app.multi) allIn ? app.select([...app.selection].filter((id) => !z.pieceIds.includes(id))) : app.selectZone(z.id, true);
-      else app.selectZone(z.id);
+      this._listTap = true;
+      this.acc = { zones: true, mat: false, custom: false };
+      allIn ? app.select([...app.selection].filter((id) => !z.pieceIds.includes(id))) : app.selectZone(z.id, true);
+      this._listTap = false;
       app.viewer.invalidate();
       return;
     }
@@ -366,8 +385,16 @@ export class UI {
     if (mat) { app.applyToSelection({ m: mat.dataset.mat }); return; }
     const fin = tgt.closest('[data-finish]');
     if (fin) { app.applyToSelection({ f: fin.dataset.finish }); return; }
-    const tab = tgt.closest('[data-tab]');
-    if (tab) { this.tab = tab.dataset.tab; this.renderPalette(); return; }
+    const acc = tgt.closest('[data-acc]');
+    if (acc) {
+      const k = acc.dataset.acc, open = !this.acc[k];
+      this.acc = { zones: false, mat: false, custom: false }; this.acc[k] = open;
+      this.root.querySelectorAll('.acc[data-accsec]').forEach((sec) => {
+        const on = !!this.acc[sec.dataset.accsec];
+        sec.classList.toggle('open', on); sec.querySelector('.acc-h')?.setAttribute('aria-expanded', String(on));
+      });
+      return;
+    }
     const md = tgt.closest('.seg [data-mode]');
     if (md) { this.setMode(md.dataset.mode); return; }
     const pb = tgt.closest('[data-pop-btn]');
@@ -428,7 +455,8 @@ export class UI {
       case 'open': $('#file', this.root).click(); break;
       case 'undo': app.undo(); break;
       case 'redo': app.redo(); break;
-      case 'multi': app.multi = !app.multi; this.renderAll(); break;
+      case 'explode': app.exploder.toggleAll(); this.renderAll(); break;
+      case 'selall': this._listTap = true; this.acc = { zones: true, mat: false, custom: false }; app.select(app.zones.flatMap((z) => z.pieceIds)); this._listTap = false; break;
       case 'fine': app.granularity = app.granularity === 'zone' ? 'piece' : 'zone'; this.renderAll(); break;
       case 'similar': app.selectSimilar(); break;
       case 'clearsel': app.clearSelection(); break;
@@ -443,6 +471,7 @@ export class UI {
       case 'flipup': this.svc.reimport({ flipUp: !this.svc.options?.flipUp }); break;
       case 'report': this.openReport(); break;
       case 'exportproject': this.exportProject(); break;
+      case 'more': this.openMore(); break;
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
       case 'photo': this.takePhoto(); break;
@@ -545,6 +574,15 @@ export class UI {
       client, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden],
       env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI),
     });
+  }
+
+  /** Actions secondaires, rangées dans un menu pour garder la barre d'actions propre. */
+  openMore() {
+    const d = this.html(`<div class="more-list">
+      <button data-a="variants"><b>${t('variants')}</b><span>${t('variantsHint')}</span></button>
+      <button data-a="share"><b>${t('share')}</b><span>${t('shareHint')}</span></button>
+      <button data-a="recap"><b>${t('recap')}</b><span>${t('recapHint')}</span></button></div>`);
+    this.openDialog(t('more'), d);
   }
 
   async openShare() {

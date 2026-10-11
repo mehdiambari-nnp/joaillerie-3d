@@ -30,3 +30,9 @@
 - **Identité** : nom Domuse (logo au trait + wordmark Cormorant Garamond espacé), palette pierre / lilas gris / or sourd, mode sombre bleu-nuit (inspiré du compte Instagram de la joaillerie : fonds gris doux, pierres profondes). Polices embarquées via @fontsource (pas de requête externe).
 - **Interface** : icônes au trait à la place des emojis, boutons fins, bouton principal encre, intitulés en petites capitales espacées, mode client sans barre : logo centré + trois actions.
 - **Rendu** : éclairage par défaut = HDRI « Ville, plein soleil » (le studio s'affiche le temps du chargement) ; fond de scène gris pierre. Brossé : relief très léger pour éviter l'effet quadrillé en gros plan.
+
+## Itération 5 — feuille repliable, liste des parties, vue éclatée
+
+- **Feuille inférieure en accordéons exclusifs** (Parties / Matière / Teinte libre) : repliés par défaut, la vue 3D garde l'essentiel de l'écran ; animation `grid-template-rows` 0fr→1fr. Palettes en grille (plus de lignes tronquées).
+- **Liste des parties à choix multiples** : lignes sobres (nom en serif, pastille matière, coche), outils « tout / aucune / similaires ».
+- **Vue éclatée** (`src/core/explode.js`) : décalage radial par zone depuis l'origine du modèle, easeInOutCubic 900 ms avec léger décalage entre pièces, recul caméra automatique. Bouton global + bouton par partie. Les exports (GLB/AR/USDZ) et l'essayage remettent toujours la bague assemblée.

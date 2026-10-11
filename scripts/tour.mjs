@@ -21,12 +21,12 @@ await page.evaluate(() => { localStorage.setItem('rc:onboarded', 'true'); docume
 await shot(page, '02-vitrine-maquette');
 // sélection d'une zone
 await page.evaluate(() => __rc.app.selectZone('z-gem-center')); await shot(page, '03-selection-pierre-centrale');
-await page.click('button[role=tab][data-tab=gems]'); await shot(page, '04-palette-pierres');
+await shot(page, '04-palette-pierres');
 await page.evaluate(() => __rc.app.applyToSelection({ m: 'green-emerald' })); await shot(page, '05-emeraude-centrale');
 await page.evaluate(() => { __rc.app.selectZone('z-gem-side'); __rc.app.applyToSelection({ m: 'blue-medium' }); });
 await shot(page, '06-saphir-lateraux');
 await page.evaluate(() => { __rc.app.selectZone('z-setting-center'); __rc.app.applyToSelection({ m: 'rose' }); });
-await page.click('button[role=tab][data-tab=metals]'); await shot(page, '07-chaton-or-rose-metaux');
+await shot(page, '07-chaton-or-rose-metaux');
 await page.evaluate(() => { __rc.app.selectZone('z-body'); __rc.app.applyToSelection({ m: 'platinum', f: 'satin' }); });
 await shot(page, '08-corps-platine-satine');
 await page.evaluate(() => { __rc.app.selectZone('z-claw'); __rc.app.applyToSelection({ m: 'grey', f: 'hammered' }); });
@@ -54,9 +54,9 @@ await V(page, [0.62, 0.45, 0.64]);
 await page.click('button[data-a=undo]'); await shot(page, '19-annuler');
 await page.click('button[data-a=redo]');
 // dialogues
-await page.click('button[data-a=share]'); await shot(page, '20-partage-lien-qr', { wait: 1200 }); await close(page);
-await page.click('button[data-a=recap]'); await shot(page, '21-fiche-recap'); await close(page);
-await page.click('button[data-a=variants]'); await shot(page, '22-variantes'); await close(page);
+await page.evaluate(() => __rc.ui.openShare()); await shot(page, '20-partage-lien-qr', { wait: 1200 }); await close(page);
+await page.evaluate(() => __rc.ui.openRecap()); await shot(page, '21-fiche-recap'); await close(page);
+await page.evaluate(() => __rc.ui.openVariants()); await shot(page, '22-variantes'); await close(page);
 await page.click('button[data-a=ar]'); await shot(page, '23-ar-desktop', { wait: 2500 }); await close(page);
 // atelier
 await page.click('button[data-mode=atelier]');
@@ -95,7 +95,7 @@ await page.evaluate(() => __rc.app.selectZone('z-gem-center')); await page.evalu
 await shot(page, '32-iphone-rubis-selection');
 await page.evaluate(() => __rc.app.clearSelection());
 await page.tap('button[data-a=ar]'); await shot(page, '33-iphone-ar-quicklook', { wait: 2500 }); await close(page);
-await page.tap('button[data-a=share]'); await shot(page, '34-iphone-partage', { wait: 1200 }); await close(page);
+await page.evaluate(() => __rc.ui.openShare()); await shot(page, '34-iphone-partage', { wait: 1200 }); await close(page);
 await ctx.close();
 
 // ----- Essayage (fausse caméra) -----

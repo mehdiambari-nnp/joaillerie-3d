@@ -7,6 +7,7 @@ import { History } from './state/store.js';
 import { createMaterial, transitionMaterial } from './materials/factory.js';
 import { DEFAULT_METAL, DEFAULT_GEM, isMaterialFor, normalizeAssignment, validHex, CUSTOM } from './materials/library.js';
 import { similarPieceIds } from './import/zones.js';
+import { Exploder } from './core/explode.js';
 
 class Emitter {
   constructor() { this.l = {}; }
@@ -36,6 +37,8 @@ export class Configurator extends Emitter {
     this.history = new History(50);
     this.variants = [];
     this.modelId = null;
+    this.exploder = new Exploder(this);
+    this.on('zones', () => this.exploder.compute());
   }
 
   // ---------- Modèle ----------

@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { getEnvironment, disposeEnvironments } from './environments.js';
 
-const HIGHLIGHT = new THREE.Color(0x6f8cff);
+const HIGHLIGHT = new THREE.Color('#ffe2a8'); // halo chaud discret (sélection)
 
 export class Viewer {
   constructor(container, { alpha = true } = {}) {

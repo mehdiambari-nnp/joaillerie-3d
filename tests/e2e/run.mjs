@@ -153,7 +153,7 @@ const vpH = await page.evaluate(() => document.querySelector('.viewport').getBou
 await page.evaluate(() => document.querySelector('[data-a=present]').click());
 await page.waitForTimeout(500);
 const fsr = await page.evaluate(() => { const v = document.querySelector('.viewport').getBoundingClientRect(); const b = document.querySelector('[data-a=present-exit]').getBoundingClientRect(); return { h: v.height, ih: innerHeight, exitVisible: b.width > 0 && b.top >= 0 }; });
-ok(fsr.h > vpH * 1.3 && fsr.h >= fsr.ih - 2, `plein écran : vue 3D agrandie (${Math.round(vpH)} → ${Math.round(fsr.h)} px)`);
+ok(fsr.h > vpH * 1.1 && fsr.h >= fsr.ih - 2, `plein écran : vue 3D agrandie (${Math.round(vpH)} → ${Math.round(fsr.h)} px)`);
 ok(fsr.exitVisible, 'plein écran : bouton de sortie visible');
 await page.evaluate(() => document.querySelector('[data-a=present-exit]').click());
 await page.waitForTimeout(300);

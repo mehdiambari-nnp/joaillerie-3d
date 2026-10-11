@@ -73,6 +73,7 @@ export class TryOn {
   async open() {
     if (this.active) return;
     this.active = true;
+    this.app.exploder?.assembleNow();
     this.viewer.setPaused(true);
     this.host.classList.add('tryon-on');
     this.stage = h('div', 'tryon-stage');
