@@ -41,7 +41,13 @@ export class Exploder {
     // centre de la bague = centre du trou (origine du modèle normalisé), repli sur le centre de la boîte
     const o = new THREE.Vector3(0, 0, 0);
     const size = all.getSize(new THREE.Vector3()).length() || 1;
+    // « haut » de la bague = direction moyenne des pierres / sertissage ; le corps (anneau) descend à l'opposé
+    const up = new THREE.Vector3();
+    for (const z of app.zones) { const b = boxes.get(z.id); if (b && z.role !== 'body') up.add(b.getCenter(new THREE.Vector3()).sub(o)); }
+    if (up.lengthSq() > 1e-9) up.normalize(); else up.set(0, 1, 0);
     for (const [zid, b] of boxes) {
+      const zone = app.zones.find((x) => x.id === zid);
+      if (zone?.role === 'body') { this.offsets.set(zid, up.clone().multiplyScalar(-size * 0.3)); continue; }
       const c = b.getCenter(new THREE.Vector3());
       const v = c.clone().sub(o);
       const dist = v.length();

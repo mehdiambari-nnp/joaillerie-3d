@@ -23,6 +23,8 @@ const ICON = {
   full: ic('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
   undo: ic('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/>'),
   redo: ic('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 12h3"/>'),
+  eye: ic('<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
+  eyeOff: ic('<path d="M2 12s3.6-6.5 10-6.5c2 0 3.7.6 5.1 1.5M22 12s-3.6 6.5-10 6.5c-2 0-3.7-.6-5.1-1.5M4 4l16 16"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
   explode: ic('<rect x="9" y="9" width="6" height="6" rx="1"/><path d="M12 3v3M10.5 4.5 12 3l1.5 1.5M12 21v-3M10.5 19.5 12 21l1.5-1.5M3 12h3M4.5 10.5 3 12l1.5 1.5M21 12h-3M19.5 10.5 21 12l-1.5 1.5"/>'),
   open: ic('<path d="M12 16V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 20h14"/>'),
 };
@@ -200,6 +202,7 @@ export class UI {
         <button class="pmain" role="option" data-zone="${esc(z.id)}" aria-selected="${on}">
           <i class="psw" style="--sw:${this.swatchOf(z)}"></i><span class="pn">${esc(z.name)}</span><span class="pcheck" aria-hidden="true"></span>
         </button>
+        <button class="pexp peye" data-eye="${esc(z.id)}" aria-pressed="${hid}" aria-label="${hid ? t('show') : t('hide')}" title="${hid ? t('show') : t('hide')}">${hid ? ICON.eyeOff : ICON.eye}</button>
         ${can ? `<button class="pexp" data-explode="${esc(z.id)}" aria-pressed="${!!exp}" aria-label="${exp ? t('assemblePart') : t('explodePart')}" title="${exp ? t('assemblePart') : t('explodePart')}">${ICON.explode}</button>` : '<span class="pexp-gap"></span>'}
       </li>`;
     }).join('');
@@ -367,6 +370,8 @@ export class UI {
   onClick(e) {
     const app = this.app;
     const tgt = e.target;
+    const eye = tgt.closest('[data-eye]');
+    if (eye) { const z = app.zones.find((zz) => zz.id === eye.dataset.eye); if (z) app.setHidden(z.pieceIds, !z.pieceIds.every((id) => app.hidden.has(id))); return; }
     const ex1 = tgt.closest('[data-explode]');
     if (ex1) { app.exploder.toggleZone(ex1.dataset.explode); this.renderAll(); return; }
     const zone = tgt.closest('[data-zone]');

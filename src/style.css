@@ -393,3 +393,5 @@ dialog { border-radius: 20px; }
 .link:disabled { opacity: .35; }
 .app[data-mode='client'] .parts { display: none; }
 .app[data-present='1'] .parts { display: none; }
+.peye[aria-pressed='true'] { border-color: transparent; background: none; color: var(--muted); opacity: .7; }
+.peye { width: 34px; }
