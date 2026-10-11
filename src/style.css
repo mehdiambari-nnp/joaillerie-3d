@@ -432,3 +432,13 @@ dialog { border-radius: 20px; }
 .dot[aria-pressed='true'] span.gemic { box-shadow: none !important; filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 2.5px var(--accent)) drop-shadow(0 0 1.5px var(--accent)); transform: scale(1.12); }
 .sw-stack i.gemic { width: 28px; height: 28px; }
 .acc-h .sw.gemic { width: 32px; height: 32px; }
+
+/* Outils d'angle de vue : en ligne, en bas à droite (explosion, plein écran) ; plus de libellé « quitter » */
+.hud-right { top: auto; bottom: 10px; flex-direction: row; align-items: center; }
+.hud-right .icon-btn { width: 38px; height: 38px; }
+.app[data-present='1'] .hud-right { top: auto; bottom: calc(14px + var(--safe-b)); right: 14px; }
+.present-exit { display: none !important; }
+[data-a=present] .i-exit { display: none; }
+[data-a=present][aria-pressed='true'] .i-full { display: none; }
+[data-a=present][aria-pressed='true'] .i-exit { display: inline; }
+.app[data-mode='client'] .hud-right { bottom: 14px; }
