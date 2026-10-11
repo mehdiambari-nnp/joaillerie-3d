@@ -38,3 +38,4 @@
 - **Vue éclatée** (`src/core/explode.js`) : décalage radial par zone depuis l'origine du modèle, easeInOutCubic 900 ms avec léger décalage entre pièces, recul caméra automatique. Bouton global + bouton par partie. Les exports (GLB/AR/USDZ) et l'essayage remettent toujours la bague assemblée.
 - **Éclatement** : le « haut » est déduit des pierres/sertissage ; le corps (rôle `body`) descend à l'opposé, le reste monte radialement.
 - **Œil par partie** : masque/affiche une partie (réutilise `app.hidden`, annulable, conservé dans les liens de partage).
+- **Correctif** : masquer/afficher une partie recalcule l'éclatement ; les positions d'origine sont désormais remesurées à l'état assemblé (avant, la bague restait éclatée). Test : `scripts/explode-regression.mjs`.

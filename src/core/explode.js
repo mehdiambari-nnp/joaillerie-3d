@@ -23,7 +23,9 @@ export class Exploder {
   compute() {
     const app = this.app, root = app.viewer.root;
     if (!root) return;
-    this.assembleNow(false);
+    // remettre d'abord chaque mesh à sa position d'origine : les boîtes et positions de base se mesurent à l'état assemblé
+    for (const [id, b] of this.base) { const p = app.pieceById(id); if (p) p.mesh.position.copy(b); }
+    this.tweens.clear();
     this.base.clear(); this.offsets.clear();
     root.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(root.matrixWorld).invert();
