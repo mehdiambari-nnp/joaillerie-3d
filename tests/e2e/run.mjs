@@ -61,20 +61,20 @@ const gemZone = zones.find((z) => z[1] === 'gem')?.[0];
 const metalZones = zones.filter((z) => z[1] === 'metal').map((z) => z[0]);
 await page.evaluate(([gz, mz]) => {
   const a = __rc.app;
-  a.selectZone(gz); a.applyToSelection({ m: 'emerald' });
-  a.selectZone(mz[0]); a.applyToSelection({ m: 'rose18', f: 'polish' });
+  a.selectZone(gz); a.applyToSelection({ m: 'green-emerald' });
+  a.selectZone(mz[0]); a.applyToSelection({ m: 'rose', f: 'polish' });
   if (mz[1]) { a.selectZone(mz[1]); a.applyToSelection({ m: 'platinum', f: 'satin' }); }
   a.clearSelection();
 }, [gemZone, metalZones]);
-await page.click('button[data-mat="sapphire"]').catch(() => {}); // sans sélection : sans effet attendu
+await page.click('button[data-mat="blue-medium"]').catch(() => {}); // sans sélection : sans effet attendu
 await page.waitForTimeout(500);
 const applied = await page.evaluate(() => Object.values(__rc.app.assign).map((a) => a.m));
-ok(applied.includes('emerald') && applied.includes('rose18'), `matériaux appliqués par zone (${[...new Set(applied)].join(', ')})`);
+ok(applied.includes('green-emerald') && applied.includes('rose'), `matériaux appliqués par zone (${[...new Set(applied)].join(', ')})`);
 // règle : une pierre ne reçoit pas un métal
 const guard = await page.evaluate((gz) => {
-  const a = __rc.app; const id = a.zoneById(gz).pieceIds[0]; a.applyMaterial([id], { m: 'gold18' }); return a.assign[id].m;
+  const a = __rc.app; const id = a.zoneById(gz).pieceIds[0]; a.applyMaterial([id], { m: 'rose' }); return a.assign[id].m;
 }, gemZone);
-ok(guard === 'emerald', 'une pierre refuse un métal');
+ok(guard === 'green-emerald', 'une pierre refuse un métal');
 await page.evaluate(() => __rc.app.viewer.setView([0.62, 0.45, 0.64], false));
 await page.waitForTimeout(500);
 await page.screenshot({ path: OUT + 'e2e-materials.png' });
@@ -146,6 +146,35 @@ await page.screenshot({ path: OUT + 'e2e-iphone.png' });
 const noHScroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
 ok(noHScroll, 'pas de défilement horizontal');
 ok(await page.evaluate(() => innerWidth === visualViewport.width), 'mise en page = largeur du viewport (pas de zoom/élargissement iOS)');
+// plein écran (iPhone) : la vue 3D occupe tout l'écran et le bouton de sortie est visible
+const vpH = await page.evaluate(() => document.querySelector('.viewport').getBoundingClientRect().height);
+await page.evaluate(() => document.querySelector('[data-a=present]').click());
+await page.waitForTimeout(500);
+const fsr = await page.evaluate(() => { const v = document.querySelector('.viewport').getBoundingClientRect(); const b = document.querySelector('[data-a=present-exit]').getBoundingClientRect(); return { h: v.height, ih: innerHeight, exitVisible: b.width > 0 && b.top >= 0 }; });
+ok(fsr.h > vpH * 1.3 && fsr.h >= fsr.ih - 2, `plein écran : vue 3D agrandie (${Math.round(vpH)} → ${Math.round(fsr.h)} px)`);
+ok(fsr.exitVisible, 'plein écran : bouton de sortie visible');
+await page.evaluate(() => document.querySelector('[data-a=present-exit]').click());
+await page.waitForTimeout(300);
+ok(await page.evaluate(() => document.querySelector('.app').dataset.present === '0' && document.querySelector('.topbar').offsetHeight > 0), 'plein écran : retour à l’interface');
+// teinte libre
+const cust = await page.evaluate(async () => {
+  const a = __rc.app; a.selectZone(a.zones.find((z) => z.type === 'gem').id);
+  __rc.ui.renderAll();
+  document.querySelector('.custom-dot').click();
+  const e = document.querySelector('[data-r=chex]'); e.value = '#17b2a8'; e.dispatchEvent(new Event('change', { bubbles: true }));
+  const id = [...a.selection][0];
+  return { assign: a.assign[id], att: '#' + a.pieceById(id).mesh.material.attenuationColor.getHexString() };
+});
+ok(cust.assign.m === 'custom' && cust.assign.c === '#17b2a8', `teinte libre appliquée (${JSON.stringify(cust.assign)})`);
+// mode client : aucun réglage visible, pas de sélection
+const cl = await page.evaluate(() => {
+  __rc.ui.setMode('client');
+  const vis = (sel) => { const e = document.querySelector(sel); return !!e && e.offsetParent !== null; };
+  document.querySelector('.app').dataset.mode;
+  return { zones: vis('.zones'), mats: vis('.mats'), seg: vis('.seg'), tryon: vis('[data-a=tryon]'), ar: vis('[data-a=ar]'), sel: __rc.app.selection.size, interactive: __rc.app.interactive };
+});
+ok(!cl.zones && !cl.mats && !cl.seg && cl.tryon && cl.ar && cl.sel === 0 && !cl.interactive, 'mode client : épuré (AR + essayage seulement)');
+await page.evaluate(() => __rc.ui.setMode('vitrine'));
 await page.tap('button[data-a=ar]').catch(() => {});
 await page.waitForTimeout(1500);
 await page.screenshot({ path: OUT + 'e2e-iphone-ar.png' });

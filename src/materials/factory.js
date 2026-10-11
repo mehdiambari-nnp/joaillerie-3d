@@ -1,8 +1,41 @@
 // Fabrique de matériaux three.js + transitions douces (~200 ms) pour un rendu « temps réel ».
 import * as THREE from 'three';
-import { METALS, FINISHES, GEMS, byId, DEFAULT_METAL, DEFAULT_GEM } from './library.js';
+import { resolveMetal, resolveGem } from './library.js';
 
 let hammeredNormal = null;
+let brushedNormal = null;
+
+/** Normal map procédurale de brossage : fines rayures parallèles (512 px, répétable). Navigateur uniquement. */
+export function getBrushedNormalMap() {
+  if (brushedNormal || typeof document === 'undefined') return brushedNormal;
+  const N = 512;
+  let seed = 4242;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  // hauteur par ligne (rayures), légèrement modulée le long de la ligne
+  const rows = Float32Array.from({ length: N }, () => rnd() - 0.5);
+  const smooth = rows.map((_, y) => (rows[y] * 2 + rows[(y + 1) % N] + rows[(y + N - 1) % N]) / 4);
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = N;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(N, N);
+  for (let y = 0; y < N; y++) {
+    const dy = (smooth[(y + 1) % N] - smooth[(y + N - 1) % N]) * 5;
+    for (let x = 0; x < N; x++) {
+      const wob = 1 + 0.15 * Math.sin((x / N) * Math.PI * 2 * 2);
+      const ny = dy * wob, len = Math.hypot(ny, 1);
+      const i = (y * N + x) * 4;
+      img.data[i] = 128;
+      img.data[i + 1] = (ny / len * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (1 / len * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  brushedNormal = new THREE.CanvasTexture(canvas);
+  brushedNormal.wrapS = brushedNormal.wrapT = THREE.RepeatWrapping;
+  brushedNormal.colorSpace = THREE.NoColorSpace;
+  return brushedNormal;
+}
 
 /** Normal map procédurale de martelage (512 px, dimples aléatoires). Navigateur uniquement. */
 export function getHammeredNormalMap() {
@@ -43,19 +76,20 @@ export function getHammeredNormalMap() {
 
 /** Paramètres cibles (sans créer de matériau) pour une affectation de métal. */
 export function metalParams(a) {
-  const metal = byId(METALS, a.m) ?? byId(METALS, DEFAULT_METAL.m);
-  const fin = byId(FINISHES, a.f) ?? byId(FINISHES, DEFAULT_METAL.f);
+  const r = resolveMetal(a);
   return {
-    color: new THREE.Color().setRGB(...metal.rgb, THREE.LinearSRGBColorSpace),
-    roughness: Math.min(1, fin.roughness + (metal.roughnessAdd ?? 0)),
-    anisotropy: fin.anisotropy,
-    hammered: !!fin.hammered,
+    color: new THREE.Color().setRGB(...r.rgb, THREE.LinearSRGBColorSpace),
+    roughness: r.fin.roughness,
+    anisotropy: r.fin.anisotropy,
+    hammered: !!r.fin.hammered,
+    brushed: !!r.fin.brushed,
   };
 }
 
-export function gemParams(a) {
-  const gem = byId(GEMS, a.m) ?? byId(GEMS, DEFAULT_GEM.m);
-  return gem;
+export const gemParams = resolveGem;
+
+function metalNormal(p) {
+  return p.hammered ? getHammeredNormalMap() : p.brushed ? getBrushedNormalMap() : null;
 }
 
 /** Crée un matériau neuf pour une affectation. */
@@ -74,7 +108,8 @@ export function createMaterial(kind, a) {
   const p = metalParams(a);
   const m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 1, roughness: p.roughness, envMapIntensity: 1.2 });
   m.anisotropy = p.anisotropy;
-  if (p.hammered) { m.normalMap = getHammeredNormalMap(); m.normalScale.set(0.6, 0.6); }
+  m.normalMap = metalNormal(p);
+  m.normalScale.set(p.brushed ? 0.1 : 0.6, p.brushed ? 0.1 : 0.6);
   return m;
 }
 
@@ -114,11 +149,13 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
   } else {
     const p = metalParams(a);
     material.anisotropy = p.anisotropy;
-    material.normalMap = p.hammered ? getHammeredNormalMap() : null;
+    material.normalMap = metalNormal(p);
+    material.normalScale.set(p.brushed ? 0.1 : 0.6, p.brushed ? 0.1 : 0.6);
     material.needsUpdate = true;
     toColor = p.color; toRough = p.roughness;
   }
   if (material.userData.tw) { cancelAnimationFrame(material.userData.tw.raf); tweens.delete(material.userData.tw); }
+  if (duration <= 0) { material.color.copy(toColor); material.roughness = toRough; onTick?.(); onDone?.(); return null; }
   const fromColor = material.color.clone();
   const fromRough = material.roughness;
   const start = performance.now();

@@ -25,6 +25,7 @@ async function boot() {
   let pending = parseShareHash(location.hash); // configuration d'un lien de partage
 
   const ui = new UI(root, app, svc);
+  if (pending?.client) ui.lockClient(); // lien client : interface épurée et verrouillée
   window.__rc = { app, ui, THREE }; // pratique pour le débogage et les tests E2E
 
   /** Importe un buffer et l'installe dans le configurateur. */
@@ -73,7 +74,7 @@ async function boot() {
     const glb = await buildDemoRingGLB();
     await load(glb, 'bague-demo.glb', {}, null, 'demo-ring');
   }
-  app.viewer.setAutoRotate(ui.mode === 'vitrine');
+  app.viewer.setAutoRotate(ui.mode !== 'atelier');
   ui.loadThumbnails();
   ui.onboard();
   if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);

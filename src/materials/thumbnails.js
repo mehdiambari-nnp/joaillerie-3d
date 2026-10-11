@@ -2,7 +2,7 @@
 // un seul contexte persistant sur iOS (limite mémoire) → ce moteur est détruit juste après.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { METALS, FINISHES, GEMS, DEFAULT_METAL } from './library.js';
+import { METALS, FINISHES, GEMS, DEFAULT_METAL, resolveGem } from './library.js';
 import { createMaterial } from './factory.js';
 
 /** Retourne { metals:{id:url}, finishes:{id:url}, gems:{id:url} }. */
@@ -61,7 +61,7 @@ export function renderThumbnails(size = 112) {
   for (const gm of GEMS) {
     const mat = createMaterial('gem', { m: gm.id });
     mat.thickness = 1.4; // sphère de rayon 1 : épaisseur adaptée (la scène des bagues est en mm)
-    if (!gm.opaque) mat.attenuationDistance = Math.max(0.5, gm.attDist / 3);
+    if (!gm.opaque) mat.attenuationDistance = Math.max(0.5, resolveGem({ m: gm.id }).attDist / 3);
     out.gems[gm.id] = shoot(gem, mat, true);
   }
   env.dispose(); pmrem.dispose(); sphere.dispose(); gemGeo.dispose(); bg.dispose();

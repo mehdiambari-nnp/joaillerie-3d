@@ -1,6 +1,6 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
-import { METALS, FINISHES, GEMS, byId, describeAssignment } from '../materials/library.js';
+import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl } from '../state/store.js';
@@ -19,7 +19,10 @@ export class UI {
     this.root = root;
     this.app = app;
     this.svc = services; // { openFile(file), reimport(patch) }
-    this.mode = prefs.get('mode', 'vitrine');
+    const saved = prefs.get('mode', 'vitrine');
+    this.mode = saved === 'atelier' ? 'atelier' : 'vitrine';
+    this.locked = false; // lien client : l'interface ne peut pas quitter le mode client
+    this.customHex = { metal: '#d8b45a', gem: '#4a7de0' };
     this.tab = 'metals';
     this.thumbs = { metals: {}, finishes: {}, gems: {} };
     this.bg = 'light';
@@ -37,9 +40,11 @@ export class UI {
         <div class="brand"><span class="mark">◇</span><span>${t('app')}</span></div>
         <div class="spacer"></div>
         <div class="seg" role="group" aria-label="Mode">
+          <button data-mode="client">${t('modeClient')}</button>
           <button data-mode="vitrine">${t('modeVitrine')}</button>
           <button data-mode="atelier">${t('modeAtelier')}</button>
         </div>
+        <button class="btn small client-exit" data-a="exit-client">✕ ${t('exitPreview')}</button>
         <button class="icon-btn" data-a="undo" aria-label="${t('undo')}" title="${t('undo')}">↶</button>
         <button class="icon-btn" data-a="redo" aria-label="${t('redo')}" title="${t('redo')}">↷</button>
         <button class="icon-btn" data-a="open" aria-label="${t('open')}" title="${t('open')}">⤒</button>
@@ -54,6 +59,7 @@ export class UI {
             <button class="icon-btn" data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">⟳</button>
             <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}">⛶</button>
           </div>
+          <button class="btn present-exit" data-a="present-exit" aria-label="${t('exitPresent')}">✕ ${t('exitPresent')}</button>
           <div class="pop" data-pop="views" hidden></div>
           <div class="pop" data-pop="env" hidden></div>
           <div class="hint" data-r="hint">${t('tapHint')}</div>
@@ -78,6 +84,7 @@ export class UI {
               </div></div>
             <p class="palette-title" data-r="ptitle"></p>
             <div class="palette" data-r="palette" role="listbox"></div>
+            <div class="custom" data-r="custom" hidden></div>
             <div data-r="finishes-wrap">
               <p class="palette-title">${t('finishes')}</p>
               <div class="palette" data-r="finishes"></div>
@@ -147,6 +154,7 @@ export class UI {
   // ---------- Rendu ----------
   renderAll() {
     this.el.dataset.mode = this.mode;
+    this.app.interactive = this.mode !== 'client';
     this.root.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === this.mode)));
     this.renderInfo();
     this.renderZones();
@@ -172,8 +180,7 @@ export class UI {
   }
 
   swatchOf(zone) {
-    const a = this.app.assign[zone.pieceIds[0]];
-    return (byId(METALS, a?.m) ?? byId(GEMS, a?.m))?.swatch ?? '#ccc';
+    return swatchOf(zone.type === 'gem' ? 'gem' : 'metal', this.app.assign[zone.pieceIds[0]]);
   }
 
   renderZones() {
@@ -205,6 +212,18 @@ export class UI {
       <span class="b" style="--sw:${item.swatch ?? '#bbb'};${url ? `--img:url(${url})` : ''}"></span><span class="n">${esc(item.name)}</span></button>`;
   }
 
+  /** Pierres : pastilles de couleur groupées par famille, sans nom d'espèce. */
+  gemDots(list, sameM) {
+    const dot = (item, pressed, extra = '') => {
+      return `<button class="dot ${extra}" role="option" data-mat="${item.id}" aria-label="${esc(item.name)}" aria-pressed="${pressed}" title="${esc(item.name)}"><span style="--sw:${item.swatch ?? '#bbb'}"></span></button>`;
+    };
+    const groups = GEM_GROUPS.map((g) => {
+      const items = list.filter((x) => x.group === g.id);
+      return items.length ? `<div class="dots" role="group" aria-label="${esc(g.name)}">${items.map((x) => dot(x, x.id === sameM)).join('')}</div>` : '';
+    }).join('');
+    return groups;
+  }
+
   renderPalette() {
     const app = this.app;
     const kind = app.selectionKind();
@@ -221,14 +240,66 @@ export class UI {
     const allowed = enabled ? this.allowedFor(kind) : null;
     let list = this.tab === 'metals' ? METALS : GEMS;
     if (allowed) list = list.filter((x) => allowed.includes(x.id));
-    palette.innerHTML = list.map((m) => this.ball(m, this.tab, m.id === sameM)).join('');
+    const sameC = assigns.length && assigns.every((a) => a.m === CUSTOM && a.c === assigns[0].c) ? assigns[0].c : null;
+    const customOn = !allowed || allowed.includes(CUSTOM);
+    palette.innerHTML = this.tab === 'gems'
+      ? this.gemDots(list, sameM) + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
+      : list.map((m) => this.ball(m, this.tab, m.id === sameM)).join('')
+        + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '');
+    palette.classList.toggle('gems', this.tab === 'gems');
     palette.classList.toggle('dim', !enabled);
+    this.renderCustom(this.tab === 'gems' ? 'gem' : 'metal', enabled && customOn, sameM === CUSTOM ? sameC : null);
     finWrap.hidden = this.tab !== 'metals';
     $('[data-r=finishes]', this.root).innerHTML = FINISHES.map((f) => this.ball(f, 'finishes', f.id === sameF)).join('');
     $('[data-r=finishes]', this.root).classList.toggle('dim', !enabled);
     title.textContent = !kind ? t('nothingSelected') + ' — ' + t('tapHint')
       : kind === 'mixed' ? t('selected') + ' : ' + t('typeMetal') + ' + ' + t('typeGem')
-      : (enabled ? `${t('selected')} : ${ids.length} ${t('pieces')}${sameM ? ' · ' + describeAssignment({ m: sameM, f: sameF }) : ''}` : '');
+      : (enabled ? `${t('selected')} : ${ids.length} ${t('pieces')}${sameM ? ' · ' + describeAssignment({ m: sameM, f: sameF, c: sameC }, kind) : ''}` : '');
+  }
+
+  /** Sélecteur de teinte libre : couleur native + code + teinte / intensité / clarté. */
+  renderCustom(kind, show, hexIn) {
+    const box = $('[data-r=custom]', this.root);
+    if (this._dragging) return; // ne pas reconstruire les curseurs pendant un glissement
+    if (!show) { box.hidden = true; box.innerHTML = ''; return; }
+    const hex = hexIn ?? this.customHex[kind];
+    const [h, s, l] = hexToHsl(hex);
+    box.hidden = false;
+    box.dataset.kind = kind;
+    box.innerHTML = `<div class="c-row">
+        <input type="color" data-r="cpick" value="${hex}" aria-label="${t('customColor')}">
+        <input type="text" data-r="chex" value="${hex.toUpperCase()}" maxlength="7" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="${t('hexLabel')}">
+      </div>
+      <label>${t('hue')}<input type="range" class="hue" min="0" max="360" value="${Math.round(h)}" data-r="ch"></label>
+      <label>${t('intensity')}<input type="range" class="track-s" min="0" max="100" value="${Math.round(s * 100)}" data-r="cs"></label>
+      <label>${t('lightness')}<input type="range" class="track-l" min="4" max="96" value="${Math.round(l * 100)}" data-r="cl"></label>`;
+    this.paintTracks(box);
+  }
+
+  paintTracks(box) {
+    const h = +$('[data-r=ch]', box).value, s = +$('[data-r=cs]', box).value / 100, l = +$('[data-r=cl]', box).value / 100;
+    $('[data-r=cs]', box).style.background = `linear-gradient(90deg, ${hslToHex(h, 0, l)}, ${hslToHex(h, 1, l)})`;
+    $('[data-r=cl]', box).style.background = `linear-gradient(90deg, #000, ${hslToHex(h, s, 0.5)}, #fff)`;
+  }
+
+  /** Applique une teinte libre à la sélection. live = glissement en cours (pas d'historique). */
+  applyCustom(hex, { live = false, source = null } = {}) {
+    hex = validHex(hex);
+    const kind = this.app.selectionKind();
+    if (!hex || (kind !== 'metal' && kind !== 'gem')) return;
+    this.customHex[kind] = hex;
+    this._dragging = live;
+    this.app.applyToSelection({ m: CUSTOM, c: hex }, { record: !live, animate: false });
+    const box = $('[data-r=custom]', this.root);
+    if (box && !box.hidden) {
+      if (source !== 'pick') $('[data-r=cpick]', box).value = hex;
+      if (source !== 'hex') $('[data-r=chex]', box).value = hex.toUpperCase();
+      if (source === 'pick' || source === 'hex') {
+        const [h, s, l] = hexToHsl(hex);
+        $('[data-r=ch]', box).value = Math.round(h); $('[data-r=cs]', box).value = Math.round(s * 100); $('[data-r=cl]', box).value = Math.round(l * 100);
+      }
+      this.paintTracks(box);
+    }
   }
 
   renderAtelier() {
@@ -246,7 +317,7 @@ export class UI {
         <div class="field"><label>${t('type')}<select data-r="ztype"><option value="metal" ${z.type === 'metal' ? 'selected' : ''}>${t('typeMetal')}</option><option value="gem" ${z.type === 'gem' ? 'selected' : ''}>${t('typeGem')}</option></select></label></div>
         <div class="tools"><button class="btn small" data-a="zhide">${hidden ? t('show') : t('hide')}</button>${z.pieceIds.length > 1 ? `<button class="btn small" data-a="zsplit">${t('split')}</button>` : ''}</div>
         <p class="palette-title">${t('rules')}</p>
-        <div class="rules" data-r="rules">${list.map((x) => `<label><input type="checkbox" data-rule="${x.id}" ${!z.allowed || z.allowed.includes(x.id) ? 'checked' : ''}>${esc(x.name)}</label>`).join('')}</div>`;
+        <div class="rules" data-r="rules">${[...list, { id: CUSTOM, name: t('customColor') }].map((x) => `<label><input type="checkbox" data-rule="${x.id}" ${!z.allowed || z.allowed.includes(x.id) ? 'checked' : ''}>${esc(x.name)}</label>`).join('')}</div>`;
     } else if (selZones.length > 1) {
       html += `<div class="tools"><button class="btn small" data-a="zmerge">${t('merge')} (${selZones.length})</button></div>`;
     } else {
@@ -285,7 +356,7 @@ export class UI {
     const tab = tgt.closest('[data-tab]');
     if (tab) { this.tab = tab.dataset.tab; this.renderPalette(); return; }
     const md = tgt.closest('.seg [data-mode]');
-    if (md) { this.mode = md.dataset.mode; prefs.set('mode', this.mode); app.viewer.setAutoRotate(this.mode === 'vitrine' && this.autorotate !== false); this.renderAll(); return; }
+    if (md) { this.setMode(md.dataset.mode); return; }
     const pb = tgt.closest('[data-pop-btn]');
     if (pb) { this.togglePop(pb.dataset.popBtn); return; }
     const vw = tgt.closest('[data-view]');
@@ -309,6 +380,13 @@ export class UI {
     if (r === 'envrot') this.app.viewer.setEnvironmentRotation(+e.target.value);
     if (r === 'bgblur') this.app.viewer.setBackground('env', { blur: +e.target.value });
     if (r === 'exposure') this.app.viewer.setExposure(+e.target.value);
+    if (r === 'cpick') this.applyCustom(e.target.value, { live: true, source: 'pick' });
+    if (r === 'ch' || r === 'cs' || r === 'cl') this.applyCustom(this.hexFromSliders(), { live: true, source: 'slider' });
+  }
+
+  hexFromSliders() {
+    const box = $('[data-r=custom]', this.root);
+    return hslToHex(+$('[data-r=ch]', box).value, +$('[data-r=cs]', box).value / 100, +$('[data-r=cl]', box).value / 100);
   }
 
   onChange(e) {
@@ -317,6 +395,13 @@ export class UI {
     if (r === 'zname' && z) app.renameZone(z.id, e.target.value.trim() || z.name);
     if (r === 'ztype' && z) app.setZoneType(z.id, e.target.value);
     if (r === 'unit') this.svc.reimport({ unit: e.target.value });
+    if (r === 'cpick') { this._dragging = false; this.applyCustom(e.target.value, { source: 'pick' }); }
+    if (r === 'ch' || r === 'cs' || r === 'cl') { this._dragging = false; this.applyCustom(this.hexFromSliders(), { source: 'slider' }); }
+    if (r === 'chex') {
+      const hx = validHex(e.target.value);
+      this._dragging = false;
+      if (hx) this.applyCustom(hx, { source: 'hex' }); else this.renderPalette();
+    }
     if (e.target.dataset.rule && z) {
       const checks = [...this.root.querySelectorAll('[data-rule]')];
       const on = checks.filter((c) => c.checked).map((c) => c.dataset.rule);
@@ -336,6 +421,8 @@ export class UI {
       case 'clearsel': app.clearSelection(); break;
       case 'autorotate': this.autorotate = !(el.getAttribute('aria-pressed') === 'true'); el.setAttribute('aria-pressed', String(this.autorotate)); app.viewer.setAutoRotate(this.autorotate); break;
       case 'present': this.setPresent(this.el.dataset.present !== '1'); break;
+      case 'present-exit': this.setPresent(false); break;
+      case 'exit-client': if (!this.locked) this.setMode(prefs.get('mode', 'vitrine') === 'atelier' ? 'atelier' : 'vitrine'); break;
       case 'dlg-close': this.dlg.close(); break;
       case 'zhide': { const z = app.zones.find((zz) => zz.pieceIds.some((id) => app.selection.has(id))); if (z) app.setHidden(z.pieceIds, !z.pieceIds.every((id) => app.hidden.has(id))); break; }
       case 'zsplit': { const z = app.zones.find((zz) => zz.pieceIds.some((id) => app.selection.has(id))); if (z) app.splitZone(z.id); break; }
@@ -352,12 +439,32 @@ export class UI {
     }
   }
 
+  /** Plein écran : sur iPhone (pas d'API Fullscreen) l'interface se réduit à la vue 3D + un bouton de sortie visible. */
   setPresent(on) {
     this.el.dataset.present = on ? '1' : '0';
     $('[data-a=present]', this.root).setAttribute('aria-pressed', String(on));
-    if (on && document.documentElement.requestFullscreen && !/iPhone|iPad/.test(navigator.userAgent)) document.documentElement.requestFullscreen().catch(() => {});
+    if (on) this.app.clearSelection();
+    const canFs = document.documentElement.requestFullscreen && !/iPhone|iPad/.test(navigator.userAgent);
+    if (on && canFs) document.documentElement.requestFullscreen().catch(() => {});
     if (!on && document.fullscreenElement) document.exitFullscreen?.();
+    for (const d of [50, 250]) setTimeout(() => this.app.viewer.resize(), d);
+  }
+
+  setMode(m) {
+    if (this.locked) m = 'client';
+    this.mode = m;
+    if (m !== 'client') prefs.set('mode', m);
+    this.app.viewer.setAutoRotate(m !== 'atelier' && this.autorotate !== false);
+    if (m === 'client') { this.app.clearSelection(); this.setPresent(false); }
+    this.renderAll();
     setTimeout(() => this.app.viewer.resize(), 50);
+  }
+
+  /** Lien client : interface épurée, verrouillée. */
+  lockClient() {
+    this.locked = true;
+    this.el.dataset.locked = '1';
+    this.setMode('client');
   }
 
   setBg(k) {
@@ -419,31 +526,36 @@ export class UI {
 
   html(s) { const d = document.createElement('div'); d.innerHTML = s; return d; }
 
-  shareUrl() {
+  shareUrl(client = false) {
     const a = this.app;
     return buildShareUrl(location.origin + location.pathname, {
-      modelId: a.modelId, assign: a.assign, hidden: [...a.hidden],
+      client, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden],
       env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI),
     });
   }
 
   async openShare() {
-    const url = this.shareUrl();
+    const urls = { client: this.shareUrl(true), jeweler: this.shareUrl(false) };
+    const field = (k, label) => `<p class="palette-title">${label}</p>
+      <input type="url" readonly value="${esc(urls[k])}" data-r="shareurl-${k}" aria-label="${esc(label)}">
+      <div class="row"><button class="btn ${k === 'client' ? 'primary' : ''}" data-s="copy" data-k="${k}">${t('copyLink')}</button>
+        ${navigator.share ? `<button class="btn" data-s="native" data-k="${k}">${t('share')}…</button>` : ''}</div>`;
     const d = this.html(`
+      <p class="muted tiny">${t('clientNote')}</p>
+      ${field('client', t('clientLink'))}
+      <img class="qr" alt="QR" width="180" height="180">
+      ${field('jeweler', t('jewelerLink'))}
       <p class="muted tiny">${t('shareNote')}</p>
-      <input type="url" readonly value="${esc(url)}" data-r="shareurl" aria-label="${t('share')}">
-      <div class="row"><button class="btn primary" data-s="copy">${t('copyLink')}</button>
-        ${navigator.share ? `<button class="btn" data-s="native">${t('share')}…</button>` : ''}
-        <button class="btn" data-s="project">${t('exportProject')}</button></div>
-      <img class="qr" alt="QR" width="180" height="180">`);
+      <div class="row"><button class="btn" data-s="project">${t('exportProject')}</button></div>`);
     d.addEventListener('click', async (e) => {
-      const s = e.target.closest('[data-s]')?.dataset.s;
-      if (s === 'copy') { try { await navigator.clipboard.writeText(url); this.toast(t('linkCopied')); } catch { $('[data-r=shareurl]', d).select(); } }
+      const b = e.target.closest('[data-s]'); if (!b) return;
+      const s = b.dataset.s, url = urls[b.dataset.k];
+      if (s === 'copy') { try { await navigator.clipboard.writeText(url); this.toast(t('linkCopied')); } catch { $(`[data-r=shareurl-${b.dataset.k}]`, d).select(); } }
       if (s === 'native') { try { await navigator.share({ url, title: t('app') }); } catch { /* annulé */ } }
       if (s === 'project') this.exportProject();
     });
     this.openDialog(t('share'), d);
-    qrDataUrl(url).then((u) => { $('img.qr', d).src = u; }).catch(() => {});
+    qrDataUrl(urls.client).then((u) => { $('img.qr', d).src = u; }).catch(() => {});
   }
 
   async exportProject() {
@@ -501,7 +613,7 @@ export class UI {
   async openAR() {
     const app = this.app;
     const d = this.html('');
-    const url = this.shareUrl();
+    const url = this.shareUrl(this.mode === 'client');
     if (!isMobile()) {
       d.innerHTML = `<p>${t('arDesktop')}</p><img class="qr" alt="QR" width="200" height="200">`;
       this.openDialog(t('arTitle'), d);
@@ -541,7 +653,7 @@ export class UI {
   }
 
   onboard() {
-    if (prefs.get('onboarded')) return;
+    if (prefs.get('onboarded') || this.locked) return;
     const d = this.html(`<p>${t('onboardBody')}</p><p class="muted tiny">${t('privacy')}</p><div class="row"><button class="btn primary" data-s="ok">${t('gotIt')}</button></div>`);
     d.addEventListener('click', (e) => { if (e.target.closest('[data-s=ok]')) { prefs.set('onboarded', true); this.dlg.close(); } });
     this.openDialog(t('onboardTitle'), d);

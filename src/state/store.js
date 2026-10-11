@@ -44,15 +44,18 @@ export class History {
 export function packAssign(assign) {
   const groups = new Map();
   for (const [id, a] of Object.entries(assign)) {
-    const k = `${a.m}|${a.f ?? ''}`;
+    const k = `${a.m}|${a.f ?? ''}|${a.c ?? ''}`;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(id);
   }
-  return [...groups.entries()].map(([k, ids]) => { const [m, f] = k.split('|'); return f ? [ids, m, f] : [ids, m]; });
+  return [...groups.entries()].map(([k, ids]) => {
+    const [m, f, c] = k.split('|');
+    return c ? [ids, m, f || 0, c] : f ? [ids, m, f] : [ids, m];
+  });
 }
 export function unpackAssign(packed) {
   const out = {};
-  for (const [ids, m, f] of packed) for (const id of ids) out[id] = f ? { m, f } : { m };
+  for (const [ids, m, f, c] of packed) for (const id of ids) out[id] = { m, ...(f ? { f } : {}), ...(c ? { c } : {}) };
   return out;
 }
 
@@ -64,8 +67,8 @@ export function decodeShare(str) {
 }
 
 /** Construit l'URL de partage de la configuration courante. */
-export function buildShareUrl(base, { modelId, assign, env, envRot, hidden }) {
-  const payload = { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden };
+export function buildShareUrl(base, { modelId, assign, env, envRot, hidden, client = false }) {
+  const payload = { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden, ...(client ? { k: 1 } : {}) };
   return `${base}#c=${encodeShare(payload)}`;
 }
 
@@ -74,7 +77,7 @@ export function parseShareHash(hash) {
   if (!m) return null;
   const p = decodeShare(m[1]);
   if (!p || p.v !== 1) return null;
-  return { modelId: p.model, assign: unpackAssign(p.a || []), env: p.e, envRot: p.r, hidden: p.h || [] };
+  return { modelId: p.model, assign: unpackAssign(p.a || []), env: p.e, envRot: p.r, hidden: p.h || [], client: !!p.k };
 }
 
 /** Préférences par viewer (jamais bloquant si le stockage est indisponible : mode privé iOS, etc.). */

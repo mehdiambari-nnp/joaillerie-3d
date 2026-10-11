@@ -5,7 +5,7 @@ import { Viewer } from './core/viewer.js';
 import { Picker } from './selection/picker.js';
 import { History } from './state/store.js';
 import { createMaterial, transitionMaterial } from './materials/factory.js';
-import { DEFAULT_METAL, DEFAULT_GEM, METALS, GEMS } from './materials/library.js';
+import { DEFAULT_METAL, DEFAULT_GEM, isMaterialFor, normalizeAssignment, validHex, CUSTOM } from './materials/library.js';
 import { similarPieceIds } from './import/zones.js';
 
 class Emitter {
@@ -31,6 +31,7 @@ export class Configurator extends Emitter {
     this.selection = new Set();
     this.hover = null;
     this.multi = false;
+    this.interactive = true; // false en mode client : pas de sélection de pièces
     this.granularity = 'zone'; // 'zone' | 'piece'
     this.history = new History(50);
     this.variants = [];
@@ -53,6 +54,7 @@ export class Configurator extends Emitter {
     this.assign = {};
     for (const p of this.pieces) this.assign[p.id] = { ...(p.kind === 'gem' ? DEFAULT_GEM : DEFAULT_METAL) };
     if (config?.assign) Object.assign(this.assign, config.assign);
+    this._normalizeAll();
     this.hidden = new Set(config?.hidden || []);
     this.selection.clear();
     for (const p of this.pieces) { this._ensureMaterial(p, false); p.mesh.visible = !this.hidden.has(p.id); }
@@ -98,19 +100,20 @@ export class Configurator extends Emitter {
       piece.mesh.material = m;
       return;
     }
-    if (animate) transitionMaterial(cur, piece.kind, a, { onTick: () => this.viewer.invalidate() });
+    transitionMaterial(cur, piece.kind, a, { duration: animate ? 200 : 0, onTick: () => this.viewer.invalidate() });
   }
 
   /** Applique une affectation à des pièces (temps réel + historique). */
-  applyMaterial(pieceIds, a, { record = true } = {}) {
+  applyMaterial(pieceIds, a, { record = true, animate = true } = {}) {
     for (const id of pieceIds) {
       const p = this.pieceById(id);
       if (!p) continue;
-      const wanted = p.kind === 'gem' ? GEMS.some((g) => g.id === a.m) : METALS.some((m) => m.id === a.m);
-      if (!wanted) continue; // une pierre ne reçoit pas un métal et inversement
+      if (a.m != null && !isMaterialFor(p.kind, a.m)) continue; // une pierre ne reçoit pas un métal et inversement
       const prev = this.assign[id] || {};
-      this.assign[id] = p.kind === 'gem' ? { m: a.m } : { m: a.m ?? prev.m, f: a.f ?? prev.f ?? DEFAULT_METAL.f };
-      this._ensureMaterial(p, true);
+      const m = a.m ?? prev.m;
+      const c = m === CUSTOM ? (validHex(a.c) ?? prev.c) : undefined;
+      this.assign[id] = normalizeAssignment(p.kind, p.kind === 'gem' ? { m, c } : { m, c, f: a.f ?? prev.f ?? DEFAULT_METAL.f });
+      this._ensureMaterial(p, animate);
     }
     this._refreshHighlight();
     if (record && this.history.push(this.snapshot())) this.emit('history');
@@ -118,16 +121,18 @@ export class Configurator extends Emitter {
     this.viewer.invalidate();
   }
 
-  applyToSelection(a) { this.applyMaterial([...this.selection], a); }
+  applyToSelection(a, opts) { this.applyMaterial([...this.selection], a, opts); }
 
   // ---------- Sélection ----------
   _onHover(id, e) {
+    if (!this.interactive) return;
     this.hover = id;
     this._refreshHighlight();
     this.emit('hover', id ? this.pieceById(id) : null, e);
   }
 
   _onPick(id, { shift }) {
+    if (!this.interactive) return;
     if (!id) { if (!shift && !this.multi) this.clearSelection(); return; }
     const target = this.granularity === 'zone' ? (this.zoneOfPiece(id)?.pieceIds ?? [id]) : [id];
     const multi = shift || this.multi;
@@ -230,10 +235,16 @@ export class Configurator extends Emitter {
   }
 
   // ---------- Instantanés / projets ----------
+  /** Remet toutes les affectations au format courant (anciens liens / projets). */
+  _normalizeAll() {
+    for (const p of this.pieces) this.assign[p.id] = normalizeAssignment(p.kind, this.assign[p.id]) ?? { ...(p.kind === 'gem' ? DEFAULT_GEM : DEFAULT_METAL) };
+  }
+
   snapshot() { return { assign: this.assign, hidden: [...this.hidden] }; }
 
   restore(snap) {
     this.assign = JSON.parse(JSON.stringify(snap.assign));
+    this._normalizeAll();
     this.hidden = new Set(snap.hidden || []);
     for (const p of this.pieces) {
       p.mesh.visible = !this.hidden.has(p.id);

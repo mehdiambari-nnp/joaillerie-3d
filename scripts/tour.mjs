@@ -22,14 +22,14 @@ await shot(page, '02-vitrine-maquette');
 // sélection d'une zone
 await page.evaluate(() => __rc.app.selectZone('z-gem-center')); await shot(page, '03-selection-pierre-centrale');
 await page.click('button[role=tab][data-tab=gems]'); await shot(page, '04-palette-pierres');
-await page.evaluate(() => __rc.app.applyToSelection({ m: 'emerald' })); await shot(page, '05-emeraude-centrale');
-await page.evaluate(() => { __rc.app.selectZone('z-gem-side'); __rc.app.applyToSelection({ m: 'sapphire' }); });
+await page.evaluate(() => __rc.app.applyToSelection({ m: 'green-emerald' })); await shot(page, '05-emeraude-centrale');
+await page.evaluate(() => { __rc.app.selectZone('z-gem-side'); __rc.app.applyToSelection({ m: 'blue-medium' }); });
 await shot(page, '06-saphir-lateraux');
-await page.evaluate(() => { __rc.app.selectZone('z-setting-center'); __rc.app.applyToSelection({ m: 'rose18' }); });
+await page.evaluate(() => { __rc.app.selectZone('z-setting-center'); __rc.app.applyToSelection({ m: 'rose' }); });
 await page.click('button[role=tab][data-tab=metals]'); await shot(page, '07-chaton-or-rose-metaux');
 await page.evaluate(() => { __rc.app.selectZone('z-body'); __rc.app.applyToSelection({ m: 'platinum', f: 'satin' }); });
 await shot(page, '08-corps-platine-satine');
-await page.evaluate(() => { __rc.app.selectZone('z-claw'); __rc.app.applyToSelection({ m: 'white18', f: 'hammered' }); });
+await page.evaluate(() => { __rc.app.selectZone('z-claw'); __rc.app.applyToSelection({ m: 'grey', f: 'hammered' }); });
 await page.evaluate(() => __rc.app.clearSelection());
 await shot(page, '09-bague-composee');
 // multi-sélection + sélection fine

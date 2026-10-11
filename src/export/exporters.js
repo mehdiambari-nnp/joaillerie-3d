@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { USDZExporter } from 'three/examples/jsm/exporters/USDZExporter.js';
-import { GEMS, METALS, byId, gemSubstitute } from '../materials/library.js';
+import { resolveGem, gemSubstitute, describeAssignment, swatchOf, FINISHES, byId } from '../materials/library.js';
 
 /** Désactive la surbrillance de sélection le temps d'un export / d'une capture. */
 export async function withoutHighlight(app, fn) {
@@ -38,7 +38,7 @@ export function buildARScene(app, scaleMode = 'real') {
     const a = app.assign[o.userData.pieceId];
     if (!piece || !a || !piece.mesh.visible) { o.visible = false; return; }
     if (piece.kind === 'gem') {
-      const s = gemSubstitute(byId(GEMS, a.m));
+      const s = gemSubstitute(resolveGem(a));
       o.material = new THREE.MeshStandardMaterial({ color: s.color, metalness: s.metalness, roughness: s.roughness, side: THREE.FrontSide });
     } else {
       const src = piece.mesh.material;
@@ -99,9 +99,9 @@ export function recapRows(app) {
     const a = app.assign[z.pieceIds[0]];
     const names = new Set(z.pieceIds.map((id) => {
       const x = app.assign[id];
-      const metal = byId(METALS, x?.m);
-      return metal ? metal.name + (x.f ? ' · ' + (app.finishName?.(x.f) ?? x.f) : '') : byId(GEMS, x?.m)?.name ?? '';
+      const d = describeAssignment(x, z.type === 'gem' ? 'gem' : 'metal');
+      return x?.f && !d.includes('·') ? `${d} · ${app.finishName?.(x.f) ?? byId(FINISHES, x.f)?.name ?? x.f}` : d;
     }));
-    return { zone: z.name, type: z.type, material: [...names].join(' / '), swatch: (byId(METALS, a?.m) ?? byId(GEMS, a?.m))?.swatch };
+    return { zone: z.name, type: z.type, material: [...names].join(' / '), swatch: swatchOf(z.type === 'gem' ? 'gem' : 'metal', a) };
   });
 }
