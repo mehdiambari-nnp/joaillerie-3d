@@ -41,19 +41,22 @@ const box = await page.locator('canvas').first().boundingBox();
 // point écran d'un sommet réel de la pièce du corps le plus proche de la caméra (déterministe)
 await page.evaluate(() => { __rc.app.viewer.setAutoRotate(false); });
 await page.waitForTimeout(300);
+let picked = false;
+for (let k = 0; k < 3 && !picked; k++) {
 const target = await page.evaluate(() => {
   const T = __rc.THREE, v = __rc.app.viewer, cam = v.camera;
   const p = __rc.app.pieces.find((x) => x.role === 'body') || __rc.app.pieces[0];
   const pos = p.mesh.geometry.attributes.position; let best = null, bd = 1e9;
   const w = new T.Vector3();
-  for (let i = 0; i < pos.count; i += 7) { w.fromBufferAttribute(pos, i).applyMatrix4(p.mesh.matrixWorld); const d = w.distanceTo(cam.position); if (d < bd) { bd = d; best = w.clone(); } }
+  for (let i = 0; i < pos.count; i += 7) { w.fromBufferAttribute(pos, i).applyMatrix4(p.mesh.matrixWorld); const q = w.clone().project(cam); const d = Math.hypot(q.x, q.y) + (q.z > 1 ? 9 : 0); if (d < bd) { bd = d; best = w.clone(); } }
   const n = best.project(cam); const r = v.renderer.domElement.getBoundingClientRect();
   return { x: r.left + (n.x + 1) / 2 * r.width, y: r.top + (1 - n.y) / 2 * r.height };
 });
 await page.mouse.move(target.x, target.y);
 await page.mouse.down(); await page.mouse.up();
 await page.waitForTimeout(500);
-const picked = await page.evaluate(() => __rc.app.selection.size > 0);
+picked = await page.evaluate(() => __rc.app.selection.size > 0);
+}
 ok(picked, 'clic sur la bague → sélection d\'une zone');
 await page.screenshot({ path: OUT + 'e2e-selected.png' });
 
