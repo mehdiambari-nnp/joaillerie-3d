@@ -140,7 +140,8 @@ export class Configurator extends Emitter {
     const zone = this.granularity === 'zone' ? this.zoneOfPiece(id) : null;
     // 1er clic : toute la partie ; clic suivant dans une partie déjà (en partie) sélectionnée : on bascule la pièce visée
     if (zone && zone.pieceIds.length > 1 && zone.pieceIds.some((x) => this.selection.has(x))) {
-      this.selection.has(id) ? this.selection.delete(id) : this.selection.add(id);
+      if (zone.pieceIds.every((x) => this.selection.has(x))) this.selection = new Set([id]); // partie entière sélectionnée → on isole la pierre touchée
+      else this.selection.has(id) ? this.selection.delete(id) : this.selection.add(id);   // sinon on ajoute / retire la pierre touchée
       this._refreshHighlight();
       this.emit('selection');
       return;

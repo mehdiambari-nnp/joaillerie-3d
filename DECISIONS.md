@@ -54,3 +54,4 @@
 - **Pastilles de couleur des pierres** : petites gemmes facettées (SVG généré, `src/materials/gemicon.js`) à la place des ronds — palette, en-têtes d'accordéon et liste des parties.
 - **Rendu (PBR)** : MeshPhysicalMaterial (métal metalness 1, pierres en transmission/IOR/dispersion) + éclairage par image HDRI (IBL). Le HDRI « Ville, plein soleil » reçoit une balance des blancs chaude pour l'éclairage seulement (le fond reste fidèle) : l'or est moins verdâtre quand il reflète le ciel bleu.
 - **Barre d'outils de vue** : explosion + plein écran en ligne en bas à droite ; libellé « Quitter le plein écran » supprimé (le bouton plein écran devient l'icône « réduire » en mode plein écran).
+- **Clic 3D sur une pierre** : 1er clic = toute la partie ; 2e clic (partie entière sélectionnée) = isole la pierre touchée ; clics suivants = ajoute / retire la pierre touchée.
