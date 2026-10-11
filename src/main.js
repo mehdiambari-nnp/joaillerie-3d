@@ -1,4 +1,5 @@
 // Point d'entrée : crée le configurateur, l'interface, charge la bague de démo (ou le fichier demandé).
+import { FEATURES } from './config/features.js';
 import '@fontsource/cormorant-garamond/latin-400.css';
 import '@fontsource/cormorant-garamond/latin-500.css';
 import '@fontsource/cormorant-garamond/latin-600.css';
@@ -78,7 +79,7 @@ async function boot() {
     const glb = await buildDemoRingGLB();
     await load(glb, 'bague-demo.glb', {}, null, 'demo-ring');
   }
-  app.viewer.setAutoRotate(ui.mode !== 'atelier');
+  app.viewer.setAutoRotate(FEATURES.autoRotate && ui.mode !== 'atelier');
   ui.loadThumbnails();
   ui.onboard();
   if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);

@@ -9,7 +9,7 @@ export const ENVIRONMENTS = [
   { id: 'studio', name: 'Atelier', group: 'studio' },
   { id: 'softbox', name: 'Softbox', group: 'studio' },
   { id: 'daylight', name: 'Jour', group: 'studio' },
-  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr' },
+  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr', tint: [1.14, 1.0, 0.76] },
   { id: 'venice', name: 'Coucher de soleil', group: 'hdri', url: 'hdr/venice-sunset.hdr' },
   { id: 'quarry', name: 'Ciel couvert', group: 'hdri', url: 'hdr/quarry.hdr' },
   { id: 'spruit', name: 'Aube', group: 'hdri', url: 'hdr/spruit-sunrise.hdr' },
@@ -95,7 +95,14 @@ export function getEnvironment(renderer, id) {
     if (def.url) {
       const equirect = await new RGBELoader().loadAsync(import.meta.env.BASE_URL + def.url);
       equirect.mapping = THREE.EquirectangularReflectionMapping;
-      const rt = pmrem.fromEquirectangular(equirect);
+      let rt;
+      if (def.tint) {
+        // balance des blancs chaude pour l'éclairage seulement (le fond 360° reste fidèle) : l'or n'est plus verdâtre
+        // quand il reflète un ciel bleu
+        const sc = new THREE.Scene();
+        sc.add(new THREE.Mesh(new THREE.SphereGeometry(50, 64, 32).scale(1, 1, -1), new THREE.MeshBasicMaterial({ map: equirect, color: new THREE.Color(...def.tint) })));
+        rt = pmrem.fromScene(sc, 0);
+      } else rt = pmrem.fromEquirectangular(equirect);
       out = { texture: rt.texture, background: equirect, equirect: true };
     } else {
       const scene = def.id === 'softbox' ? buildSoftbox() : def.id === 'daylight' ? buildDaylight() : buildStudio();
