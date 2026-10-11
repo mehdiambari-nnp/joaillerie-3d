@@ -280,3 +280,19 @@ dialog { border-radius: 20px; }
   .brand .sub { display: none; }
   .seg button { padding: 6px 8px; font-size: 10.5px; letter-spacing: .08em; }
 }
+
+/* Essayage : plein écran sans barre ni panneau, curseurs verticaux à droite */
+.app:has(.viewport.tryon-on) { grid-template-rows: minmax(0, 1fr); }
+.app:has(.viewport.tryon-on) .topbar, .app:has(.viewport.tryon-on) .panel { display: none !important; }
+.app:has(.viewport.tryon-on) .main { grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); }
+.tryon-status { top: calc(12px + var(--safe-t)); font-size: 12px; letter-spacing: .04em; }
+.tryon-top { top: calc(10px + var(--safe-t)); }
+.tryon-top .icon-btn { background: rgba(20, 20, 24, .55); color: #fff; border-color: rgba(255, 255, 255, .25); }
+.tryon-side { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); display: grid; gap: 22px; justify-items: center; color: #fff; text-shadow: 0 1px 4px rgba(0, 0, 0, .6); }
+.vslider { display: grid; justify-items: center; gap: 4px; font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; }
+.vtrack { position: relative; width: 34px; height: 150px; }
+.vtrack input[type='range'] { position: absolute; left: 50%; top: 50%; width: 150px; margin: 0; transform: translate(-50%, -50%) rotate(-90deg); accent-color: #e6c36a; }
+.tryon-row { display: flex; align-items: center; justify-content: center; gap: 18px; }
+.tryon-row select { background: rgba(255, 255, 255, .92); color: #111; border: 0; border-radius: 999px; padding: 8px 12px; font-size: 13px; }
+.tryon-row .btn { background: rgba(255, 255, 255, .92); color: #111; border-color: transparent; }
+.tryon-bottom .muted.tiny { font-size: 11px; opacity: .85; }

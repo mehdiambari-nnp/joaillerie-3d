@@ -51,18 +51,19 @@ export class TryOn {
         <button class="icon-btn" data-a="switch" aria-label="${t('tryonSwitch')}" title="${t('tryonSwitch')}">⟲</button>
         <button class="icon-btn" data-a="close" aria-label="${t('tryonClose')}" title="${t('tryonClose')}">✕</button>
       </div>
+      <div class="tryon-side">
+        <label class="vslider"><span>${t('tryonSizeShort')}</span><div class="vtrack"><input type="range" min="85" max="115" value="${Math.round(this.userScale * 100)}" data-r="scale" aria-label="${t('tryonSize')}" title="${t('tryonSize')}"></div></label>
+        <label class="vslider"><span>${t('tryonFovShort')}</span><div class="vtrack"><input type="range" min="50" max="90" value="${this.fov}" data-r="fov" aria-label="${t('tryonFov')}" title="${t('tryonFov')}"></div></label>
+      </div>
       <div class="tryon-bottom">
-        <div class="tryon-controls">
-          <label>${t('tryonFinger')}
-            <select data-r="finger">
-              <option value="ring">${t('ring')}</option><option value="middle">${t('middle')}</option>
-              <option value="index">${t('index')}</option><option value="pinky">${t('pinky')}</option>
-            </select></label>
-          <label>${t('tryonSize')} <input type="range" min="85" max="115" value="${Math.round(this.userScale * 100)}" data-r="scale"></label>
-          <label>${t('tryonFov')} <input type="range" min="50" max="90" value="${this.fov}" data-r="fov"></label>
+        <div class="tryon-row">
+          <select data-r="finger" aria-label="${t('tryonFinger')}">
+            <option value="ring">${t('ring')}</option><option value="middle">${t('middle')}</option>
+            <option value="index">${t('index')}</option><option value="pinky">${t('pinky')}</option>
+          </select>
+          <button class="shutter" data-a="shot" aria-label="${t('tryonShot')}"></button>
           <button class="btn small" data-a="flip">${t('tryonFlip')}</button>
         </div>
-        <button class="shutter" data-a="shot" aria-label="${t('tryonShot')}"></button>
         <p class="muted tiny">${t('tryonNote')}</p>
       </div>`;
     hud.querySelector('[data-r=finger]').value = this.finger;
@@ -115,6 +116,11 @@ export class TryOn {
     // Scène d'essayage : caméra à l'origine, bague en mètres.
     this.scene = new THREE.Scene();
     this.scene.environment = v.envTexture;
+    // Même HDRI que la vue 3D, incliné : la bague est vue de dessus par la caméra, ses facettes reflètent donc l'horizon
+    // derrière l'utilisateur ; on remonte le ciel lumineux vers cet horizon et on renforce l'intensité pour retrouver l'éclat de la présentation.
+    this.scene.environmentRotation.copy(v.scene.environmentRotation);
+    this.scene.environmentRotation.x = -0.85;
+    this.scene.environmentIntensity = 1.9;
     // L'image caméra est le fond de la scène 3D : les pierres (transmission) réfractent ainsi le vrai décor.
     this.videoTex = new THREE.VideoTexture(this.video);
     this.videoTex.colorSpace = THREE.SRGBColorSpace;
@@ -137,7 +143,7 @@ export class TryOn {
 
     // LOD allégé (une seule fois par session d'essayage)
     try {
-      this.lod = await applyTryOnLOD(app.pieces, 0.25);
+      this.lod = await applyTryOnLOD(app.pieces, 0.5);
     } catch { this.lod = null; }
     app.viewer.root.traverse((o) => { if (o.isMesh) o.frustumCulled = false; });
 
@@ -211,7 +217,7 @@ export class TryOn {
     const d = c.getImageData(0, 0, 16, 16).data;
     let s = 0; for (let i = 0; i < d.length; i += 4) s += 0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2];
     const L = s / (256 * 255);
-    this.viewer.renderer.toneMappingExposure = Math.min(1.3, Math.max(0.7, 0.55 + L * 0.9));
+    this.viewer.renderer.toneMappingExposure = Math.min(1.3, Math.max(0.95, 0.7 + L * 0.9));
   }
 
   // ---------- Boucle ----------
