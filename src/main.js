@@ -46,6 +46,7 @@ async function boot() {
         if (pending.env) app.viewer.setEnvironment(pending.env);
         if (pending.envRot != null) app.viewer.setEnvironmentRotation(pending.envRot);
         pending = null;
+        app.exploder.assembleNow(); // un lien de partage s'ouvre toujours bague assemblée, jamais éclatée
       }
       ui.progress(100);
       return model;
@@ -56,6 +57,9 @@ async function boot() {
       return null;
     }
   }
+
+  // Coller un lien de partage dans l'onglet déjà ouvert ne recharge pas la page : on la recharge pour repartir d'un état neuf (assemblé).
+  window.addEventListener('hashchange', () => { if (/[#&]c=/.test(location.hash)) location.reload(); });
 
   svc.openFile = async (file) => {
     const buffer = await file.arrayBuffer();

@@ -25,6 +25,10 @@ export class TryOn {
     this.fov = prefs.get('tryon.fov', 66);       // champ de vision sur le grand côté (calibration)
     this.userScale = prefs.get('tryon.scale', 1); // correction de taille ±15 %
     this.flip = false;
+    this.along = prefs.get('tryon.along', 0.36); // position de la bague le long du doigt (0 = base, 1 = bout)
+    // Lissage des points de la main avant le calcul de pose (le bruit en profondeur est la 1re cause de bague « tournée »).
+    this.lmFilter = new OneEuroVec(63, 1.5, 6, 1);
+    this.wlFilter = new OneEuroVec(63, 0.8, 10, 1);
     this.filters = { pos: new OneEuroVec(3, 1.2, 0.02, 1), axis: new OneEuroVec(3, 1.5, 0.02, 1), top: new OneEuroVec(3, 1.5, 0.02, 1) };
     this.lastSeen = 0;
     this.inferMs = [];
@@ -46,14 +50,12 @@ export class TryOn {
   _buildHud() {
     const hud = h('div', 'tryon-hud');
     hud.innerHTML = `
-      <div class="chip tryon-status" data-r="status">${t('tryonLooking')}</div>
       <div class="tryon-top">
-        <button class="icon-btn" data-a="switch" aria-label="${t('tryonSwitch')}" title="${t('tryonSwitch')}">⟲</button>
         <button class="icon-btn" data-a="close" aria-label="${t('tryonClose')}" title="${t('tryonClose')}">✕</button>
       </div>
       <div class="tryon-side">
         <label class="vslider"><span>${t('tryonSizeShort')}</span><div class="vtrack"><input type="range" min="85" max="115" value="${Math.round(this.userScale * 100)}" data-r="scale" aria-label="${t('tryonSize')}" title="${t('tryonSize')}"></div></label>
-        <label class="vslider"><span>${t('tryonFovShort')}</span><div class="vtrack"><input type="range" min="50" max="90" value="${this.fov}" data-r="fov" aria-label="${t('tryonFov')}" title="${t('tryonFov')}"></div></label>
+        <label class="vslider"><span>${t('tryonPosShort')}</span><div class="vtrack"><input type="range" min="10" max="65" value="${Math.round(this.along * 100)}" data-r="along" aria-label="${t('tryonPos')}" title="${t('tryonPos')}"></div></label>
       </div>
       <div class="tryon-bottom">
         <div class="tryon-row">
@@ -96,6 +98,7 @@ export class TryOn {
     err.hidden = true;
     const btn = this.intro.querySelector('[data-a=start]');
     btn.disabled = true; btn.textContent = t('loading');
+    this._startMotion(); // doit être appelé pendant le geste (permission iOS)
     try {
       // Le tracker se charge en parallèle de la permission caméra.
       this.tracker ||= new HandTracker();
@@ -150,7 +153,6 @@ export class TryOn {
 
     this.hud = this._buildHud();
     this.host.append(this.hud);
-    this.statusEl = this.hud.querySelector('[data-r=status]');
     this.hud.addEventListener('click', (e) => this._onHud(e));
     this.hud.addEventListener('input', (e) => this._onInput(e));
     this._applyVideoSize();
@@ -192,24 +194,48 @@ export class TryOn {
     if (a === 'close') this.close();
     else if (a === 'flip') { this.flip = !this.flip; }
     else if (a === 'shot') this.capture();
-    else if (a === 'switch') this._switchCamera();
   }
 
   _onInput(e) {
     const r = e.target.dataset.r;
     if (r === 'finger') { this.finger = e.target.value; prefs.set('tryon.finger', this.finger); this._resetFilters(); }
     if (r === 'scale') { this.userScale = e.target.value / 100; prefs.set('tryon.scale', this.userScale); }
-    if (r === 'fov') { this.fov = +e.target.value; prefs.set('tryon.fov', this.fov); this._applyCameraAspect(); }
+    if (r === 'along') { this.along = e.target.value / 100; prefs.set('tryon.along', this.along); this._resetFilters(); }
   }
 
-  _resetFilters() { Object.values(this.filters).forEach((f) => f.reset()); }
-
-  async _switchCamera() {
-    this.facing = this.facing === 'environment' ? 'user' : 'environment';
-    prefs.set('tryon.facing', this.facing);
-    try { this.camInfo = await startCamera(this.video, this.facing); this.camInfo.facing = this.facing; this._applyVideoSize(); this._applyCameraAspect(); this._resetFilters(); }
-    catch { this.toast(t('tryonNoCam')); }
+  // ---------- Mouvement du téléphone ----------
+  // Les reflets de la bague doivent suivre le mouvement du téléphone : l'environnement est fixe dans la pièce, pas dans la caméra.
+  async _startMotion() {
+    this._devQ = null; this._devRef = null; this._envBase = null; this._envQ = null;
+    try {
+      const D = window.DeviceOrientationEvent;
+      if (!D) return;
+      if (typeof D.requestPermission === 'function') { if ((await D.requestPermission()) !== 'granted') return; }
+      this._onOrient = (e) => {
+        if (e.alpha == null) return;
+        const rad = Math.PI / 180;
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(e.beta * rad, e.alpha * rad, -e.gamma * rad, 'YXZ'));
+        q.multiply(new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2)); // l'arrière du téléphone regarde la scène
+        const so = ((screen.orientation?.angle ?? window.orientation ?? 0) * rad) || 0;
+        q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -so));
+        this._devQ = q;
+        this._devRef ||= q.clone();
+      };
+      window.addEventListener('deviceorientation', this._onOrient);
+    } catch { /* capteurs indisponibles : reflets fixes */ }
   }
+
+  _applyMotion() {
+    if (!this._devQ || !this.scene) return;
+    // rotation de la caméra depuis le début de l'essayage, exprimée dans son propre repère
+    const rel = this._devRef.clone().invert().multiply(this._devQ);
+    const target = rel.invert().multiply(this._envBase ||= new THREE.Quaternion().setFromEuler(this.scene.environmentRotation));
+    this._envQ ||= target.clone();
+    this._envQ.slerp(target, 0.15);
+    this.scene.environmentRotation.setFromQuaternion(this._envQ);
+  }
+
+  _resetFilters() { [this.lmFilter, this.wlFilter, ...Object.values(this.filters)].forEach((f) => f.reset()); }
 
   _estimateLight() {
     if (!this.video || this.video.readyState < 2) return;
@@ -232,7 +258,8 @@ export class TryOn {
       if (this._frame % this.skip === 0) this._detect(now);
     }
     // bague perdue depuis > 0,6 s → masquée
-    if (this.anchor.visible && now - this.lastSeen > 600) { this.anchor.visible = false; this._setStatus(false); }
+    if (this.anchor.visible && now - this.lastSeen > 600) { this.anchor.visible = false; this._lost = true; }
+    this._applyMotion();
     this.viewer.renderer.render(this.scene, this.camera);
   }
 
@@ -243,10 +270,13 @@ export class TryOn {
     catch { this._gpuFailed(); return; }
     this._trackPerf(performance.now() - t0);
     if (!res) return;
-    const pose = computeRingPose({ lm: res.lm, wl: res.wl, label: res.label, width: this.vw, height: this.vh, fovLongDeg: this.fov, finger: this.finger, flip: this.flip });
+    const ts = now / 1000;
+    if (this._lost) { this._resetFilters(); this._lost = false; }
+    const sm = (flt, pts) => { const o = flt.filter(pts.flatMap((q) => [q.x, q.y, q.z]), ts); return pts.map((_, i) => ({ x: o[i * 3], y: o[i * 3 + 1], z: o[i * 3 + 2] })); };
+    res = { ...res, lm: sm(this.lmFilter, res.lm), wl: sm(this.wlFilter, res.wl) };
+    const pose = computeRingPose({ lm: res.lm, wl: res.wl, label: res.label, width: this.vw, height: this.vh, fovLongDeg: this.fov, finger: this.finger, along: this.along, flip: this.flip });
     if (!pose) return;
     this.lastDetect = { lm: res.lm, wl: res.wl, label: res.label, score: res.score, pose };
-    const ts = now / 1000;
     const p = this.filters.pos.filter(pose.position.toArray(), ts);
     const a = new THREE.Vector3(...this.filters.axis.filter(pose.axis.toArray(), ts)).normalize();
     const tp = new THREE.Vector3(...this.filters.top.filter(pose.top.toArray(), ts));
@@ -257,14 +287,6 @@ export class TryOn {
     this.anchor.scale.setScalar(this.userScale);
     this.anchor.visible = true;
     this.lastSeen = now;
-    this._setStatus(true);
-  }
-
-  _setStatus(found) {
-    if (this._found === found) return;
-    this._found = found;
-    this.statusEl.textContent = found ? t('tryonFound') : t('tryonLooking');
-    this.statusEl.classList.toggle('ok', found);
   }
 
   _trackPerf(ms) {
@@ -306,6 +328,8 @@ export class TryOn {
     cancelAnimationFrame(this._raf);
     clearInterval(this._lumaTimer);
     window.removeEventListener('resize', this._onResize);
+    if (this._onOrient) window.removeEventListener('deviceorientation', this._onOrient);
+    this._devQ = null;
     stopCamera(this.video);
     this.tracker?.close(); this.tracker = null;
     if (this.ringRoot) {

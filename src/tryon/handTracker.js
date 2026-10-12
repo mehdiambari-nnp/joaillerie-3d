@@ -13,8 +13,8 @@ export class HandTracker {
       runningMode: 'VIDEO',
       numHands: 1,
       minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      minHandPresenceConfidence: 0.6,
+      minTrackingConfidence: 0.6,
     });
     try { this.landmarker = await make(preferred); this.delegate = preferred; }
     catch (e) {
