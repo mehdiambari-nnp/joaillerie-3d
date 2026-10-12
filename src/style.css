@@ -429,3 +429,8 @@ dialog { border-radius: 20px; }
 .brand .logo svg { height: var(--logo-h, 22px); width: auto; display: block; }
 .app[data-mode='client'] .brand .logo svg { height: var(--logo-h-client, 28px); }
 @media (max-width: 400px) { .brand .logo svg { height: calc(var(--logo-h, 22px) * .85); } }
+
+/* Mode client : boutons de la vue 3D bien visibles, y compris l'état actif (explosion) */
+.app[data-mode='client'] .hud-right .icon-btn { width: 44px; height: 44px; background: color-mix(in srgb, var(--surface) 70%, transparent); border-color: color-mix(in srgb, var(--ink) 35%, transparent); color: var(--ink); }
+.app[data-mode='client'] .hud-right .icon-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.icon-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }

@@ -71,3 +71,7 @@
 
 ## Itération 9 — zoom automatique sur la sélection
 - Sélectionner une partie (clic 3D ou liste) cadre la caméra dessus ; pour des pierres, la vue passe de face (depuis l'extérieur de la bague) afin de bien voir couleur et facettes. Vider la sélection revient au cadrage d'ensemble en gardant l'angle courant. Pas de rezoom en changeant de pierre dans la même partie. Désactivable : flag `autoZoomSelect` (`src/config/features.js`, surchargeable par thème).
+
+## Itération 10 — vue éclatée par étages
+- L'éclatement se fait désormais **par étages le long de l'axe « haut »** : corps (descend légèrement) → sertissage (chatons, paniers, griffes) → pierres (en haut), avec un faible écart latéral pour séparer gauche/droite. Distances réduites (pas de plafond arbitraire à 55 % de la taille). La caméra se recentre sur l'ensemble éclaté.
+- Mode client : le bouton d'explosion actif était invisible (fond transparent + texte de la couleur du fond) → états actifs et boutons plus contrastés (44 px).
