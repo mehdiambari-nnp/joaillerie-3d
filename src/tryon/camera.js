@@ -12,7 +12,7 @@ export async function startCamera(video, facing = 'environment') {
   if (!navigator.mediaDevices?.getUserMedia) throw new CameraError('unsupported', 'getUserMedia indisponible (HTTPS requis).');
   stopCamera(video);
   try {
-    stream = await openStream({ facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } });
+    stream = await openStream({ facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } });
   } catch (e) {
     if (e.name === 'NotAllowedError' || e.name === 'SecurityError') throw new CameraError('denied', e.message);
     if (e.name === 'NotFoundError' || e.name === 'OverconstrainedError') throw new CameraError('nocam', e.message);
@@ -26,7 +26,7 @@ export async function startCamera(video, facing = 'environment') {
       const better = devs.find((d) => /back|arri|rear|environment/i.test(d.label) && !/ultra|tele|télé/i.test(d.label));
       if (better) {
         stream.getTracks().forEach((t) => t.stop());
-        stream = await openStream({ deviceId: { exact: better.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } });
+        stream = await openStream({ deviceId: { exact: better.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 60 } });
       }
     }
   } catch { /* on garde le flux obtenu */ }

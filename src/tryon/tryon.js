@@ -26,6 +26,9 @@ export class TryOn {
     this.userScale = prefs.get('tryon.scale', 1); // correction de taille ±15 %
     this.flip = false;
     this.along = prefs.get('tryon.along', 0.36); // position de la bague le long du doigt (0 = base, 1 = bout)
+    // Lissage des points de la main avant le calcul de pose (le bruit en profondeur est la 1re cause de bague « tournée »).
+    this.lmFilter = new OneEuroVec(63, 1.5, 6, 1);
+    this.wlFilter = new OneEuroVec(63, 0.8, 10, 1);
     this.filters = { pos: new OneEuroVec(3, 1.2, 0.02, 1), axis: new OneEuroVec(3, 1.5, 0.02, 1), top: new OneEuroVec(3, 1.5, 0.02, 1) };
     this.lastSeen = 0;
     this.inferMs = [];
@@ -95,6 +98,7 @@ export class TryOn {
     err.hidden = true;
     const btn = this.intro.querySelector('[data-a=start]');
     btn.disabled = true; btn.textContent = t('loading');
+    this._startMotion(); // doit être appelé pendant le geste (permission iOS)
     try {
       // Le tracker se charge en parallèle de la permission caméra.
       this.tracker ||= new HandTracker();
@@ -199,7 +203,39 @@ export class TryOn {
     if (r === 'along') { this.along = e.target.value / 100; prefs.set('tryon.along', this.along); this._resetFilters(); }
   }
 
-  _resetFilters() { Object.values(this.filters).forEach((f) => f.reset()); }
+  // ---------- Mouvement du téléphone ----------
+  // Les reflets de la bague doivent suivre le mouvement du téléphone : l'environnement est fixe dans la pièce, pas dans la caméra.
+  async _startMotion() {
+    this._devQ = null; this._devRef = null; this._envBase = null; this._envQ = null;
+    try {
+      const D = window.DeviceOrientationEvent;
+      if (!D) return;
+      if (typeof D.requestPermission === 'function') { if ((await D.requestPermission()) !== 'granted') return; }
+      this._onOrient = (e) => {
+        if (e.alpha == null) return;
+        const rad = Math.PI / 180;
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(e.beta * rad, e.alpha * rad, -e.gamma * rad, 'YXZ'));
+        q.multiply(new THREE.Quaternion(-Math.SQRT1_2, 0, 0, Math.SQRT1_2)); // l'arrière du téléphone regarde la scène
+        const so = ((screen.orientation?.angle ?? window.orientation ?? 0) * rad) || 0;
+        q.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), -so));
+        this._devQ = q;
+        this._devRef ||= q.clone();
+      };
+      window.addEventListener('deviceorientation', this._onOrient);
+    } catch { /* capteurs indisponibles : reflets fixes */ }
+  }
+
+  _applyMotion() {
+    if (!this._devQ || !this.scene) return;
+    // rotation de la caméra depuis le début de l'essayage, exprimée dans son propre repère
+    const rel = this._devRef.clone().invert().multiply(this._devQ);
+    const target = rel.invert().multiply(this._envBase ||= new THREE.Quaternion().setFromEuler(this.scene.environmentRotation));
+    this._envQ ||= target.clone();
+    this._envQ.slerp(target, 0.15);
+    this.scene.environmentRotation.setFromQuaternion(this._envQ);
+  }
+
+  _resetFilters() { [this.lmFilter, this.wlFilter, ...Object.values(this.filters)].forEach((f) => f.reset()); }
 
   _estimateLight() {
     if (!this.video || this.video.readyState < 2) return;
@@ -222,7 +258,8 @@ export class TryOn {
       if (this._frame % this.skip === 0) this._detect(now);
     }
     // bague perdue depuis > 0,6 s → masquée
-    if (this.anchor.visible && now - this.lastSeen > 600) { this.anchor.visible = false; }
+    if (this.anchor.visible && now - this.lastSeen > 600) { this.anchor.visible = false; this._lost = true; }
+    this._applyMotion();
     this.viewer.renderer.render(this.scene, this.camera);
   }
 
@@ -233,10 +270,13 @@ export class TryOn {
     catch { this._gpuFailed(); return; }
     this._trackPerf(performance.now() - t0);
     if (!res) return;
+    const ts = now / 1000;
+    if (this._lost) { this._resetFilters(); this._lost = false; }
+    const sm = (flt, pts) => { const o = flt.filter(pts.flatMap((q) => [q.x, q.y, q.z]), ts); return pts.map((_, i) => ({ x: o[i * 3], y: o[i * 3 + 1], z: o[i * 3 + 2] })); };
+    res = { ...res, lm: sm(this.lmFilter, res.lm), wl: sm(this.wlFilter, res.wl) };
     const pose = computeRingPose({ lm: res.lm, wl: res.wl, label: res.label, width: this.vw, height: this.vh, fovLongDeg: this.fov, finger: this.finger, along: this.along, flip: this.flip });
     if (!pose) return;
     this.lastDetect = { lm: res.lm, wl: res.wl, label: res.label, score: res.score, pose };
-    const ts = now / 1000;
     const p = this.filters.pos.filter(pose.position.toArray(), ts);
     const a = new THREE.Vector3(...this.filters.axis.filter(pose.axis.toArray(), ts)).normalize();
     const tp = new THREE.Vector3(...this.filters.top.filter(pose.top.toArray(), ts));
@@ -288,6 +328,8 @@ export class TryOn {
     cancelAnimationFrame(this._raf);
     clearInterval(this._lumaTimer);
     window.removeEventListener('resize', this._onResize);
+    if (this._onOrient) window.removeEventListener('deviceorientation', this._onOrient);
+    this._devQ = null;
     stopCamera(this.video);
     this.tracker?.close(); this.tracker = null;
     if (this.ringRoot) {

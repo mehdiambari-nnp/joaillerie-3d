@@ -120,3 +120,10 @@
 ## Itération 18 — épuration de l'essayage
 - Retrait du bouton « changer de caméra » (⟲), du libellé « Recherche de la main… / Main détectée » et du curseur « Vision ». Le champ de vision reste à sa valeur calibrée (66°, ou celle déjà mémorisée).
 - Nouveau curseur « Position » : déplace la bague le long du doigt (paramètre `along` de `computeRingPose`, 0,10–0,65, défaut 0,36, mémorisé).
+
+## Itération 19 — qualité du suivi et sensation de 3D (essayage)
+- **Points lissés avant la pose** : filtre One Euro sur les 21 points image et les 21 points « monde » (le bruit en profondeur faisait « tourner » la bague), puis filtre léger sur la pose. Réinitialisé quand la main est perdue ou le doigt/la position change.
+- **Orientation** : le dessus de la bague suit à 85 % la normale mesurée du dos de la main (60 % avant), 15 % de rappel vers la caméra pour éviter les retournements.
+- **Reflets liés au téléphone** : l'orientation du téléphone (capteurs, permission iOS demandée au toucher de « Activer la caméra ») tourne l'environnement des reflets en sens inverse, comme une pièce fixe. Repli silencieux sans capteur.
+- Caméra 60 i/s demandés si possible ; seuils de présence/suivi MediaPipe 0,5 → 0,6.
+- Non vérifié sur iPhone réel ; la photo de test fixe ne mesure ni la latence ni le tremblement.
