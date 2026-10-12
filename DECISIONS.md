@@ -75,3 +75,7 @@
 ## Itération 10 — vue éclatée par étages
 - L'éclatement se fait désormais **par étages le long de l'axe « haut »** : corps (descend légèrement) → sertissage (chatons, paniers, griffes) → pierres (en haut), avec un faible écart latéral pour séparer gauche/droite. Distances réduites (pas de plafond arbitraire à 55 % de la taille). La caméra se recentre sur l'ensemble éclaté.
 - Mode client : le bouton d'explosion actif était invisible (fond transparent + texte de la couleur du fond) → états actifs et boutons plus contrastés (44 px).
+
+## Itération 11 — modèle par défaut par client
+- Clé `defaultModel` du `theme.json` : le fichier (dans `themes/<client>/`) est copié dans le build (`model/…`) et chargé au démarrage ; repli sur la bague de démonstration s'il manque. Domuse : `MAQUETTE_GEMV.fbx`. L'identifiant du modèle reste le nom du fichier, donc les liens de partage existants continuent d'appliquer leur configuration.
+- Conséquence assumée : ce FBX est désormais accessible publiquement avec le site du client (avant, il n'était jamais embarqué dans le build).

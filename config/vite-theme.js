@@ -19,7 +19,8 @@ export function loadTheme(id = process.env.THEME || 'domuse', root = process.cwd
     const p = path.join(dir, f);
     if (fs.existsSync(p)) logos[k] = fs.readFileSync(p, 'utf8').replace(/<\?xml[^>]*>/, '').trim();
   }
-  return { dir, theme, logos };
+  const dm = theme.defaultModel && fs.existsSync(path.join(dir, theme.defaultModel)) ? theme.defaultModel : null;
+  return { dir, theme, logos, defaultModel: dm };
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
@@ -40,7 +41,7 @@ export function manifestOf(theme) {
 }
 
 export default function themePlugin() {
-  const { dir, theme, logos } = loadTheme();
+  const { dir, theme, logos, defaultModel } = loadTheme();
   const icons = ['icon-180.png', 'icon-192.png', 'icon-512.png'];
   const iconPath = (n) => path.join(dir, 'icons', n);
   return {
@@ -49,7 +50,7 @@ export default function themePlugin() {
     load(id) {
       if (id !== RID) return null;
       const fonts = (theme.fonts?.packages || []).map((p) => `import ${JSON.stringify(p)};`).join('\n');
-      return `${fonts}\nexport default ${JSON.stringify({ ...theme, logoSvg: logos })};`;
+      return `${fonts}\nexport default ${JSON.stringify({ ...theme, logoSvg: logos, defaultModelUrl: defaultModel ? `model/${defaultModel}` : null })};`;
     },
     transformIndexHtml(html) {
       const b = theme.brand;
@@ -66,6 +67,7 @@ export default function themePlugin() {
           res.setHeader('Content-Type', 'application/manifest+json');
           return res.end(JSON.stringify(manifestOf(theme)));
         }
+        if (defaultModel && u.endsWith('/model/' + defaultModel)) { res.setHeader('Content-Type', 'application/octet-stream'); return fs.createReadStream(path.join(dir, defaultModel)).pipe(res); }
         const n = icons.find((i) => u.endsWith('/icons/' + i));
         if (n && fs.existsSync(iconPath(n))) { res.setHeader('Content-Type', 'image/png'); return fs.createReadStream(iconPath(n)).pipe(res); }
         next();
@@ -73,6 +75,7 @@ export default function themePlugin() {
     },
     generateBundle() {
       this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: JSON.stringify(manifestOf(theme), null, 2) });
+      if (defaultModel) this.emitFile({ type: 'asset', fileName: `model/${defaultModel}`, source: fs.readFileSync(path.join(dir, defaultModel)) });
       for (const n of icons) if (fs.existsSync(iconPath(n))) this.emitFile({ type: 'asset', fileName: `icons/${n}`, source: fs.readFileSync(iconPath(n)) });
     },
   };

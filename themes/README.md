@@ -5,6 +5,7 @@ Tout ce qui change d'une joaillerie à l'autre vit dans `themes/<client>/` :
 | Fichier | Rôle |
 |---|---|
 | `theme.json` | nom, description, logo d'en-tête, polices, palettes **claire** et **sombre**, thème par défaut, textes à surcharger (`texts.fr/en`), interrupteurs de fonctionnalités (`features`), nom de l'app installée (`pwa`) |
+| `<defaultModel>` (ex. `MAQUETTE_GEMV.fbx`) | modèle 3D chargé par défaut chez ce client (clé `defaultModel` du `theme.json`) ; sans lui, bague de démonstration. Il est **publié avec le site** : n'y mettre que ce que le client accepte de rendre accessible |
 | `monogram.svg`, `wordmark.svg`, `lockup.svg` | logos vectoriels monochromes (ils prennent la couleur du texte du thème) |
 | `icons/icon-{180,192,512}.png` | icônes de l'app (générées : `node scripts/make-icons.mjs <client>`) |
 
