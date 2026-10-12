@@ -8,6 +8,7 @@ describe('matériaux', () => {
     expect(normalizeAssignment('metal', { m: 'white18', f: 'polish' }).m).toBe('grey');
     expect(normalizeAssignment('gem', { m: 'moissanite' })).toEqual({ m: 'diamond' });
     expect(normalizeAssignment('gem', { m: 'sapphire' }).m).toBe('blue-medium');
+    expect(normalizeAssignment('gem', { m: 'tsavorite' }).m).toBe('green-deep');
   });
   it('teinte libre validée', () => {
     expect(normalizeAssignment('gem', { m: CUSTOM, c: '#ABC' })).toEqual({ m: CUSTOM, c: '#aabbcc' });
@@ -22,9 +23,20 @@ describe('matériaux', () => {
     const lum = (id) => resolveMetal({ m: id, f: 'polish' }).rgb.reduce((a, b) => a + b, 0);
     expect(lum('platinum')).toBeGreaterThan(lum('grey'));
   });
-  it('pierres : le diamant est incolore, les autres colorées sans nom d’espèce', () => {
+  it('pierres : nommées par espèce, avec leurs propriétés optiques', () => {
     expect(resolveGem({ m: 'diamond' }).ior).toBeGreaterThan(2.3);
-    expect(GEMS.some((g) => /saphir|rubis|moissanite|zirconium|améthyste|topaze/i.test(g.name))).toBe(false);
+    const ruby = resolveGem({ m: 'red-vivid' }), emerald = resolveGem({ m: 'green-emerald' }), zircon = resolveGem({ m: 'teal' });
+    expect(ruby.name).toBe('Rubis'); expect(ruby.ior).toBeCloseTo(1.77, 2);
+    expect(emerald.ior).toBeLessThan(ruby.ior); // béryl < corindon
+    expect(zircon.ior).toBeGreaterThan(1.9);
+    expect(zircon.dispersion).toBeGreaterThan(emerald.dispersion);
+    expect(resolveGem({ m: 'diamond' }).dispersion).toBeGreaterThan(zircon.dispersion);
+    for (const g of GEMS.filter((x) => !x.opaque && x.id !== 'diamond')) expect(g.ior && g.disp).toBeTruthy();
+  });
+  it('or jaune : plusieurs nuances, de la plus intense à la plus pâle', () => {
+    const ids = ['yellow-deep', 'yellow', 'yellow-light', 'champagne'];
+    const blue = (id) => resolveMetal({ m: id, f: 'polish' }).rgb[2];
+    for (let i = 1; i < ids.length; i++) expect(blue(ids[i])).toBeGreaterThan(blue(ids[i - 1]));
     expect(METALS.some((m) => /\b(18|24|925)\b|\bk\b/i.test(m.name))).toBe(false);
     expect(FINISHES.map((f) => f.id)).toEqual(['polish', 'satin', 'brushed', 'hammered']);
   });

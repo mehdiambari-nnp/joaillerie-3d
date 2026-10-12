@@ -2,6 +2,19 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.3.0', date: '2026-10-12',
+    fr: [
+      'Quatre nuances d’or jaune : intense, classique, clair et champagne',
+      'Les pierres portent le nom de la gemme qui a cette couleur (rubis, émeraude, saphir, tanzanite…)',
+      'Chaque pierre a ses propriétés optiques réelles : indice de réfraction et dispersion',
+    ],
+    en: [
+      'Four yellow gold shades: deep, classic, light and champagne',
+      'Stones are named after the gem with that colour (ruby, emerald, sapphire, tanzanite…)',
+      'Each stone has its real optical properties: refractive index and dispersion',
+    ],
+  },
+  {
     version: '0.2.0', date: '2026-10-12',
     fr: [
       'Rendu des pierres refait : réflexions internes, éclat et couleurs plus fidèles',

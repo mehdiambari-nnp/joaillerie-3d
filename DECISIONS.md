@@ -83,3 +83,8 @@
 ## Itération 12 — « Nouveautés » et thème sombre par défaut
 - **Fenêtre « Nouveautés »** (`src/config/changelog.js`) : une fois par visiteur à chaque nouvelle version (clé `rc:seenVersion`), montrant les entrées plus récentes que la dernière vue. Pas à la toute première visite (l'accueil suffit, la version est alors marquée vue), ni en mode client / lien client. Rouvrable via « Plus → Nouveautés ». **À chaque version : ajouter une entrée en tête de `CHANGELOG`.**
 - **Sombre par défaut** : `defaultScheme: "dark"` dans le `theme.json` (appliqué avant le premier rendu, sans flash ; le choix mémorisé du visiteur reste prioritaire ; `"system"` pour suivre l'appareil). Couleur de barre / manifest alignées.
+
+## Itération 13 — nuances d'or jaune, pierres nommées par espèce
+- **Or jaune : 4 nuances** (intense, « Or jaune » = ancien identifiant `yellow` conservé, clair, champagne), du plus saturé au plus pâle (moins d'or pur, plus d'argent). Pas de titrage (carats) affiché : on garde le principe « une couleur, pas un alliage ».
+- **Pierres nommées par la gemme qui a cette couleur** (Rubis, Émeraude, Saphir, Tanzanite, Péridot…). Les **identifiants ne changent pas** (liens de partage et projets existants intacts). Chaque pierre a son **indice de réfraction et sa dispersion B–G réels** (corindon 1,77 / 0,018 ; béryl 1,58 / 0,014 ; zircon 1,93 / 0,039 ; grenats 1,74–1,80 ; quartz 1,55 / 0,013 …), utilisés par le shader de gemme : moins de feu pour l'améthyste, beaucoup plus pour le zircon. Échelle de dispersion calée sur le diamant (0,044 ↔ 0,4).
+- Anciens liens `tsavorite` redirigés vers « Tsavorite » (vert profond) au lieu de l'émeraude. Version 0.3.0 au journal des nouveautés.
