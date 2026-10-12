@@ -96,6 +96,46 @@ export function getHammeredNormalMap() {
   return hammeredNormal;
 }
 
+// ---- Brossé : grain circulaire dans le sens de la bague (autour de l'axe du doigt), indépendant des UV du modèle ----
+const grainShared = { uGrainCenter: { value: new THREE.Vector3() }, uGrainAxis: { value: new THREE.Vector3(0, 0, 1) } };
+/** Axe du doigt (Z après normalisation à l'import) et centre de la bague, pour orienter le grain. */
+export function setGrainFrame(center, axis = new THREE.Vector3(0, 0, 1)) {
+  grainShared.uGrainCenter.value.copy(center);
+  grainShared.uGrainAxis.value.copy(axis).normalize();
+}
+function installGrain(m) {
+  if (m.userData.grainU) return;
+  m.userData.grainU = { value: 0 };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, grainShared, { uGrainAmt: m.userData.grainU });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainWP;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvGrainWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vGrainWP;
+uniform vec3 uGrainCenter; uniform vec3 uGrainAxis; uniform float uGrainAmt;
+float gH(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i)) * 6.0 * f * (1.0 - f); }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      if (uGrainAmt > 0.0) {
+        vec3 rel = vGrainWP - uGrainCenter;
+        float ax = dot(rel, uGrainAxis);
+        vec3 rad = rel - uGrainAxis * ax;
+        float r = length(rad);
+        vec3 rd = rad / max(r, 1e-4);
+        float s = ax + r * 0.6;
+        // stries fines le long de la circonférence : le relief ne varie qu'en travers (axe / rayon)
+        float dh = gD(s * 14.0) + 0.7 * gD(s * 37.0 + 3.1) + 0.5 * gD(s * 91.0 + 7.7);
+        vec3 g = dh * (uGrainAxis + 0.6 * rd);
+        vec3 nW = inverseTransformDirection(normal, viewMatrix);
+        nW = normalize(nW - g * uGrainAmt);
+        normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+      }`);
+  };
+  m.customProgramCacheKey = () => 'grain1';
+}
+
 /** Paramètres cibles (sans créer de matériau) pour une affectation de métal. */
 export function metalParams(a) {
   const r = resolveMetal(a);
@@ -106,6 +146,7 @@ export function metalParams(a) {
     hammered: !!r.fin.hammered,
     brushed: !!r.fin.brushed,
     satin: !!r.fin.satin,
+    grain: r.fin.grain ?? 0,
     normalScale: r.fin.normalScale ?? 0.6,
   };
 }
@@ -113,7 +154,7 @@ export function metalParams(a) {
 export const gemParams = resolveGem;
 
 function metalNormal(p) {
-  return p.hammered ? getHammeredNormalMap() : p.brushed ? getBrushedNormalMap('brushed') : p.satin ? getBrushedNormalMap('satin') : null;
+  return p.hammered ? getHammeredNormalMap() : p.satin ? getBrushedNormalMap('satin') : null;
 }
 
 /** Crée un matériau neuf pour une affectation. */
@@ -132,6 +173,8 @@ export function createMaterial(kind, a, gemData = null) {
   }
   const p = metalParams(a);
   const m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 1, roughness: p.roughness, envMapIntensity: 1.2 });
+  installGrain(m);
+  m.userData.grainU.value = p.grain;
   m.anisotropy = p.anisotropy;
   m.normalMap = metalNormal(p);
   m.normalScale.set(p.normalScale, p.normalScale);
@@ -182,6 +225,8 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
     // attenuationColor : cible interpolée, valeur initiale = valeur courante avant configureGem → on la restaure
   } else {
     const p = metalParams(a);
+    installGrain(material);
+    material.userData.grainU.value = p.grain;
     material.anisotropy = p.anisotropy;
     material.normalMap = metalNormal(p);
     material.normalScale.set(p.normalScale, p.normalScale);
