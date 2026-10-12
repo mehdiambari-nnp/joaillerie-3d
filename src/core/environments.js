@@ -9,7 +9,7 @@ export const ENVIRONMENTS = [
   { id: 'studio', name: 'Atelier', group: 'studio' },
   { id: 'softbox', name: 'Softbox', group: 'studio' },
   { id: 'daylight', name: 'Jour', group: 'studio' },
-  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr', tint: [1.14, 1.0, 0.76], studio: { hdr: 0.55, boxes: 1 } },
+  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr', tint: [1.06, 1.0, 0.9], sat: 0.35, groundSat: 0, studio: { hdr: 0.85, boxes: 1.3 } },
   { id: 'venice', name: 'Coucher de soleil', group: 'hdri', url: 'hdr/venice-sunset.hdr' },
   { id: 'quarry', name: 'Ciel couvert', group: 'hdri', url: 'hdr/quarry.hdr' },
   { id: 'spruit', name: 'Aube', group: 'hdri', url: 'hdr/spruit-sunrise.hdr' },
@@ -108,11 +108,23 @@ export function getEnvironment(renderer, id) {
       equirect.mapping = THREE.EquirectangularReflectionMapping;
       let rt;
       if (def.tint) {
-        // balance des blancs chaude pour l'éclairage seulement (le fond 360° reste fidèle) : l'or n'est plus verdâtre
-        // quand il reflète un ciel bleu
+        // Éclairage « bijouterie » dérivé du HDRI : l'or reflète le ciel (bleu) et le sol (herbe) → teintes gris-vert.
+        // On garde la structure lumineuse du HDRI (soleil, nuages, contrastes) mais on neutralise sa couleur : ciel désaturé et
+        // réchauffé, sol remplacé par un fauve neutre. Le fond 360° affiché, lui, reste le HDRI d'origine.
         const sc = new THREE.Scene();
         const k = def.studio?.hdr ?? 1;
-        sc.add(new THREE.Mesh(new THREE.SphereGeometry(50, 64, 32).scale(1, 1, -1), new THREE.MeshBasicMaterial({ map: equirect, color: new THREE.Color(...def.tint).multiplyScalar(k) })));
+        const mat = new THREE.MeshBasicMaterial({ map: equirect, color: new THREE.Color(...def.tint).multiplyScalar(k) });
+        const sky = (def.sat ?? 0.35).toFixed(3), ground = (def.groundSat ?? 0.0).toFixed(3);
+        mat.onBeforeCompile = (sh) => {
+          sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+            { float L = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+              vec3 warm = vec3(1.0, 0.95, 0.84) * L;
+              float g = smoothstep(0.52, 0.40, vMapUv.y);              // 1 sous l'horizon
+              float sat = mix(${sky}, ${ground}, g);
+              diffuseColor.rgb = mix(warm, diffuseColor.rgb, sat); }`);
+        };
+        mat.customProgramCacheKey = () => 'envwarm' + sky + ground;
+        sc.add(new THREE.Mesh(new THREE.SphereGeometry(50, 64, 32).scale(1, 1, -1), mat));
         if (def.studio) addSoftboxes(sc, def.studio.boxes);
         rt = pmrem.fromScene(sc, 0);
       } else rt = pmrem.fromEquirectangular(equirect);

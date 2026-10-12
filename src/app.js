@@ -80,6 +80,7 @@ export class Configurator extends Emitter {
     for (const p of this.pieces) {
       p.mesh.geometry.disposeBoundsTree?.();
       disposeGemData(p.gemData);
+      p._hullGeo?.dispose();
       p.mesh.geometry.dispose();
       p.mesh.material?.dispose?.();
     }

@@ -7,11 +7,15 @@ export const CHANGELOG = [
       'Quatre nuances d’or jaune : intense, classique, clair et champagne',
       'Les pierres portent le nom de la gemme qui a cette couleur (rubis, émeraude, saphir, tanzanite…)',
       'Chaque pierre a ses propriétés optiques réelles : indice de réfraction et dispersion',
+      'Sélection dans la vue 3D : un contour net autour de la pièce, sans filtre sur sa couleur',
+      'Éclairage revu : fini le gris-vert sur l’or, reflets chauds mis en valeur',
     ],
     en: [
       'Four yellow gold shades: deep, classic, light and champagne',
       'Stones are named after the gem with that colour (ruby, emerald, sapphire, tanzanite…)',
       'Each stone has its real optical properties: refractive index and dispersion',
+      '3D selection: a crisp outline around the piece, no colour filter over it',
+      'Lighting reworked: no more grey-green cast on gold, warm highlights',
     ],
   },
   {
