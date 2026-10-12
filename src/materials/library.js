@@ -20,7 +20,7 @@ export const METALS = [
 export const FINISHES = [
   { id: 'polish', name: 'Poli', roughness: 0.05, anisotropy: 0 },
   // Réglées d'après des pièces réelles : satiné = reflet doux + stries fines ; brossé = mat uniforme à grain très fin ; martelé = facettes brillantes.
-  { id: 'satin', name: 'Satiné', roughness: 0.26, anisotropy: 0, satin: true, normalScale: 0.12 },
+  { id: 'satin', name: 'Satiné', roughness: 0.4, anisotropy: 0 },
   { id: 'brushed', name: 'Brossé', roughness: 0.42, anisotropy: 0, brushed: true, normalScale: 0.14 },
   { id: 'hammered', name: 'Martelé', roughness: 0.1, anisotropy: 0, hammered: true, normalScale: 0.6 },
 ];

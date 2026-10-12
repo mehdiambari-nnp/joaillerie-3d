@@ -4,10 +4,10 @@ export const CHANGELOG = [
   {
     version: '0.3.1', date: '2026-10-12',
     fr: [
-      'Finitions de l’or retravaillées d’après des pièces réelles : brossé mat à grain fin, satiné aux stries douces, martelé à facettes brillantes',
+      'Finitions de l’or retravaillées d’après des pièces réelles : satiné doux sans rayures, brossé mat à grain fin, martelé à facettes brillantes',
     ],
     en: [
-      'Gold finishes reworked from real pieces: matte fine-grain brushed, soft-streaked satin, faceted shiny hammered',
+      'Gold finishes reworked from real pieces: streak-free soft satin, matte fine-grain brushed, faceted shiny hammered',
     ],
   },
   {
