@@ -128,3 +128,7 @@
 - Caméra 60 i/s demandés si possible ; seuils de présence/suivi MediaPipe 0,5 → 0,6.
 - Non vérifié sur iPhone réel ; la photo de test fixe ne mesure ni la latence ni le tremblement.
 - **Correctif (retour iPhone)** : avec 85 % de relief, la bague regardait sur le côté quand la main était inclinée. Retour à un dessus majoritairement tourné vers la caméra (relief 35 %), et direction du doigt mesurée sur MCP → DIP (plus longue, moins bruitée). Les reflets liés au téléphone gardent la sensation de 3D.
+
+## Itération 20 — liens de partage toujours assemblés
+- L'état éclaté n'a jamais fait partie du lien (le lien ne contient que modèle, matières, parties masquées, environnement), et un lien ouvert dans un nouvel onglet arrive assemblé (vérifié en test). Cas restant : coller le lien dans l'onglet déjà éclaté ne recharge pas la page (seul le `#` change) → la page se recharge maintenant sur tout changement de lien de partage.
+- Ceinture et bretelles : à l'ouverture d'un lien de partage, la bague est rangée de force (`assembleNow`) après application de la configuration.
