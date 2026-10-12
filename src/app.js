@@ -123,7 +123,7 @@ export class Configurator extends Emitter {
       const prev = this.assign[id] || {};
       const m = a.m ?? prev.m;
       const c = m === CUSTOM ? (validHex(a.c) ?? prev.c) : undefined;
-      this.assign[id] = normalizeAssignment(p.kind, p.kind === 'gem' ? { m, c } : { m, c, f: a.f ?? prev.f ?? DEFAULT_METAL.f });
+      this.assign[id] = normalizeAssignment(p.kind, p.kind === 'gem' ? { m, c } : { m, c, f: a.f ?? prev.f ?? DEFAULT_METAL.f, i: a.i ?? (a.f && a.f !== prev.f ? undefined : prev.i) });
       this._ensureMaterial(p, animate);
     }
     this._refreshHighlight();

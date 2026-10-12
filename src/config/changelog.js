@@ -2,12 +2,27 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
-    version: '0.3.1', date: '2026-10-12',
+    version: '0.4.0', date: '2026-10-12',
     fr: [
-      'Finitions de l’or retravaillées d’après des pièces réelles : satiné doux sans rayures, brossé mat à grain fin, martelé à facettes brillantes',
+      'Le bouton de finition devient un curseur : glissez dessus pour régler l’effet',
+      'Satiné : degré de satinage ; Brossé : orientation du brossage ; Martelé : taille des coups de marteau',
+      'Finitions refaites d’après des pièces réelles : satiné lisse, brossé fin, martelé en petites cuvettes',
+      'La réalité augmentée est désactivée pour l’instant',
     ],
     en: [
-      'Gold finishes reworked from real pieces: streak-free soft satin, matte fine-grain brushed, faceted shiny hammered',
+      'The finish button is now a slider: drag across it to tune the effect',
+      'Satin: satin level; Brushed: brushing direction; Hammered: hammer-mark size',
+      'Finishes rebuilt from real pieces: smooth satin, fine brushed, small-dimple hammered',
+      'Augmented reality is switched off for now',
+    ],
+  },
+  {
+    version: '0.3.1', date: '2026-10-12',
+    fr: [
+      'Finitions de l’or retravaillées d’après des pièces réelles : satiné doux sans rayures, brossé mat à grain fin, martelé',
+    ],
+    en: [
+      'Gold finishes reworked from real pieces: streak-free soft satin, matte fine-grain brushed, faceted hammered',
     ],
   },
   {

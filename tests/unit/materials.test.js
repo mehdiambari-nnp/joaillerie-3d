@@ -49,3 +49,30 @@ describe('matériaux', () => {
     expect(p.assign).toEqual(assign);
   });
 });
+
+describe('intensité des finitions', () => {
+  it('satiné : plus d’intensité = plus de rugosité', async () => {
+    const { resolveMetal } = await import('../../src/materials/library.js');
+    const lo = resolveMetal({ m: 'yellow', f: 'satin', i: 0 }).fin.roughness;
+    const hi = resolveMetal({ m: 'yellow', f: 'satin', i: 1 }).fin.roughness;
+    expect(hi).toBeGreaterThan(lo);
+  });
+  it('brossé : angle 0–90° ; martelé : taille croissante', async () => {
+    const { resolveMetal } = await import('../../src/materials/library.js');
+    expect(resolveMetal({ m: 'yellow', f: 'brushed', i: 1 }).fin.grainAngle).toBeCloseTo(Math.PI / 2);
+    expect(resolveMetal({ m: 'yellow', f: 'hammered', i: 1 }).fin.hamSize).toBeGreaterThan(resolveMetal({ m: 'yellow', f: 'hammered', i: 0 }).fin.hamSize);
+  });
+  it('l’intensité est bornée, ignorée sur poli, et survit au lien de partage', async () => {
+    const { normalizeAssignment } = await import('../../src/materials/library.js');
+    const { packAssign, unpackAssign } = await import('../../src/state/store.js');
+    expect(normalizeAssignment('metal', { m: 'yellow', f: 'satin', i: 7 }).i).toBe(1);
+    expect(normalizeAssignment('metal', { m: 'yellow', f: 'polish', i: 0.5 }).i).toBeUndefined();
+    const a = { p1: { m: 'yellow', f: 'hammered', i: 0.4 }, p2: { m: 'rose', f: 'satin' } };
+    expect(unpackAssign(packAssign(a))).toEqual(a);
+  });
+  it('satiné : aucune texture de relief (pas de rayures)', async () => {
+    const { metalParams } = await import('../../src/materials/factory.js');
+    const p = metalParams({ m: 'yellow', f: 'satin' });
+    expect(p.satin || p.brushed || p.hammered).toBe(false);
+  });
+});

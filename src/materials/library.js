@@ -20,9 +20,10 @@ export const METALS = [
 export const FINISHES = [
   { id: 'polish', name: 'Poli', roughness: 0.05, anisotropy: 0 },
   // Réglées d'après des pièces réelles : satiné = reflet doux + stries fines ; brossé = mat uniforme à grain très fin ; martelé = facettes brillantes.
-  { id: 'satin', name: 'Satiné', roughness: 0.4, anisotropy: 0 },
-  { id: 'brushed', name: 'Brossé', roughness: 0.4, anisotropy: 0, brushed: true, grain: 0.07 },
-  { id: 'hammered', name: 'Martelé', roughness: 0.1, anisotropy: 0, hammered: true, normalScale: 0.6 },
+  // `i0` = intensité par défaut (0..1) ; le curseur du bouton la règle : satiné = degré de satinage, brossé = orientation (0–90°), martelé = taille des coups.
+  { id: 'satin', name: 'Satiné', roughness: 0.4, anisotropy: 0, i0: 0.62, gauge: 'satin' },
+  { id: 'brushed', name: 'Brossé', roughness: 0.4, anisotropy: 0, brushed: true, grain: 0.07, i0: 0, gauge: 'angle' },
+  { id: 'hammered', name: 'Martelé', roughness: 0.3, anisotropy: 0, hammered: true, ham: 0.5, i0: 0.35, gauge: 'size' },
 ];
 
 // Pierres : chaque couleur porte le nom de la pierre qui l'illustre le mieux, avec ses vraies propriétés optiques :
@@ -83,10 +84,22 @@ const LEGACY_GEM = {
 };
 const LEGACY_FINISH = { matte: 'satin' };
 
+/** Applique l'intensité (0..1) d'une finition : satiné → rugosité, brossé → angle du grain, martelé → taille des coups (mm). */
+export function withIntensity(fin, i) {
+  if (!fin.gauge) return fin;
+  const v = i ?? fin.i0;
+  const out = { ...fin, intensity: v };
+  if (fin.gauge === 'satin') out.roughness = 0.14 + 0.42 * v;
+  if (fin.gauge === 'angle') out.grainAngle = v * Math.PI / 2;
+  if (fin.gauge === 'size') out.hamSize = 0.5 + 1.7 * v;
+  return out;
+}
+
 /** Remet une affectation (éventuellement ancienne) au format courant. kind: 'metal' | 'gem'. */
 export function normalizeAssignment(kind, a) {
   if (!a) return null;
-  let { m, c, f } = a;
+  let { m, c, f, i } = a;
+  i = Number.isFinite(i) ? Math.round(Math.min(1, Math.max(0, i)) * 100) / 100 : undefined;
   if (kind === 'gem') {
     if (m !== CUSTOM && !byId(GEMS, m)) m = LEGACY_GEM[m] ?? DEFAULT_GEM.m;
     return m === CUSTOM ? { m, c: validHex(c) ?? '#4a7de0' } : { m };
@@ -95,7 +108,9 @@ export function normalizeAssignment(kind, a) {
   if (m !== CUSTOM && !byId(METALS, m)) m = LEGACY_METAL[m] ?? DEFAULT_METAL.m;
   f = LEGACY_FINISH[f] ?? f;
   if (!byId(FINISHES, f)) f = DEFAULT_METAL.f;
-  return m === CUSTOM ? { m, c: validHex(c) ?? '#d8b45a', f } : { m, f };
+  const out = m === CUSTOM ? { m, c: validHex(c) ?? '#d8b45a', f } : { m, f };
+  if (i !== undefined && byId(FINISHES, f)?.gauge) out.i = i;
+  return out;
 }
 
 /** L'identifiant m convient-il à ce type de pièce ? */
@@ -139,7 +154,7 @@ const srgbToLinear = (x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) **
 // ---------- Résolution d'une affectation en paramètres de rendu ----------
 export function resolveMetal(a) {
   const n = normalizeAssignment('metal', a) ?? DEFAULT_METAL;
-  const fin = byId(FINISHES, n.f) ?? FINISHES[0];
+  const fin = withIntensity(byId(FINISHES, n.f) ?? FINISHES[0], n.i);
   if (n.m === CUSTOM) {
     const rgb = hexToRgb(n.c).map((x) => srgbToLinear(x / 255));
     return { id: CUSTOM, name: `Teinte ${n.c.toUpperCase()}`, rgb, swatch: n.c, fin };

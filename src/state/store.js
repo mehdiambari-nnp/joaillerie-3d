@@ -44,18 +44,18 @@ export class History {
 export function packAssign(assign) {
   const groups = new Map();
   for (const [id, a] of Object.entries(assign)) {
-    const k = `${a.m}|${a.f ?? ''}|${a.c ?? ''}`;
+    const k = `${a.m}|${a.f ?? ''}|${a.c ?? ''}|${a.i != null ? Math.round(a.i * 100) : ''}`;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(id);
   }
   return [...groups.entries()].map(([k, ids]) => {
-    const [m, f, c] = k.split('|');
-    return c ? [ids, m, f || 0, c] : f ? [ids, m, f] : [ids, m];
+    const [m, f, c, i] = k.split('|');
+    return i !== '' ? [ids, m, f || 0, c || 0, Number(i)] : c ? [ids, m, f || 0, c] : f ? [ids, m, f] : [ids, m];
   });
 }
 export function unpackAssign(packed) {
   const out = {};
-  for (const [ids, m, f, c] of packed) for (const id of ids) out[id] = { m, ...(f ? { f } : {}), ...(c ? { c } : {}) };
+  for (const [ids, m, f, c, i] of packed) for (const id of ids) out[id] = { m, ...(f ? { f } : {}), ...(c ? { c } : {}), ...(Number.isFinite(i) ? { i: i / 100 } : {}) };
   return out;
 }
 
