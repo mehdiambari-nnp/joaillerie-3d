@@ -105,16 +105,17 @@ export function setGrainFrame(center, axis = new THREE.Vector3(0, 0, 1)) {
 }
 function installGrain(m) {
   if (m.userData.grainU) return;
-  m.userData.grainU = { value: 0 };
+  m.userData.grainU = { value: 0 }; m.userData.hamU = { value: 0 };
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, grainShared, { uGrainAmt: m.userData.grainU });
+    Object.assign(sh.uniforms, grainShared, { uGrainAmt: m.userData.grainU, uHamAmt: m.userData.hamU, uHamSize: { value: 1.1 } });
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainWP;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\nvGrainWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainWP; varying vec3 vGrainOP;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvGrainWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vGrainOP = transformed;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vGrainWP;
-uniform vec3 uGrainCenter; uniform vec3 uGrainAxis; uniform float uGrainAmt;
+varying vec3 vGrainWP; varying vec3 vGrainOP;
+uniform vec3 uGrainCenter; uniform vec3 uGrainAxis; uniform float uGrainAmt; uniform float uHamAmt; uniform float uHamSize;
+vec3 gH3(vec3 p) { p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6))); return fract(sin(p) * 43758.5453) * 2.0 - 1.0; }
 float gH(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i)) * 6.0 * f * (1.0 - f); }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
@@ -131,6 +132,26 @@ float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i
         vec3 nW = inverseTransformDirection(normal, viewMatrix);
         nW = normalize(nW - g * uGrainAmt);
         normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+      }
+      if (uHamAmt > 0.0) {
+        // Martelé : coups de marteau peu profonds = cellules de Voronoï 3D ; chaque cellule est une facette légèrement inclinée
+        vec3 q = vGrainOP / uHamSize;
+        vec3 ip = floor(q), fp = fract(q);
+        float d1 = 9.0, d2 = 9.0; vec3 tilt = vec3(0.0), toC = vec3(0.0);
+        for (int k = -1; k <= 1; k++) for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {
+          vec3 cell = vec3(float(i), float(j), float(k));
+          vec3 pt = cell + 0.5 + 0.42 * gH3(ip + cell);
+          float d = length(pt - fp);
+          if (d < d1) { d2 = d1; d1 = d; tilt = gH3(ip + cell + 17.0); toC = pt - fp; } else if (d < d2) d2 = d;
+        }
+        float edge = smoothstep(0.0, 0.3, d2 - d1);            // arête adoucie entre deux facettes
+        vec3 nW2 = inverseTransformDirection(normal, viewMatrix);
+        // cuvette concave : la normale s'incline vers le centre du coup de marteau, d'autant plus qu'on s'approche du bord ;
+        // + un léger biais aléatoire par cellule pour que chaque coup ait sa propre profondeur / orientation
+        vec3 dimple = (toC * (1.0 + 0.5 * tilt.x) + tilt * 0.25) * edge;
+        dimple -= nW2 * dot(dimple, nW2);                         // composante dans le plan de la surface
+        nW2 = normalize(nW2 + dimple * uHamAmt);
+        normal = normalize((viewMatrix * vec4(nW2, 0.0)).xyz);
       }`);
   };
   m.customProgramCacheKey = () => 'grain1';
@@ -147,6 +168,7 @@ export function metalParams(a) {
     brushed: !!r.fin.brushed,
     satin: !!r.fin.satin,
     grain: r.fin.grain ?? 0,
+    ham: r.fin.ham ?? 0,
     normalScale: r.fin.normalScale ?? 0.6,
   };
 }
@@ -154,7 +176,7 @@ export function metalParams(a) {
 export const gemParams = resolveGem;
 
 function metalNormal(p) {
-  return p.hammered ? getHammeredNormalMap() : p.satin ? getBrushedNormalMap('satin') : null;
+  return p.satin ? getBrushedNormalMap('satin') : null;
 }
 
 /** Crée un matériau neuf pour une affectation. */
@@ -174,7 +196,7 @@ export function createMaterial(kind, a, gemData = null) {
   const p = metalParams(a);
   const m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 1, roughness: p.roughness, envMapIntensity: 1.2 });
   installGrain(m);
-  m.userData.grainU.value = p.grain;
+  m.userData.grainU.value = p.grain; m.userData.hamU.value = p.ham;
   m.anisotropy = p.anisotropy;
   m.normalMap = metalNormal(p);
   m.normalScale.set(p.normalScale, p.normalScale);
@@ -226,7 +248,7 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
   } else {
     const p = metalParams(a);
     installGrain(material);
-    material.userData.grainU.value = p.grain;
+    material.userData.grainU.value = p.grain; material.userData.hamU.value = p.ham;
     material.anisotropy = p.anisotropy;
     material.normalMap = metalNormal(p);
     material.normalScale.set(p.normalScale, p.normalScale);

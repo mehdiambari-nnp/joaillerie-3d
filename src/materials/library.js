@@ -22,7 +22,7 @@ export const FINISHES = [
   // Réglées d'après des pièces réelles : satiné = reflet doux + stries fines ; brossé = mat uniforme à grain très fin ; martelé = facettes brillantes.
   { id: 'satin', name: 'Satiné', roughness: 0.4, anisotropy: 0 },
   { id: 'brushed', name: 'Brossé', roughness: 0.4, anisotropy: 0, brushed: true, grain: 0.07 },
-  { id: 'hammered', name: 'Martelé', roughness: 0.1, anisotropy: 0, hammered: true, normalScale: 0.6 },
+  { id: 'hammered', name: 'Martelé', roughness: 0.3, anisotropy: 0, hammered: true, ham: 0.5 },
 ];
 
 // Pierres : chaque couleur porte le nom de la pierre qui l'illustre le mieux, avec ses vraies propriétés optiques :
