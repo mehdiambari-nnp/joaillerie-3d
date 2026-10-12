@@ -7,22 +7,28 @@ let hammeredNormal = null;
 let brushedNormal = null;
 
 /** Normal map procédurale de brossage : fines rayures parallèles (512 px, répétable). Navigateur uniquement. */
-export function getBrushedNormalMap() {
-  if (brushedNormal || typeof document === 'undefined') return brushedNormal;
-  const N = 512;
-  let seed = 4242;
+const grainMaps = {};
+/** Grain linéaire fin. brossé = stries très fines et denses (mat uniforme) ; satiné = stries plus longues et douces (reflet doux). */
+export function getBrushedNormalMap(kind = 'brushed') {
+  if (grainMaps[kind] || typeof document === 'undefined') return grainMaps[kind];
+  const N = 1024;
+  const fine = kind === 'brushed';
+  let seed = fine ? 4242 : 777;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  // hauteur par ligne (rayures), légèrement modulée le long de la ligne
   const rows = Float32Array.from({ length: N }, () => rnd() - 0.5);
-  const smooth = rows.map((_, y) => (rows[y] * 2 + rows[(y + 1) % N] + rows[(y + N - 1) % N]) / 4);
+  // brossé : bruit blanc quasi brut (grain fin) ; satiné : lissé sur ~4 lignes (stries plus larges, plus douces)
+  const k = fine ? 1 : 4;
+  const smooth = rows.map((_, y) => { let a = 0; for (let j = -k; j <= k; j++) a += rows[(y + j + N) % N]; return a / (2 * k + 1); });
+  const gain = fine ? 3.2 : 9;
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = N;
   const ctx = canvas.getContext('2d');
   const img = ctx.createImageData(N, N);
   for (let y = 0; y < N; y++) {
-    const dy = (smooth[(y + 1) % N] - smooth[(y + N - 1) % N]) * 5;
+    const dy = (smooth[(y + 1) % N] - smooth[(y + N - 1) % N]) * gain;
     for (let x = 0; x < N; x++) {
-      const wob = 1 + 0.15 * Math.sin((x / N) * Math.PI * 2 * 2);
+      // légère modulation le long de la strie pour casser la régularité
+      const wob = 0.75 + 0.25 * Math.sin((x / N) * Math.PI * 2 * (fine ? 7 : 3) + y * 0.37);
       const ny = dy * wob, len = Math.hypot(ny, 1);
       const i = (y * N + x) * 4;
       img.data[i] = 128;
@@ -32,27 +38,42 @@ export function getBrushedNormalMap() {
     }
   }
   ctx.putImageData(img, 0, 0);
-  brushedNormal = new THREE.CanvasTexture(canvas);
-  brushedNormal.wrapS = brushedNormal.wrapT = THREE.RepeatWrapping;
-  brushedNormal.colorSpace = THREE.NoColorSpace;
-  return brushedNormal;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.NoColorSpace;
+  grainMaps[kind] = tex;
+  return tex;
 }
 
-/** Normal map procédurale de martelage (512 px, dimples aléatoires). Navigateur uniquement. */
 export function getHammeredNormalMap() {
   if (hammeredNormal || typeof document === 'undefined') return hammeredNormal;
-  const N = 512;
+  const N = 1024;
   const h = new Float32Array(N * N);
   let seed = 1337;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let k = 0; k < 520; k++) {
-    const cx = rnd() * N, cy = rnd() * N, r = 14 + rnd() * 20, depth = 0.6 + rnd() * 0.4;
+  // Martelage : chaque coup de marteau laisse une facette plane inclinée, au contour polygonal, qui capte la lumière
+  for (let n = 0; n < 380; n++) {
+    const cx = rnd() * N, cy = rnd() * N, r = 26 + rnd() * 26;
+    const tx = (rnd() - 0.5) * 0.5, ty = (rnd() - 0.5) * 0.5, rot = rnd() * Math.PI, sides = 5 + Math.floor(rnd() * 3);
     for (let y = -r; y <= r; y++) for (let x = -r; x <= r; x++) {
-      const d = Math.hypot(x, y) / r;
-      if (d > 1) continue;
+      const ang = Math.atan2(y, x) - rot, seg = Math.PI * 2 / sides;
+      const edge = r * Math.cos(seg / 2) / Math.cos(((ang % seg) + seg) % seg - seg / 2);
+      const d = Math.hypot(x, y);
+      if (d > edge) continue;
       const px = (Math.round(cx + x) + N) % N, py = (Math.round(cy + y) + N) % N;
-      h[py * N + px] = Math.min(h[py * N + px], -depth * (1 - d * d) * 0.5);
+      // plan incliné + cuvette légère ; la dernière facette posée l'emporte (comme un coup de marteau)
+      h[py * N + px] = tx * x + ty * y - 0.012 * (r * r - d * d) / r;
     }
+  }
+  // léger flou : adoucit l'arête entre facettes (évite les traits durs)
+  const hb = new Float32Array(N * N);
+  for (let pass = 0; pass < 2; pass++) {
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      let a = 0;
+      for (let j = -1; j <= 1; j++) for (let i = -1; i <= 1; i++) a += h[((y + j + N) % N) * N + ((x + i + N) % N)];
+      hb[y * N + x] = a / 9;
+    }
+    h.set(hb);
   }
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = N;
@@ -60,7 +81,7 @@ export function getHammeredNormalMap() {
   const img = ctx.createImageData(N, N);
   const at = (x, y) => h[((y + N) % N) * N + ((x + N) % N)];
   for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    const dx = (at(x + 1, y) - at(x - 1, y)) * 6, dy = (at(x, y + 1) - at(x, y - 1)) * 6;
+    const dx = (at(x + 1, y) - at(x - 1, y)) * 1.2, dy = (at(x, y + 1) - at(x, y - 1)) * 1.2;
     const len = Math.hypot(dx, dy, 1);
     const i = (y * N + x) * 4;
     img.data[i] = (-dx / len * 0.5 + 0.5) * 255;
@@ -75,6 +96,46 @@ export function getHammeredNormalMap() {
   return hammeredNormal;
 }
 
+// ---- Brossé : grain circulaire dans le sens de la bague (autour de l'axe du doigt), indépendant des UV du modèle ----
+const grainShared = { uGrainCenter: { value: new THREE.Vector3() }, uGrainAxis: { value: new THREE.Vector3(0, 0, 1) } };
+/** Axe du doigt (Z après normalisation à l'import) et centre de la bague, pour orienter le grain. */
+export function setGrainFrame(center, axis = new THREE.Vector3(0, 0, 1)) {
+  grainShared.uGrainCenter.value.copy(center);
+  grainShared.uGrainAxis.value.copy(axis).normalize();
+}
+function installGrain(m) {
+  if (m.userData.grainU) return;
+  m.userData.grainU = { value: 0 };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, grainShared, { uGrainAmt: m.userData.grainU });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainWP;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvGrainWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vGrainWP;
+uniform vec3 uGrainCenter; uniform vec3 uGrainAxis; uniform float uGrainAmt;
+float gH(float n) { return fract(sin(n * 127.1) * 43758.5453); }
+float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i)) * 6.0 * f * (1.0 - f); }`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+      if (uGrainAmt > 0.0) {
+        vec3 rel = vGrainWP - uGrainCenter;
+        float ax = dot(rel, uGrainAxis);
+        vec3 rad = rel - uGrainAxis * ax;
+        float r = length(rad);
+        vec3 rd = rad / max(r, 1e-4);
+        float s = ax + r * 0.6;
+        // stries fines le long de la circonférence : le relief ne varie qu'en travers (axe / rayon)
+        float dh = gD(s * 14.0) + 0.7 * gD(s * 37.0 + 3.1) + 0.5 * gD(s * 91.0 + 7.7);
+        vec3 g = dh * (uGrainAxis + 0.6 * rd);
+        vec3 nW = inverseTransformDirection(normal, viewMatrix);
+        nW = normalize(nW - g * uGrainAmt);
+        normal = normalize((viewMatrix * vec4(nW, 0.0)).xyz);
+      }`);
+  };
+  m.customProgramCacheKey = () => 'grain1';
+}
+
 /** Paramètres cibles (sans créer de matériau) pour une affectation de métal. */
 export function metalParams(a) {
   const r = resolveMetal(a);
@@ -84,13 +145,16 @@ export function metalParams(a) {
     anisotropy: r.fin.anisotropy,
     hammered: !!r.fin.hammered,
     brushed: !!r.fin.brushed,
+    satin: !!r.fin.satin,
+    grain: r.fin.grain ?? 0,
+    normalScale: r.fin.normalScale ?? 0.6,
   };
 }
 
 export const gemParams = resolveGem;
 
 function metalNormal(p) {
-  return p.hammered ? getHammeredNormalMap() : p.brushed ? getBrushedNormalMap() : null;
+  return p.hammered ? getHammeredNormalMap() : p.satin ? getBrushedNormalMap('satin') : null;
 }
 
 /** Crée un matériau neuf pour une affectation. */
@@ -109,9 +173,11 @@ export function createMaterial(kind, a, gemData = null) {
   }
   const p = metalParams(a);
   const m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 1, roughness: p.roughness, envMapIntensity: 1.2 });
+  installGrain(m);
+  m.userData.grainU.value = p.grain;
   m.anisotropy = p.anisotropy;
   m.normalMap = metalNormal(p);
-  m.normalScale.set(p.brushed ? 0.04 : 0.6, p.brushed ? 0.04 : 0.6);
+  m.normalScale.set(p.normalScale, p.normalScale);
   return m;
 }
 
@@ -159,9 +225,11 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
     // attenuationColor : cible interpolée, valeur initiale = valeur courante avant configureGem → on la restaure
   } else {
     const p = metalParams(a);
+    installGrain(material);
+    material.userData.grainU.value = p.grain;
     material.anisotropy = p.anisotropy;
     material.normalMap = metalNormal(p);
-    material.normalScale.set(p.brushed ? 0.04 : 0.6, p.brushed ? 0.04 : 0.6);
+    material.normalScale.set(p.normalScale, p.normalScale);
     material.needsUpdate = true;
     toColor = p.color; toRough = p.roughness;
   }

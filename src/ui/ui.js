@@ -99,9 +99,9 @@ export class UI {
           <div class="parts" data-r="parts"></div>
           <div class="mats" data-r="mats"></div>
           <div class="p-section atelier-only" data-r="atelier"></div>
-          <nav class="actions" aria-label="Actions">
+          <nav class="actions${FEATURES.ar ? ' has-ar' : ''}" aria-label="Actions">
             <button class="btn primary" data-a="tryon">${t('tryon')}</button>
-            <button class="btn" data-a="ar">${t('ar')}</button>
+            <button class="btn" ${FEATURES.ar ? '' : 'hidden'} data-a="ar">${t('ar')}</button>
             <button class="btn" data-a="photo">${t('photo')}</button>
             <button class="btn more-btn" data-a="more" aria-label="${t('more')}" title="${t('more')}">${MORE}</button>
           </nav>

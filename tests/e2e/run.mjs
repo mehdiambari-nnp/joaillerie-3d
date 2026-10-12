@@ -171,9 +171,10 @@ const cl = await page.evaluate(() => {
   document.querySelector('.app').dataset.mode;
   return { zones: vis('.zones'), mats: vis('.mats'), seg: vis('.seg'), tryon: vis('[data-a=tryon]'), ar: vis('[data-a=ar]'), sel: __rc.app.selection.size, interactive: __rc.app.interactive };
 });
-ok(!cl.zones && !cl.mats && !cl.seg && cl.tryon && cl.ar && cl.sel === 0 && !cl.interactive, 'mode client : épuré (AR + essayage seulement)');
+ok(!cl.zones && !cl.mats && !cl.seg && cl.tryon && !cl.ar && cl.sel === 0 && !cl.interactive, 'mode client : épuré (essayage + photo ; AR désactivé par flag)');
 await page.evaluate(() => __rc.ui.setMode('vitrine'));
-await page.tap('button[data-a=ar]').catch(() => {});
+ok(await page.evaluate(() => !document.querySelector('[data-a=ar]:not([hidden])')), 'bouton AR masqué (flag ar désactivé)');
+await page.evaluate(() => __rc.ui.openAR()); // le code AR reste fonctionnel même flag off
 await page.waitForTimeout(1500);
 await page.screenshot({ path: OUT + 'e2e-iphone-ar.png' });
 ok(await page.evaluate(() => !!document.querySelector('dialog[open]')), 'dialogue AR affiché (parcours Quick Look)');

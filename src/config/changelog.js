@@ -2,6 +2,15 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.3.1', date: '2026-10-12',
+    fr: [
+      'Finitions de l’or retravaillées d’après des pièces réelles : satiné doux sans rayures, brossé mat à grain fin, martelé à facettes brillantes',
+    ],
+    en: [
+      'Gold finishes reworked from real pieces: streak-free soft satin, matte fine-grain brushed, faceted shiny hammered',
+    ],
+  },
+  {
     version: '0.3.0', date: '2026-10-12',
     fr: [
       'Quatre nuances d’or jaune : intense, classique, clair et champagne',
