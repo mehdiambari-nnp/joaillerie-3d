@@ -57,6 +57,7 @@ const fr = {
   webgl: 'Votre navigateur ne supporte pas WebGL2.',
   onboardTitle: `Bienvenue chez ${BRAND}`, onboardBody: 'Faites tourner la bague avec un doigt, pincez pour zoomer, touchez une partie pour changer son matériau.',
   gotIt: 'Compris', whatsNew: 'Nouveautés', whatsNewHint: 'Ce qui a changé dans cette version',
+  gauge_satin: 'degré de satinage', gauge_angle: 'orientation du brossage', gauge_size: 'taille du martelage', gaugeHint: 'Glissez sur le bouton pour régler l’effet',
   pieces: 'pièces', triangles: 'triangles',
 };
 const en = {
@@ -85,6 +86,7 @@ const en = {
   ring: 'Ring finger', middle: 'Middle', index: 'Index', pinky: 'Pinky', tryonFlip: 'Flip ring', tryonSwitch: 'Switch camera', tryonClose: 'Close', tryonShot: 'Photo',
   report: 'Import report', size: 'Dimensions', inner: 'Inner diameter', frSize: 'FR size', close: 'Close', cancel: 'Cancel', delete: 'Delete', apply: 'Apply',
   onboardTitle: 'Welcome', onboardBody: 'Drag to rotate, pinch to zoom, tap a part to change its material.', gotIt: 'Got it', whatsNew: "What's new", whatsNewHint: 'What changed in this version',
+  gauge_satin: 'satin level', gauge_angle: 'brushing direction', gauge_size: 'hammering size', gaugeHint: 'Drag across the button to adjust the effect',
 };
 const lang = (typeof navigator !== 'undefined' && navigator.language || 'fr').toLowerCase().startsWith('en') ? 'en' : 'fr';
 const dict = { ...(lang === 'en' ? en : fr), ...(theme.texts?.[lang] || {}) };

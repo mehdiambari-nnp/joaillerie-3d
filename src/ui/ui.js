@@ -123,6 +123,7 @@ export class UI {
   bind() {
     const app = this.app;
     this.root.addEventListener('click', (e) => this.onClick(e));
+    this.root.addEventListener('pointerdown', (e) => this.onGaugeDown(e));
     this.root.addEventListener('input', (e) => this.onInput(e));
     this.root.addEventListener('change', (e) => this.onChange(e));
     $('#file', this.root).addEventListener('change', (e) => { const f = e.target.files?.[0]; if (f) this.svc.openFile(f); e.target.value = ''; });
@@ -288,6 +289,7 @@ export class UI {
     const assigns = [...app.selection].map((i) => app.assign[i]).filter(Boolean);
     const sameM = assigns.length && assigns.every((a) => a.m === assigns[0].m) ? assigns[0].m : null;
     const sameF = assigns.length && assigns.every((a) => a.f === assigns[0].f) ? assigns[0].f : null;
+    const sameI = sameF && assigns.every((a) => (a.i ?? null) === (assigns[0].i ?? null)) ? (assigns[0].i ?? byId(FINISHES, sameF)?.i0 ?? 0) : null;
     const sameC = assigns.length && assigns.every((a) => a.m === CUSTOM && a.c === assigns[0].c) ? assigns[0].c : null;
     const allowed = this.allowedFor(kind);
     let list = kind === 'metal' ? METALS : GEMS;
@@ -298,7 +300,11 @@ export class UI {
       : list.map((m) => this.ball(m, 'metals', m.id === sameM)).join('')
         + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '');
     const fin = kind === 'metal'
-      ? `<div class="finish-seg" role="group" aria-label="${t('finishes')}">${FINISHES.map((f) => `<button class="pill" data-finish="${f.id}" aria-pressed="${f.id === sameF}">${esc(f.name)}</button>`).join('')}</div>` : '';
+      ? `<div class="finish-seg" role="group" aria-label="${t('finishes')}">${FINISHES.map((f) => {
+        const g = f.gauge && f.id === sameF && sameI != null; // le bouton actif devient un curseur d'intensité
+        const hint = g ? ` · ${t('gauge_' + f.gauge)}` : '';
+        return `<button class="pill${g ? ' gauge' : ''}" data-finish="${f.id}" aria-pressed="${f.id === sameF}"${g ? ` style="--g:${Math.round(sameI * 100)}%" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(sameI * 100)}" aria-label="${esc(f.name + hint)}" title="${esc(t('gaugeHint'))}"` : ''}>${esc(f.name)}</button>`;
+      }).join('')}</div>` : '';
     const name = sameM ? describeAssignment({ m: sameM, f: sameF, c: sameC }, kind) : t('severalMaterials');
     const sw = swatchOf(kind, assigns[0]);
     const cHex = (sameC ?? this.customHex[kind]).toUpperCase();
@@ -392,6 +398,29 @@ export class UI {
   }
 
   // ---------- Événements ----------
+  /** Curseur d'intensité porté par le bouton de finition actif : glisser (ou toucher) = régler, relâcher = valider. */
+  onGaugeDown(e) {
+    const pill = e.target.closest?.('.pill.gauge');
+    if (!pill || e.button > 0) return;
+    e.preventDefault();
+    const app = this.app;
+    const set = (ev, record) => {
+      const el = this.root.querySelector('.pill.gauge') || pill;
+      const r = el.getBoundingClientRect();
+      const v = Math.min(1, Math.max(0, (ev.clientX - r.left) / Math.max(1, r.width)));
+      app.applyToSelection({ i: v }, { record, animate: false });
+    };
+    set(e, false);
+    let raf = 0, last = e;
+    const move = (ev) => { last = ev; if (!raf) raf = requestAnimationFrame(() => { raf = 0; set(last, false); }); };
+    const up = (ev) => {
+      window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); window.removeEventListener('pointercancel', up);
+      if (raf) cancelAnimationFrame(raf);
+      set(ev, true);
+    };
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up); window.addEventListener('pointercancel', up);
+  }
+
   onClick(e) {
     const app = this.app;
     const tgt = e.target;
@@ -426,7 +455,7 @@ export class UI {
     const mat = tgt.closest('[data-mat]');
     if (mat) { app.applyToSelection({ m: mat.dataset.mat }); return; }
     const fin = tgt.closest('[data-finish]');
-    if (fin) { app.applyToSelection({ f: fin.dataset.finish }); return; }
+    if (fin) { if (!fin.classList.contains('gauge')) app.applyToSelection({ f: fin.dataset.finish }); return; } // actif : le curseur gère (pointerdown)
     const acc = tgt.closest('[data-acc]');
     if (acc) {
       const k = acc.dataset.acc, open = !this.acc[k];
