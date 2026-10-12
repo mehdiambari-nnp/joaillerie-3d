@@ -57,7 +57,7 @@ await page.click('button[data-a=redo]');
 await page.evaluate(() => __rc.ui.openShare()); await shot(page, '20-partage-lien-qr', { wait: 1200 }); await close(page);
 await page.evaluate(() => __rc.ui.openRecap()); await shot(page, '21-fiche-recap'); await close(page);
 await page.evaluate(() => __rc.ui.openVariants()); await shot(page, '22-variantes'); await close(page);
-await page.click('button[data-a=ar]'); await shot(page, '23-ar-desktop', { wait: 2500 }); await close(page);
+await page.evaluate(() => __rc.ui.openAR()); await shot(page, '23-ar-desktop', { wait: 2500 }); await close(page);
 
 await page.click('button[data-mode=vitrine]');
 // mode présentation + sombre
@@ -89,7 +89,7 @@ await shot(page, '31-iphone-vitrine');
 await page.evaluate(() => __rc.app.selectZone('z-gem-center')); await page.evaluate(() => __rc.app.applyToSelection({ m: 'ruby' }));
 await shot(page, '32-iphone-rubis-selection');
 await page.evaluate(() => __rc.app.clearSelection());
-await page.tap('button[data-a=ar]'); await shot(page, '33-iphone-ar-quicklook', { wait: 2500 }); await close(page);
+await page.evaluate(() => __rc.ui.openAR()); await shot(page, '33-iphone-ar-quicklook', { wait: 2500 }); await close(page);
 await page.evaluate(() => __rc.ui.openShare()); await shot(page, '34-iphone-partage', { wait: 1200 }); await close(page);
 await ctx.close();
 
