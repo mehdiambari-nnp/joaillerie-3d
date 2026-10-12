@@ -127,3 +127,4 @@
 - **Reflets liés au téléphone** : l'orientation du téléphone (capteurs, permission iOS demandée au toucher de « Activer la caméra ») tourne l'environnement des reflets en sens inverse, comme une pièce fixe. Repli silencieux sans capteur.
 - Caméra 60 i/s demandés si possible ; seuils de présence/suivi MediaPipe 0,5 → 0,6.
 - Non vérifié sur iPhone réel ; la photo de test fixe ne mesure ni la latence ni le tremblement.
+- **Correctif (retour iPhone)** : avec 85 % de relief, la bague regardait sur le côté quand la main était inclinée. Retour à un dessus majoritairement tourné vers la caméra (relief 35 %), et direction du doigt mesurée sur MCP → DIP (plus longue, moins bruitée). Les reflets liés au téléphone gardent la sensation de 3D.
