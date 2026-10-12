@@ -105,3 +105,4 @@
 - Interaction : toucher ou glisser sur le bouton actif règle `i` en direct (sans historique), relâcher enregistre une entrée d'annulation. Changer de finition remet l'intensité par défaut. Le bouton affiche un remplissage + un repère vertical (le texte reste lisible), rôle ARIA `slider`.
 - Persistance : `i` dans les liens de partage et projets (5e élément du tableau compacté, en centièmes) ; anciens liens inchangés.
 - Version 0.4.0 au journal (0.3.1 conservée).
+- **Correctif satiné** : lors de l'ajout du curseur, le drapeau `satin` (carte de normales à stries) avait été remis par erreur dans `FINISHES` → traits visibles. Retiré ; test unitaire de non-régression (le satiné n'a aucune texture de relief).

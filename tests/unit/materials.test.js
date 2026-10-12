@@ -70,4 +70,9 @@ describe('intensité des finitions', () => {
     const a = { p1: { m: 'yellow', f: 'hammered', i: 0.4 }, p2: { m: 'rose', f: 'satin' } };
     expect(unpackAssign(packAssign(a))).toEqual(a);
   });
+  it('satiné : aucune texture de relief (pas de rayures)', async () => {
+    const { metalParams } = await import('../../src/materials/factory.js');
+    const p = metalParams({ m: 'yellow', f: 'satin' });
+    expect(p.satin || p.brushed || p.hammered).toBe(false);
+  });
 });
