@@ -25,8 +25,10 @@ export function loadTheme(id = process.env.THEME || 'domuse', root = process.cwd
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 
+export const startColors = (theme) => (theme.defaultScheme === 'dark' ? theme.colors.dark : theme.colors.light);
+
 export function manifestOf(theme) {
-  const light = theme.colors.light;
+  const light = startColors(theme);
   return {
     name: theme.pwa?.name || theme.brand.name,
     short_name: theme.pwa?.shortName || theme.brand.name,
@@ -58,7 +60,7 @@ export default function themePlugin() {
         .replace(/<title>[^<]*<\/title>/, `<title>${esc(b.name)}</title>`)
         .replace(/(name="description" content=")[^"]*/, `$1${esc(b.description)}`)
         .replace(/(name="apple-mobile-web-app-title" content=")[^"]*/, `$1${esc(b.name)}`)
-        .replace(/(name="theme-color" content=")[^"]*/, `$1${theme.colors.light.bg}`);
+        .replace(/(name="theme-color" content=")[^"]*/, `$1${startColors(theme).bg}`);
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {

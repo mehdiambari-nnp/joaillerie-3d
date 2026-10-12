@@ -79,3 +79,7 @@
 ## Itération 11 — modèle par défaut par client
 - Clé `defaultModel` du `theme.json` : le fichier (dans `themes/<client>/`) est copié dans le build (`model/…`) et chargé au démarrage ; repli sur la bague de démonstration s'il manque. Domuse : `MAQUETTE_GEMV.fbx`. L'identifiant du modèle reste le nom du fichier, donc les liens de partage existants continuent d'appliquer leur configuration.
 - Conséquence assumée : ce FBX est désormais accessible publiquement avec le site du client (avant, il n'était jamais embarqué dans le build).
+
+## Itération 12 — « Nouveautés » et thème sombre par défaut
+- **Fenêtre « Nouveautés »** (`src/config/changelog.js`) : une fois par visiteur à chaque nouvelle version (clé `rc:seenVersion`), montrant les entrées plus récentes que la dernière vue. Pas à la toute première visite (l'accueil suffit, la version est alors marquée vue), ni en mode client / lien client. Rouvrable via « Plus → Nouveautés ». **À chaque version : ajouter une entrée en tête de `CHANGELOG`.**
+- **Sombre par défaut** : `defaultScheme: "dark"` dans le `theme.json` (appliqué avant le premier rendu, sans flash ; le choix mémorisé du visiteur reste prioritaire ; `"system"` pour suivre l'appareil). Couleur de barre / manifest alignées.

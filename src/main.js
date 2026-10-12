@@ -90,6 +90,7 @@ async function boot() {
   app.viewer.setAutoRotate(FEATURES.autoRotate && ui.mode !== 'atelier');
   ui.loadThumbnails();
   ui.onboard();
+  ui.changelog();
   if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);
 
   if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {

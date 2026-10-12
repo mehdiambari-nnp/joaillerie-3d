@@ -434,3 +434,7 @@ dialog { border-radius: 20px; }
 .app[data-mode='client'] .hud-right .icon-btn { width: 44px; height: 44px; background: color-mix(in srgb, var(--surface) 70%, transparent); border-color: color-mix(in srgb, var(--ink) 35%, transparent); color: var(--ink); }
 .app[data-mode='client'] .hud-right .icon-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .icon-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* Fenêtre « Nouveautés » */
+.cl-v { margin: 4px 0 6px; font: 500 15px var(--sans); letter-spacing: .06em; } .cl-v small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.cl { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; line-height: 1.4; } .cl li::marker { color: var(--accent); }

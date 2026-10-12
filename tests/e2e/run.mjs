@@ -13,7 +13,7 @@ const step = (s) => console.log(`\n▶ ${s}`);
 
 const { server, url } = await startServer();
 const q = HAS_GEMV ? '?model=gemv' : '';
-const init = () => { try { localStorage.setItem('rc:onboarded', 'true'); } catch {} };
+const init = () => { try { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); } catch {} };
 
 // ---------- 1. Bureau : import, sélection, matériaux ----------
 step('Bureau : import + sélection + matériaux');

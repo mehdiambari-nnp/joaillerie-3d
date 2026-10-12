@@ -1,6 +1,8 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
 import { FEATURES } from '../config/features.js';
+import { CHANGELOG, CURRENT_VERSION, unseenEntries } from '../config/changelog.js';
+import { LANG } from './i18n.js';
 import theme, { brandHTML } from '../config/theme.js';
 import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
@@ -516,6 +518,7 @@ export class UI {
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
       case 'photo': this.takePhoto(); break;
+      case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
       case 'ar': this.openAR(); break;
       case 'tryon': this.tryon.open(); break;
@@ -643,7 +646,8 @@ export class UI {
     const d = this.html(`<div class="more-list">
       <button data-a="variants"><b>${t('variants')}</b><span>${t('variantsHint')}</span></button>
       <button data-a="share"><b>${t('share')}</b><span>${t('shareHint')}</span></button>
-      <button data-a="recap"><b>${t('recap')}</b><span>${t('recapHint')}</span></button></div>`);
+      <button data-a="recap"><b>${t('recap')}</b><span>${t('recapHint')}</span></button>
+      <button data-a="whatsnew"><b>${t('whatsNew')}</b><span>${t('whatsNewHint')}</span></button></div>`);
     this.openDialog(t('more'), d);
   }
 
@@ -770,6 +774,23 @@ export class UI {
     const d = this.html(`<p>${t('onboardBody')}</p><p class="muted tiny">${t('privacy')}</p><div class="row"><button class="btn primary" data-s="ok">${t('gotIt')}</button></div>`);
     d.addEventListener('click', (e) => { if (e.target.closest('[data-s=ok]')) { prefs.set('onboarded', true); this.dlg.close(); } });
     this.openDialog(t('onboardTitle'), d);
+  }
+
+  /** Fenêtre « Nouveautés » : une seule fois par version et par visiteur (pas à la toute première visite, ni en mode client). */
+  changelog({ force = false } = {}) {
+    const seen = prefs.get('seenVersion');
+    if (!force) {
+      if (!prefs.get('onboarded')) { prefs.set('seenVersion', CURRENT_VERSION); return; } // première visite : l'accueil suffit
+      if (this.locked || this.mode === 'client' || this.dlg.open) return;
+    }
+    const entries = force ? CHANGELOG.slice(0, 1) : unseenEntries(seen);
+    if (!entries.length) return;
+    const li = (e) => `<h3 class="cl-v">v${e.version} <small>${e.date}</small></h3><ul class="cl">${(e[LANG] || e.fr).map((x) => `<li>${x}</li>`).join('')}</ul>`;
+    const d = this.html(`${entries.map(li).join('')}<div class="row"><button class="btn primary" data-s="ok">${t('gotIt')}</button></div>`);
+    const done = () => prefs.set('seenVersion', CURRENT_VERSION);
+    d.addEventListener('click', (e) => { if (e.target.closest('[data-s=ok]')) { done(); this.dlg.close(); } });
+    this.dlg.addEventListener('close', done, { once: true });
+    this.openDialog(t('whatsNew'), d);
   }
 
   /** Génère les billes (WebGL temporaire) puis rafraîchit la palette. */

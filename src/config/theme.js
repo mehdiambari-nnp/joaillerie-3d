@@ -17,6 +17,10 @@ export function themeCSS(th = theme) {
 }
 
 if (typeof document !== 'undefined') {
+  // thème de départ (avant le premier rendu, sans flash) : choix mémorisé, sinon réglage du thème client, sinon système
+  let stored = null; try { stored = localStorage.getItem('rc:theme'); } catch { /* stockage indisponible */ }
+  const start = stored === 'light' || stored === 'dark' ? stored : (theme.defaultScheme === 'light' || theme.defaultScheme === 'dark' ? theme.defaultScheme : null);
+  if (start) document.documentElement.dataset.theme = start;
   const st = document.createElement('style');
   st.id = 'theme-vars';
   const h = theme.header || {};
