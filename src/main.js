@@ -9,6 +9,7 @@ import { t } from './ui/i18n.js';
 import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
 import { parseShareHash } from './state/store.js';
+import { shouldPlayIntro, playIntro } from './intro/intro.js';
 
 const root = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -89,6 +90,7 @@ async function boot() {
   }
   app.viewer.setAutoRotate(FEATURES.autoRotate && ui.mode !== 'atelier');
   ui.loadThumbnails();
+  if (app.model && shouldPlayIntro(theme, params, dev)) await playIntro(app, ui, theme).catch((e) => console.warn('Intro ignorée', e));
   ui.onboard();
   ui.changelog();
   if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);

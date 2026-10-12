@@ -72,5 +72,9 @@
     "shortName": "Domuse",
     "icon": "icons/icon-512.png"
   },
-  "defaultModel": "MAQUETTE_GEMV.fbx"
+  "defaultModel": "MAQUETTE_GEMV.fbx",
+  "intro": {
+    "enabled": true,
+    "logo": "wordmark"
+  }
 }

@@ -15,6 +15,25 @@ const { server, url } = await startServer();
 const q = HAS_GEMV ? '?model=gemv' : '';
 const init = () => { try { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); } catch {} };
 
+// ---------- 0. Introduction (écrin) ----------
+step('Introduction : écrin fermé → ouverture → bague libre');
+{
+  const b0 = await launch();
+  const c0 = await b0.newContext({ viewport: { width: 440, height: 956 }, deviceScaleFactor: 1, isMobile: true, hasTouch: true });
+  await c0.addInitScript(init);
+  const p0 = await c0.newPage(); const l0 = collect(p0);
+  await p0.goto(url + q + (q ? '&' : '?') + 'intro=1');
+  await p0.waitForSelector('.intro-open', { timeout: 60000 });
+  ok(await p0.evaluate(() => document.querySelector('.app').dataset.intro === '1' && !!__rc.introBox), 'écrin affiché, interface masquée');
+  ok(await p0.evaluate(() => __rc.app.model.root.position.y < 0), 'la bague est descendue dans l’écrin');
+  await p0.locator('.intro-open').click();
+  await p0.waitForFunction(() => !document.querySelector('.app').dataset.intro, null, { timeout: 30000 });
+  ok(await p0.evaluate(() => __rc.app.model.root.position.y === 0 && __rc.app.model.root.rotation.y === 0 && !document.querySelector('.intro-hint')), 'bague remise en place, indice retiré');
+  ok(await p0.evaluate(() => __rc.app.viewer.controls.enabled), 'contrôles de la vue 3D de nouveau actifs');
+  ok(l0.errors.length === 0, 'aucune erreur console (intro) ' + JSON.stringify(l0.errors));
+  await b0.close();
+}
+
 // ---------- 1. Bureau : import, sélection, matériaux ----------
 step('Bureau : import + sélection + matériaux');
 let browser = await launch();
