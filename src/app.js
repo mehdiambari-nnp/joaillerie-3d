@@ -9,6 +9,7 @@ import { createMaterial, transitionMaterial } from './materials/factory.js';
 import { DEFAULT_METAL, DEFAULT_GEM, isMaterialFor, normalizeAssignment, validHex, CUSTOM } from './materials/library.js';
 import { similarPieceIds } from './import/zones.js';
 import { Exploder } from './core/explode.js';
+import { FEATURES } from './config/features.js';
 
 class Emitter {
   constructor() { this.l = {}; }
@@ -34,6 +35,8 @@ export class Configurator extends Emitter {
     this.hover = null;
     this.multi = false;
     this.interactive = true; // false en mode client : pas de sélection de pièces
+    this._zoomKey = '';
+    this.on('selection', () => this._autoZoom());
     this.granularity = 'zone'; // 'zone' | 'piece'
     this.history = new History(50);
     this.variants = [];
@@ -186,6 +189,23 @@ export class Configurator extends Emitter {
     for (const p of this.pieces) this.viewer.setHighlight([p], 'x', false);
     if (this.hover && !this.selection.has(this.hover)) this.viewer.setHighlight([this.pieceById(this.hover)], 'hover', true);
     this.viewer.setHighlight([...this.selection].map((i) => this.pieceById(i)).filter(Boolean), 'select', true);
+  }
+
+  /** Zoom automatique : cadre la sélection quand elle change de partie, revient à l'ensemble quand elle est vidée. */
+  _autoZoom() {
+    if (!FEATURES.autoZoomSelect || !this.interactive || !this.model) return;
+    const ids = [...this.selection];
+    const key = ids.length ? [...new Set(ids.map((i) => this.zoneOfPiece(i)?.id ?? i))].sort().join('|') : '';
+    if (key === this._zoomKey) return;
+    this._zoomKey = key;
+    if (!ids.length) { this.viewer.frameAll(); return; }
+    const box = new THREE.Box3();
+    for (const i of ids) { const p = this.pieceById(i); if (p) box.expandByObject(p.mesh); }
+    if (box.isEmpty()) return;
+    // pierres : on les regarde de face (depuis l'extérieur de la bague), pour bien voir la couleur et les facettes
+    const onlyGems = ids.every((i) => this.pieceById(i)?.kind === 'gem');
+    const lookFrom = onlyGems ? box.getCenter(new THREE.Vector3()).sub(this.viewer.box.getCenter(new THREE.Vector3())) : null;
+    this.viewer.focusOn(box, { minFrac: 0.22, margin: 1.25, lookFrom: lookFrom && lookFrom.lengthSq() > 1e-6 ? lookFrom : null });
   }
 
   focusPiece(id) {

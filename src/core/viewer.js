@@ -209,12 +209,23 @@ export class Viewer {
   }
 
   /** Cadre une boîte (focus double-clic sur une zone). */
-  focusOn(box) {
+  focusOn(box, { minFrac = 0.18, margin = 1.3, lookFrom = null } = {}) {
     const c = box.getCenter(new THREE.Vector3());
-    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, this.radius * 0.18);
+    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, this.radius * minFrac);
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    if (lookFrom) dir.multiplyScalar(0.3).add(lookFrom.clone().normalize()).normalize(); // vue plus frontale sur la sélection
+    const fov = (this.camera.fov * Math.PI) / 180;
+    const dist = (Math.max(r / Math.sin(fov / 2), r / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2))) * margin;
+    this.anim = { from: this.camera.position.clone(), to: c.clone().add(dir.multiplyScalar(dist)), fromT: this.controls.target.clone(), toT: c, start: performance.now(), dur: 600 };
+    this.invalidate();
+  }
+
+  /** Revient au cadrage d'ensemble en gardant l'angle de vue courant. */
+  frameAll() {
+    const c = this.box.getCenter(new THREE.Vector3());
     const dir = this.camera.position.clone().sub(this.controls.target).normalize();
     const fov = (this.camera.fov * Math.PI) / 180;
-    const dist = (r / Math.sin(fov / 2)) * 1.3;
+    const dist = (this.radius / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2)) * 1.12;
     this.anim = { from: this.camera.position.clone(), to: c.clone().add(dir.multiplyScalar(dist)), fromT: this.controls.target.clone(), toT: c, start: performance.now(), dur: 600 };
     this.invalidate();
   }
