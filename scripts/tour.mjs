@@ -17,7 +17,7 @@ await page.goto(url + '?model=gemv'); await waitModel(page);
 await page.evaluate(() => __rc.app.viewer.setAutoRotate(false));
 await V(page, [0.62, 0.45, 0.64]);
 await shot(page, '01-accueil-onboarding');
-await page.evaluate(() => { localStorage.setItem('rc:onboarded', 'true'); document.querySelector('dialog[open]')?.close(); });
+await page.evaluate(() => { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); document.querySelector('dialog[open]')?.close(); });
 await shot(page, '02-vitrine-maquette');
 // sélection d'une zone
 await page.evaluate(() => __rc.app.selectZone('z-gem-center')); await shot(page, '03-selection-pierre-centrale');
@@ -68,21 +68,21 @@ await ctx.close?.().catch?.(() => {});
 
 // mode sombre système
 ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, locale: 'fr-FR', colorScheme: 'dark' });
-await ctx.addInitScript(() => localStorage.setItem('rc:onboarded', 'true'));
+await ctx.addInitScript(() => { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); });
 page = await ctx.newPage(); await page.goto(url + '?model=gemv'); await waitModel(page);
 await page.evaluate(() => __rc.app.viewer.setAutoRotate(false)); await V(page, [0.62, 0.45, 0.64]);
 await shot(page, '29-theme-sombre'); await ctx.close();
 
 // ----- Démo (bague procédurale, sans fichier) -----
 ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, locale: 'fr-FR' });
-await ctx.addInitScript(() => localStorage.setItem('rc:onboarded', 'true'));
+await ctx.addInitScript(() => { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); });
 page = await ctx.newPage(); await page.goto(url); await waitModel(page);
 await shot(page, '30-bague-demo'); await ctx.close();
 
 // ----- iPhone -----
 const ios = { viewport: { width: 440, height: 956 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true, locale: 'fr-FR',
   userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Mobile/15E148 Safari/604.1' };
-ctx = await b.newContext(ios); await ctx.addInitScript(() => localStorage.setItem('rc:onboarded', 'true'));
+ctx = await b.newContext(ios); await ctx.addInitScript(() => { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); });
 page = await ctx.newPage(); await page.goto(url + '?model=gemv'); await waitModel(page);
 await page.evaluate(() => __rc.app.viewer.setAutoRotate(false)); await V(page, [0.62, 0.45, 0.64]);
 await shot(page, '31-iphone-vitrine');
@@ -100,7 +100,7 @@ for (const [file, tag] of [['main_ouverte_test', 'a'], ['dos_main_index_leve_tes
   execSync(`ffmpeg -y -loglevel error -loop 1 -i tests/fixtures/${file}.jpg -t 2 -r 10 -vf "scale=640:480:force_original_aspect_ratio=decrease,pad=640:480:(ow-iw)/2:(oh-ih)/2,format=yuv420p" ${y4m}`);
   const bb = await (await import('../tests/e2e/helpers.mjs')).launch(['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${y4m}`]);
   ctx = await bb.newContext({ ...ios, deviceScaleFactor: 2, permissions: ['camera'] });
-  await ctx.addInitScript(() => localStorage.setItem('rc:onboarded', 'true'));
+  await ctx.addInitScript(() => { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); });
   page = await ctx.newPage(); await page.goto(url + '?model=gemv'); await waitModel(page);
   await page.tap('button[data-a=tryon]'); await shot(page, `35${tag}-essayage-intro`);
   await page.tap('[data-a=start]');

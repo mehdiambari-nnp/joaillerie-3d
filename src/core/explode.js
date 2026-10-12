@@ -14,7 +14,7 @@ export class Exploder {
     this.tweens = new Map();   // zoneId → { from, to, start, delay }
     this.offsets = new Map();  // zoneId → Vector3 (repère de la racine, mm)
     this.base = new Map();     // pieceId → position d'origine du mesh
-    this.factor = 0.62;
+    this.factor = 0.6; // part de l'écart latéral conservée (0 = étages stricts)
     this.boxes = new Map();
     this.raf = 0;
   }
@@ -46,16 +46,16 @@ export class Exploder {
     const up = new THREE.Vector3();
     for (const z of app.zones) { const b = boxes.get(z.id); if (b && z.role !== 'body') up.add(b.getCenter(new THREE.Vector3()).sub(o)); }
     if (up.lengthSq() > 1e-9) up.normalize(); else up.set(0, 1, 0);
+    // Éclatement par étages le long de l'axe « haut » : corps (en bas) → sertissage (chatons, paniers, griffes) → pierres (en haut).
+    // Un léger écart latéral sépare les pièces d'un même étage (pierres / paniers de gauche et de droite).
+    const gap = size * 0.1;
+    const TIER = (role = '') => (role === 'body' ? -0.9 : role.startsWith('gem') ? 1.9 : 0.6);
     for (const [zid, b] of boxes) {
       const zone = app.zones.find((x) => x.id === zid);
-      if (zone?.role === 'body') { this.offsets.set(zid, up.clone().multiplyScalar(-size * 0.3)); continue; }
-      const c = b.getCenter(new THREE.Vector3());
-      const v = c.clone().sub(o);
-      const dist = v.length();
-      // les parties quasi centrées (corps de l'anneau) restent en place ; les autres s'écartent radialement
-      const k = dist < size * 0.04 ? 0 : this.factor;
-      const off = v.multiplyScalar(k);
-      if (off.length() > size * 0.55) off.setLength(size * 0.55); // plafond : la bague reste lisible
+      const v = b.getCenter(new THREE.Vector3()).sub(o);
+      const lateral = v.clone().addScaledVector(up, -v.dot(up)); // composante perpendiculaire à « haut »
+      const off = up.clone().multiplyScalar(gap * TIER(zone?.role));
+      if (zone?.role !== 'body') off.addScaledVector(lateral, this.factor * 0.5);
       this.offsets.set(zid, off);
     }
     this.boxes = boxes;
@@ -101,20 +101,21 @@ export class Exploder {
     if (!v.root) return;
     const dir = v.camera.position.clone().sub(v.controls.target).normalize();
     const fov = (v.camera.fov * Math.PI) / 180;
-    let r = v.radius;
-    if (this.anyExploded) {
-      // rayon nécessaire pour voir toutes les parties à leur position éclatée
-      const c = v.root.worldToLocal(v.controls.target.clone());
-      for (const [zid, b] of this.boxes) {
-        const off = this.isExploded(zid) ? this.offsets.get(zid) : new THREE.Vector3();
-        for (let i = 0; i < 8; i++) {
-          const p = new THREE.Vector3(i & 1 ? b.max.x : b.min.x, i & 2 ? b.max.y : b.min.y, i & 4 ? b.max.z : b.min.z).add(off);
-          r = Math.max(r, p.distanceTo(c));
-        }
-      }
+    // boîte englobant toutes les parties à leur position (éclatée ou non) : on recentre la caméra dessus
+    const bb = new THREE.Box3();
+    for (const [zid, b] of this.boxes) {
+      const off = this.isExploded(zid) ? this.offsets.get(zid) : new THREE.Vector3();
+      bb.union(b.clone().translate(off));
     }
-    const dist = (r / Math.sin(Math.min(fov, fov * v.camera.aspect) / 2)) * 1.12;
-    v.setView(dir.toArray(), true, dist);
+    if (bb.isEmpty()) return;
+    const cl = bb.getCenter(new THREE.Vector3());
+    let r = 0;
+    for (let i = 0; i < 8; i++) r = Math.max(r, new THREE.Vector3(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).distanceTo(cl));
+    const c = v.root.localToWorld(cl.clone());
+    const k = v.radius / (this.baseRadius ||= v.radius); // échelle locale → monde (≈ 1)
+    const dist = ((Math.max(r * k, v.radius * 0.7)) / Math.sin(Math.min(fov, fov * v.camera.aspect) / 2)) * 1.0;
+    v.anim = { from: v.camera.position.clone(), to: c.clone().add(dir.multiplyScalar(dist)), fromT: v.controls.target.clone(), toT: c, start: performance.now(), dur: 650 };
+    v.invalidate();
   }
 
   _start() { if (!this.raf) this.raf = requestAnimationFrame((t) => this._tick(t)); }

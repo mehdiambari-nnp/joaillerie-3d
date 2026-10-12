@@ -13,7 +13,7 @@ const step = (s) => console.log(`\n▶ ${s}`);
 
 const { server, url } = await startServer();
 const q = HAS_GEMV ? '?model=gemv' : '';
-const init = () => { try { localStorage.setItem('rc:onboarded', 'true'); } catch {} };
+const init = () => { try { localStorage.setItem('rc:onboarded', 'true'); localStorage.setItem('rc:seenVersion', '"9.9.9"'); } catch {} };
 
 // ---------- 1. Bureau : import, sélection, matériaux ----------
 step('Bureau : import + sélection + matériaux');
@@ -148,10 +148,10 @@ ok(await page.evaluate(() => innerWidth === visualViewport.width), 'mise en page
 const vpH = await page.evaluate(() => document.querySelector('.viewport').getBoundingClientRect().height);
 await page.evaluate(() => document.querySelector('[data-a=present]').click());
 await page.waitForTimeout(500);
-const fsr = await page.evaluate(() => { const v = document.querySelector('.viewport').getBoundingClientRect(); const b = document.querySelector('[data-a=present-exit]').getBoundingClientRect(); return { h: v.height, ih: innerHeight, exitVisible: b.width > 0 && b.top >= 0 }; });
+const fsr = await page.evaluate(() => { const v = document.querySelector('.viewport').getBoundingClientRect(); const b = document.querySelector('[data-a=present]').getBoundingClientRect(); return { h: v.height, ih: innerHeight, exitVisible: b.width > 0 && b.top >= 0 }; });
 ok(fsr.h > vpH * 1.1 && fsr.h >= fsr.ih - 2, `plein écran : vue 3D agrandie (${Math.round(vpH)} → ${Math.round(fsr.h)} px)`);
 ok(fsr.exitVisible, 'plein écran : bouton de sortie visible');
-await page.evaluate(() => document.querySelector('[data-a=present-exit]').click());
+await page.evaluate(() => document.querySelector('[data-a=present]').click());
 await page.waitForTimeout(300);
 ok(await page.evaluate(() => document.querySelector('.app').dataset.present === '0' && document.querySelector('.topbar').offsetHeight > 0), 'plein écran : retour à l’interface');
 // teinte libre

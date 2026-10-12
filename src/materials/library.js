@@ -6,7 +6,11 @@ export const CUSTOM = 'custom';
 
 // Couleurs de métaux = réflectance F0 en RGB LINÉAIRE (metalness = 1).
 export const METALS = [
+  // Nuances d'or jaune : plus l'alliage est riche en or pur, plus la teinte est intense et saturée ; plus il contient d'argent, plus elle pâlit.
+  { id: 'yellow-deep', name: 'Or jaune intense', rgb: [1.0, 0.70, 0.20], swatch: '#e8ae38' },
   { id: 'yellow', name: 'Or jaune', rgb: [1.0, 0.766, 0.336], swatch: '#e8c36a' },
+  { id: 'yellow-light', name: 'Or jaune clair', rgb: [0.98, 0.80, 0.46], swatch: '#e9cb85' },
+  { id: 'champagne', name: 'Or champagne', rgb: [0.95, 0.82, 0.59], swatch: '#e6d6ae' },
   { id: 'rose', name: 'Or rose', rgb: [0.96, 0.67, 0.58], swatch: '#eaaa97' },
   { id: 'red', name: 'Or rouge', rgb: [0.93, 0.5, 0.4], swatch: '#dc8a73' },
   { id: 'grey', name: 'Or gris', rgb: [0.74, 0.73, 0.71], swatch: '#c2bfb8' },
@@ -20,8 +24,9 @@ export const FINISHES = [
   { id: 'hammered', name: 'Martelé', roughness: 0.1, anisotropy: 0, hammered: true },
 ];
 
-// Pierres : « hex » = couleur apparente voulue (la teinte de transmission est déduite, voir gemOptics).
-// Groupes = familles de couleur ; aucun nom d'espèce n'est affiché dans l'interface.
+// Pierres : chaque couleur porte le nom de la pierre qui l'illustre le mieux, avec ses vraies propriétés optiques :
+//   ior = indice de réfraction, disp = dispersion B–G (écart d'indice entre 687 et 431 nm).
+// « hex » = couleur apparente voulue (la teinte de transmission est déduite, voir gemOptics). Groupes = familles de couleur.
 export const GEM_GROUPS = [
   { id: 'white', name: 'Incolore' },
   { id: 'red', name: 'Rouges' },
@@ -36,28 +41,28 @@ export const GEM_GROUPS = [
 
 export const GEMS = [
   { id: 'diamond', group: 'white', name: 'Diamant', sparkle: true, hex: '#f4f8ff', swatch: '#f4f8ff' },
-  { id: 'red-dark', group: 'red', name: 'Rouge sombre', hex: '#8a0f24' },
-  { id: 'red-vivid', group: 'red', name: 'Rouge vif', hex: '#e0102c' },
-  { id: 'pink-pale', group: 'pink', name: 'Rose pâle', hex: '#f6b3cb' },
-  { id: 'pink-vivid', group: 'pink', name: 'Rose vif', hex: '#e8337f' },
-  { id: 'orange', group: 'orange', name: 'Orange', hex: '#f28a1a' },
-  { id: 'yellow', group: 'orange', name: 'Jaune', hex: '#f5c518' },
-  { id: 'cognac', group: 'orange', name: 'Cognac', hex: '#b9631a' },
-  { id: 'green-light', group: 'green', name: 'Vert clair', hex: '#b6dd3a' },
-  { id: 'green-emerald', group: 'green', name: 'Vert émeraude', hex: '#0fa152' },
-  { id: 'green-tourmaline', group: 'green', name: 'Vert tourmaline', hex: '#2a8f76' },
-  { id: 'green-deep', group: 'green', name: 'Vert profond', hex: '#0b5a3a' },
-  { id: 'teal-light', group: 'teal', name: 'Teal clair', hex: '#6fd3cd' },
-  { id: 'teal', group: 'teal', name: 'Teal', hex: '#0f9a9c' },
-  { id: 'blue-aqua', group: 'blue', name: 'Bleu aigue-marine', hex: '#8fd6ea' },
-  { id: 'blue-medium', group: 'blue', name: 'Bleu médium', hex: '#2f6fe0' },
-  { id: 'blue-royal', group: 'blue', name: 'Bleu roi', hex: '#1b3fc4' },
-  { id: 'blue-night', group: 'blue', name: 'Bleu très foncé', hex: '#0b1f6b' },
-  { id: 'violet-light', group: 'violet', name: 'Lilas', hex: '#c9a4f0' },
-  { id: 'violet', group: 'violet', name: 'Violet', hex: '#8a3fd0' },
-  { id: 'violet-deep', group: 'violet', name: 'Violet profond', hex: '#4a1a8a' },
-  { id: 'black', group: 'dark', name: 'Noir', opaque: true, hex: '#0b0b0d', roughness: 0.06 },
-  { id: 'pearl', group: 'dark', name: 'Nacre', opaque: true, hex: '#f4efe6', roughness: 0.25, iridescence: 1 },
+  { id: 'red-dark', group: 'red', name: 'Grenat', hex: '#8a0f24', ior: 1.78, disp: 0.024 },
+  { id: 'red-vivid', group: 'red', name: 'Rubis', hex: '#e0102c', ior: 1.77, disp: 0.018 },
+  { id: 'pink-pale', group: 'pink', name: 'Morganite', hex: '#f6b3cb', ior: 1.58, disp: 0.014 },
+  { id: 'pink-vivid', group: 'pink', name: 'Saphir rose', hex: '#e8337f', ior: 1.77, disp: 0.018 },
+  { id: 'orange', group: 'orange', name: 'Spessartite', hex: '#f28a1a', ior: 1.8, disp: 0.027 },
+  { id: 'yellow', group: 'orange', name: 'Saphir jaune', hex: '#f5c518', ior: 1.77, disp: 0.018 },
+  { id: 'cognac', group: 'orange', name: 'Citrine madère', hex: '#b9631a', ior: 1.55, disp: 0.013 },
+  { id: 'green-light', group: 'green', name: 'Péridot', hex: '#b6dd3a', ior: 1.66, disp: 0.02 },
+  { id: 'green-emerald', group: 'green', name: 'Émeraude', hex: '#0fa152', ior: 1.58, disp: 0.014 },
+  { id: 'green-tourmaline', group: 'green', name: 'Tourmaline verte', hex: '#2a8f76', ior: 1.64, disp: 0.017 },
+  { id: 'green-deep', group: 'green', name: 'Tsavorite', hex: '#0b5a3a', ior: 1.74, disp: 0.028 },
+  { id: 'teal-light', group: 'teal', name: 'Tourmaline Paraïba', hex: '#6fd3cd', ior: 1.64, disp: 0.017 },
+  { id: 'teal', group: 'teal', name: 'Zircon bleu', hex: '#0f9a9c', ior: 1.93, disp: 0.039 },
+  { id: 'blue-aqua', group: 'blue', name: 'Aigue-marine', hex: '#8fd6ea', ior: 1.58, disp: 0.014 },
+  { id: 'blue-medium', group: 'blue', name: 'Saphir', hex: '#2f6fe0', ior: 1.77, disp: 0.018 },
+  { id: 'blue-royal', group: 'blue', name: 'Saphir royal', hex: '#1b3fc4', ior: 1.77, disp: 0.018 },
+  { id: 'blue-night', group: 'blue', name: 'Spinelle cobalt', hex: '#0b1f6b', ior: 1.72, disp: 0.02 },
+  { id: 'violet-light', group: 'violet', name: 'Kunzite', hex: '#c9a4f0', ior: 1.66, disp: 0.017 },
+  { id: 'violet', group: 'violet', name: 'Améthyste', hex: '#8a3fd0', ior: 1.55, disp: 0.013 },
+  { id: 'violet-deep', group: 'violet', name: 'Tanzanite', hex: '#4a1a8a', ior: 1.69, disp: 0.021 },
+  { id: 'black', group: 'dark', name: 'Onyx', opaque: true, hex: '#0b0b0d', roughness: 0.06 },
+  { id: 'pearl', group: 'dark', name: 'Perle', opaque: true, hex: '#f4efe6', roughness: 0.25, iridescence: 1 },
 ];
 for (const g of GEMS) g.swatch ??= g.hex;
 
@@ -73,7 +78,7 @@ const LEGACY_METAL = {
 const LEGACY_GEM = {
   moissanite: 'diamond', cz: 'diamond', sapphire: 'blue-medium', 'sapphire-pink': 'pink-vivid', 'sapphire-yellow': 'yellow',
   ruby: 'red-vivid', emerald: 'green-emerald', amethyst: 'violet', topaz: 'blue-aqua', aquamarine: 'blue-aqua', citrine: 'orange',
-  tsavorite: 'green-emerald', peridot: 'green-light', onyx: 'black', turquoise: 'teal', lapis: 'blue-royal',
+  tsavorite: 'green-deep', peridot: 'green-light', onyx: 'black', turquoise: 'teal', lapis: 'blue-royal',
 };
 const LEGACY_FINISH = { matte: 'satin' };
 
@@ -147,6 +152,9 @@ export function resolveMetal(a) {
  * (loi de Beer-Lambert sur l'épaisseur) ; la surface reste claire pour ne pas assombrir deux fois.
  * Les pierres foncées gardent un peu de lumière (distance d'atténuation plus longue) pour rester lisibles.
  */
+// Échelle du moteur de rendu : dispersion 0,4 ↔ diamant (0,044 réel) ; les autres pierres sont mises à la même échelle.
+const DISP_SCALE = 0.4 / 0.044;
+
 export function gemOptics(hex) {
   const [h, s, l] = hexToHsl(hex);
   const dark = Math.max(0, 0.38 - l) / 0.38; // 0 = clair, 1 = très foncé
@@ -155,7 +163,7 @@ export function gemOptics(hex) {
     att: hex,
     attDist: 4.2 + dark * 2.4,
     ior: 1.77,
-    dispersion: 0.06,
+    dispersion: 0.16, // corindon (rubis / saphir)
   };
 }
 
@@ -165,7 +173,8 @@ export function resolveGem(a) {
   const g = byId(GEMS, n.m);
   if (g.id === 'diamond') return { ...g, color: '#f2f6ff', ior: 2.42, dispersion: 0.4, att: '#ffffff', attDist: 1e3 };
   if (g.opaque) return { ...g, color: g.hex };
-  return { ...g, ...gemOptics(g.hex) };
+  const o = gemOptics(g.hex);
+  return { ...g, ...o, ior: g.ior ?? o.ior, dispersion: g.disp != null ? g.disp * DISP_SCALE : o.dispersion };
 }
 
 /** Nom lisible d'une affectation {m, f, c}. */

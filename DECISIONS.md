@@ -44,3 +44,51 @@
 - Bandeau d'aide et infos taille/diamètre retirés de la vue 3D (restent dans les exports).
 - **Sélection pièce par pièce** : chaque partie à plusieurs pièces se déplie (chevron) en sous-lignes Pierre 1, 2… avec coche et œil. Bouton clair/sombre déplacé dans la barre du haut, à gauche du sélecteur Client / Joaillier.
 - **Clic sur la bague** : 1er clic = toute la partie (ex. toutes les pierres latérales) ; clic suivant dans une partie déjà sélectionnée = ajoute/retire la pierre visée.
+
+## Flux de déploiement (économie de crédits Netlify)
+- Un déploiement en **production** (push/fusion sur `main`) coûte 15 crédits ; les **Deploy Previews / déploiements de branche** coûtent 0.
+- Travail sur la branche `dev` + pull request vers `main` : chaque push génère un aperçu gratuit. On ne fusionne dans `main` que sur validation (« on publie »).
+
+## Itération 6
+- **Feature flags** (`src/config/features.js`) : rotation automatique, choix de l'angle de vue et gestion des lumières sont désactivés (boutons masqués, rotation coupée en Client et Joaillier) ; le code reste, il suffit de passer le flag à `true`.
+- **Pastilles de couleur des pierres** : petites gemmes facettées (SVG généré, `src/materials/gemicon.js`) à la place des ronds — palette, en-têtes d'accordéon et liste des parties.
+- **Rendu (PBR)** : MeshPhysicalMaterial (métal metalness 1, pierres en transmission/IOR/dispersion) + éclairage par image HDRI (IBL). Le HDRI « Ville, plein soleil » reçoit une balance des blancs chaude pour l'éclairage seulement (le fond reste fidèle) : l'or est moins verdâtre quand il reflète le ciel bleu.
+- **Barre d'outils de vue** : explosion + plein écran en ligne en bas à droite ; libellé « Quitter le plein écran » supprimé (le bouton plein écran devient l'icône « réduire » en mode plein écran).
+- **Clic 3D sur une pierre** : 1er clic = toute la partie ; 2e clic (partie entière sélectionnée) = isole la pierre touchée ; clics suivants = ajoute / retire la pierre touchée.
+
+## Itération 7 — rendu physique des pierres et des métaux
+- **Cause du rendu « plat » vs concurrent** : surtout l'éclairage (HDRI de ciel sans sources franches) et la transmission écran de three.js, qui ne sait pas faire de réflexions internes. Le HDRI n'était qu'en partie fautif.
+- **Pierres = ray tracing intérieur** (`src/materials/gem.js`) : pour chaque pierre, une cube-map des normales de facettes et des distances est rendue une fois depuis son centre. Le shader (greffé sur MeshPhysicalMaterial) suit le rayon : réfraction (Snell), jusqu'à 6 rebonds internes (4 sur mobile), réflexion totale interne, Fresnel, dispersion sur 3 indices (R/G/B), absorption Beer–Lambert pour la couleur. Normales plates par facette.
+- **Valeurs physiques** : IOR diamant 2,42 (borné à 2,6), rubis/saphir 1,77, émeraude 1,58… ; dispersion diamant 0,044 (écart B–R), amplifiée ×1,5 pour le rendu temps réel.
+- **Éclairage** : HDRI « Ville » à balance chaude + softboxes procédurales (haut chaud, bandes latérales chaude/froide, fond) composées dans la scène PMREM → reflets doux et contrastés sur l'or, comme en studio.
+- **Limites connues** : non testé sur iPhone réel (coût : 3 traces × rebonds par pixel de pierre) ; l'export GLB/AR utilise les matériaux de substitution (le shader n'est pas exportable) ; légère scintillation sur les diamants.
+
+## Itération 8 — marque blanche (thèmes clients)
+- **Un dossier par client** (`themes/<client>/theme.json` + logos + icônes). Le thème est choisi **au build** (`THEME=<client>`, défaut `domuse`) : un site Netlify par client, aucune identité d'un client dans le bundle d'un autre.
+- Mise en œuvre : plugin Vite `config/vite-theme.js` (module virtuel `virtual:theme`, `<title>`/meta, manifest et icônes générés) ; `src/config/theme.js` injecte palettes clair/sombre + polices en variables CSS ; textes surchargeables par thème ; flags de fonctionnalités surchargeables.
+- Charte Domuse : bordeaux `#31161f`, beige `#e5e1c8`, gris-bleu `#7d8e98`, papier Arena `#f0ece9` ; Inter seule (la typo des intitulés « Couleurs / Papiers » est écartée) ; clair = beige, sombre = bordeaux. Logos vectorisés (potrace) depuis les JPG fournis (`scripts/trace-logo.py`) : à remplacer par les fichiers d'origine si disponibles.
+- Cormorant Garamond retiré ; `public/manifest.webmanifest` et `public/icons` remplacés par la génération depuis le thème. `themes/exemple` : thème de démonstration sans logo (repli texte).
+
+## Itération 9 — zoom automatique sur la sélection
+- Sélectionner une partie (clic 3D ou liste) cadre la caméra dessus ; pour des pierres, la vue passe de face (depuis l'extérieur de la bague) afin de bien voir couleur et facettes. Vider la sélection revient au cadrage d'ensemble en gardant l'angle courant. Pas de rezoom en changeant de pierre dans la même partie. Désactivable : flag `autoZoomSelect` (`src/config/features.js`, surchargeable par thème).
+
+## Itération 10 — vue éclatée par étages
+- L'éclatement se fait désormais **par étages le long de l'axe « haut »** : corps (descend légèrement) → sertissage (chatons, paniers, griffes) → pierres (en haut), avec un faible écart latéral pour séparer gauche/droite. Distances réduites (pas de plafond arbitraire à 55 % de la taille). La caméra se recentre sur l'ensemble éclaté.
+- Mode client : le bouton d'explosion actif était invisible (fond transparent + texte de la couleur du fond) → états actifs et boutons plus contrastés (44 px).
+
+## Itération 11 — modèle par défaut par client
+- Clé `defaultModel` du `theme.json` : le fichier (dans `themes/<client>/`) est copié dans le build (`model/…`) et chargé au démarrage ; repli sur la bague de démonstration s'il manque. Domuse : `MAQUETTE_GEMV.fbx`. L'identifiant du modèle reste le nom du fichier, donc les liens de partage existants continuent d'appliquer leur configuration.
+- Conséquence assumée : ce FBX est désormais accessible publiquement avec le site du client (avant, il n'était jamais embarqué dans le build).
+
+## Itération 12 — « Nouveautés » et thème sombre par défaut
+- **Fenêtre « Nouveautés »** (`src/config/changelog.js`) : une fois par visiteur à chaque nouvelle version (clé `rc:seenVersion`), montrant les entrées plus récentes que la dernière vue. Pas à la toute première visite (l'accueil suffit, la version est alors marquée vue), ni en mode client / lien client. Rouvrable via « Plus → Nouveautés ». **À chaque version : ajouter une entrée en tête de `CHANGELOG`.**
+- **Sombre par défaut** : `defaultScheme: "dark"` dans le `theme.json` (appliqué avant le premier rendu, sans flash ; le choix mémorisé du visiteur reste prioritaire ; `"system"` pour suivre l'appareil). Couleur de barre / manifest alignées.
+
+## Itération 13 — nuances d'or jaune, pierres nommées par espèce
+- **Or jaune : 4 nuances** (intense, « Or jaune » = ancien identifiant `yellow` conservé, clair, champagne), du plus saturé au plus pâle (moins d'or pur, plus d'argent). Pas de titrage (carats) affiché : on garde le principe « une couleur, pas un alliage ».
+- **Pierres nommées par la gemme qui a cette couleur** (Rubis, Émeraude, Saphir, Tanzanite, Péridot…). Les **identifiants ne changent pas** (liens de partage et projets existants intacts). Chaque pierre a son **indice de réfraction et sa dispersion B–G réels** (corindon 1,77 / 0,018 ; béryl 1,58 / 0,014 ; zircon 1,93 / 0,039 ; grenats 1,74–1,80 ; quartz 1,55 / 0,013 …), utilisés par le shader de gemme : moins de feu pour l'améthyste, beaucoup plus pour le zircon. Échelle de dispersion calée sur le diamant (0,044 ↔ 0,4).
+- Anciens liens `tsavorite` redirigés vers « Tsavorite » (vert profond) au lieu de l'émeraude. Version 0.3.0 au journal des nouveautés.
+
+## Itération 14 — contour de sélection, éclairage sans dominante gris-vert
+- **Sélection 3D** : l'ancienne surbrillance (émissive) teintait la pierre et masquait sa couleur. Remplacée par un **contour** (coque inversée, épaisseur constante à l'écran, couleur d'accent du thème) tracé **autour de la silhouette** grâce à un masque stencil : visible même quand la pierre est sertie, et ne recouvre jamais la pièce → la couleur affichée est celle qu'on choisit. Survol = contour plus fin et translucide. Les contours sont retirés avant tout export (GLB, AR, photo). Le renderer active le stencil.
+- **Éclairage** : le gris-vert venait du HDRI (ciel bleu + sol herbeux) reflété par l'or. Le HDRI « Ville » sert toujours de base (soleil, nuages, contrastes), mais sa couleur est neutralisée pour l'éclairage seulement : ciel désaturé (35 %) et réchauffé, sol remplacé par un fauve neutre ; softboxes de studio renforcées. Le fond 360° n'est pas modifié. Résultat vérifié sur or jaune, or rose et platine.

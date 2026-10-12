@@ -1,5 +1,10 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
+import { FEATURES } from '../config/features.js';
+import { CHANGELOG, CURRENT_VERSION, unseenEntries } from '../config/changelog.js';
+import { LANG } from './i18n.js';
+import theme, { brandHTML } from '../config/theme.js';
+import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
@@ -20,6 +25,7 @@ const ICON = {
   views: ic('<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/>'),
   light: ic('<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z"/>'),
   rotate: ic('<path d="M20 12a8 8 0 1 1-2.7-6"/><path d="M20 4.5V9h-4.5"/>'),
+  fullExit: ic('<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>'),
   full: ic('<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>'),
   undo: ic('<path d="M9 14 4 9l5-5"/><path d="M4 9h9a6 6 0 0 1 0 12h-3"/>'),
   redo: ic('<path d="m15 14 5-5-5-5"/><path d="M20 9h-9a6 6 0 0 0 0 12h3"/>'),
@@ -58,7 +64,7 @@ export class UI {
     this.root.innerHTML = `
     <div class="app" data-mode="${this.mode}">
       <header class="topbar">
-        <div class="brand">${MARK}<span class="name">${t('app')}</span><span class="sub">Joaillerie</span></div>
+        <div class="brand">${brandHTML(MARK)}</div>
         <div class="spacer"></div>
         <button class="icon-btn theme-btn" data-a="theme" aria-label="${t('theme')}" title="${t('theme')}"><span class="i-sun">${ICON.sun}</span><span class="i-moon">${ICON.moon}</span></button>
         <div class="seg" role="group" aria-label="Mode">
@@ -72,18 +78,17 @@ export class UI {
           <div class="viewer-mount"></div>
           <div class="hud-chip" data-r="info"></div>
           <div class="hud-right">
-            <button class="icon-btn" data-pop-btn="views" aria-label="${t('views')}" title="${t('views')}">${ICON.views}</button>
-            <button class="icon-btn" data-pop-btn="env" aria-label="${t('environment')}" title="${t('environment')}">${ICON.light}</button>
+            <button class="icon-btn" ${FEATURES.viewAngles ? '' : 'hidden'} data-pop-btn="views" aria-label="${t('views')}" title="${t('views')}">${ICON.views}</button>
+            <button class="icon-btn" ${FEATURES.lighting ? '' : 'hidden'} data-pop-btn="env" aria-label="${t('environment')}" title="${t('environment')}">${ICON.light}</button>
             <button class="icon-btn" data-a="explode" aria-pressed="false" aria-label="${t('explode')}" title="${t('explode')}">${ICON.explode}</button>
-            <button class="icon-btn" data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">${ICON.rotate}</button>
-            <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}">${ICON.full}</button>
+            <button class="icon-btn" ${FEATURES.autoRotate ? '' : 'hidden'} data-a="autorotate" aria-pressed="false" aria-label="${t('autoRotate')}" title="${t('autoRotate')}">${ICON.rotate}</button>
+            <button class="icon-btn" data-a="present" aria-pressed="false" aria-label="${t('present')}" title="${t('present')}"><span class="i-full">${ICON.full}</span><span class="i-exit">${ICON.fullExit}</span></button>
           </div>
           <div class="dock">
             <button class="icon-btn" data-a="undo" aria-label="${t('undo')}" title="${t('undo')}">${ICON.undo}</button>
             <button class="icon-btn" data-a="redo" aria-label="${t('redo')}" title="${t('redo')}">${ICON.redo}</button>
             <button class="icon-btn" data-a="open" aria-label="${t('open')}" title="${t('open')}">${ICON.open}</button>
           </div>
-          <button class="btn present-exit" data-a="present-exit" aria-label="${t('exitPresent')}">${t('exitPresent')}</button>
           <div class="pop" data-pop="views" hidden></div>
           <div class="pop" data-pop="env" hidden></div>
           <div class="hint" data-r="hint">${t('tapHint')}</div>
@@ -183,6 +188,10 @@ export class UI {
     el.hidden = !parts.length;
   }
 
+  /** Attributs d'une pastille : gemme (SVG facetté) pour les pierres, disque pour les métaux. */
+  swAttr(type, hex, cls = '') {
+    return type === 'gem' ? `class="${cls} gemic" style="--sw:${hex};--gem:${gemIconUrl(hex)}"` : `class="${cls}" style="--sw:${hex}"`;
+  }
   swatchOf(zone) {
     return swatchOf(zone.type === 'gem' ? 'gem' : 'metal', this.app.assign[zone.pieceIds[0]]);
   }
@@ -196,7 +205,7 @@ export class UI {
     const isOn = (z) => z.pieceIds.length > 0 && z.pieceIds.every((id) => sel.has(id));
     const chosen = zones.filter(isOn);
     const summary = !chosen.length ? t('partsPick') : chosen.length === 1 ? chosen[0].name : chosen.length === zones.length ? t('partsAll') : chosen.length <= 2 ? chosen.map((z) => z.name).join(', ') : `${chosen.length} ${t('partsCount')}`;
-    const stack = chosen.slice(0, 3).map((z) => `<i style="--sw:${this.swatchOf(z)}"></i>`).join('') || '<i class="empty"></i>';
+    const stack = chosen.slice(0, 3).map((z) => `<i ${this.swAttr(z.type, this.swatchOf(z))}></i>`).join('') || '<i class="empty"></i>';
     const subOpen = (this.subOpen ||= new Set());
     const rows = zones.map((z) => {
       const on = isOn(z), hid = z.pieceIds.every((id) => app.hidden.has(id));
@@ -207,7 +216,7 @@ export class UI {
         const pon = sel.has(id), phid = app.hidden.has(id);
         return `<li class="prow sub ${phid ? 'is-hidden' : ''}">
           <button class="pmain" role="option" data-piece="${esc(id)}" aria-selected="${pon}">
-            <i class="psw" style="--sw:${swatchOf(z.type === 'gem' ? 'gem' : 'metal', app.assign[id])}"></i><span class="pn">${word} ${i + 1}</span><span class="pcheck" aria-hidden="true"></span>
+            <i ${this.swAttr(z.type, swatchOf(z.type === 'gem' ? 'gem' : 'metal', app.assign[id]), 'psw')}></i><span class="pn">${word} ${i + 1}</span><span class="pcheck" aria-hidden="true"></span>
           </button>
           <button class="pexp peye" data-eyep="${esc(id)}" aria-pressed="${phid}" aria-label="${phid ? t('show') : t('hide')}" title="${phid ? t('show') : t('hide')}">${phid ? ICON.eyeOff : ICON.eye}</button>
           <span class="pexp-gap"></span>
@@ -216,7 +225,7 @@ export class UI {
       return `<li class="prow ${hid ? 'is-hidden' : ''}">
         ${multi ? `<button class="pexp pfold" data-fold="${esc(z.id)}" aria-expanded="${open}" aria-label="${t('eachOne')}" title="${t('eachOne')}">${CHEV}</button>` : '<span class="pexp-gap pfold-gap"></span>'}
         <button class="pmain" role="option" data-zone="${esc(z.id)}" aria-selected="${on}">
-          <i class="psw" style="--sw:${this.swatchOf(z)}"></i><span class="pn">${esc(z.name)}${multi ? ` <small>${z.pieceIds.length}</small>` : ''}</span><span class="pcheck" aria-hidden="true"></span>
+          <i ${this.swAttr(z.type, this.swatchOf(z), 'psw')}></i><span class="pn">${esc(z.name)}${multi ? ` <small>${z.pieceIds.length}</small>` : ''}</span><span class="pcheck" aria-hidden="true"></span>
         </button>
         <button class="pexp peye" data-eye="${esc(z.id)}" aria-pressed="${hid}" aria-label="${hid ? t('show') : t('hide')}" title="${hid ? t('show') : t('hide')}">${hid ? ICON.eyeOff : ICON.eye}</button>
         ${can ? `<button class="pexp" data-explode="${esc(z.id)}" aria-pressed="${!!exp}" aria-label="${exp ? t('assemblePart') : t('explodePart')}" title="${exp ? t('assemblePart') : t('explodePart')}">${ICON.explode}</button>` : '<span class="pexp-gap"></span>'}
@@ -258,7 +267,7 @@ export class UI {
   /** Pierres : pastilles de couleur groupées par famille, sans nom d'espèce. */
   gemDots(list, sameM) {
     const dot = (item, pressed, extra = '') => {
-      return `<button class="dot ${extra}" role="option" data-mat="${item.id}" aria-label="${esc(item.name)}" aria-pressed="${pressed}" title="${esc(item.name)}"><span style="--sw:${item.swatch ?? '#bbb'}"></span></button>`;
+      return `<button class="dot ${extra}" role="option" data-mat="${item.id}" aria-label="${esc(item.name)}" aria-pressed="${pressed}" title="${esc(item.name)}"><span class="gemic" style="--sw:${item.swatch ?? '#bbb'};--gem:${gemIconUrl(item.swatch)}"></span></button>`;
     };
     const groups = GEM_GROUPS.map((g) => {
       const items = list.filter((x) => x.group === g.id);
@@ -297,7 +306,7 @@ export class UI {
         <button class="acc-h" data-acc="${id}" aria-expanded="${this.acc[id]}">${head}${CHEV}</button>
         <div class="acc-b"><div class="acc-in">${body}</div></div></section>`;
     host.innerHTML = acc('mat',
-      `<i class="sw" style="--sw:${sw}"></i><span class="t"><small>${kind === 'metal' ? t('typeMetal') : t('typeGem')}</small><b>${esc(name)}</b></span>`,
+      `<i class="sw ${kind === 'gem' ? 'gemic' : ''}" style="--sw:${sw};${kind === 'gem' ? `--gem:${gemIconUrl(sw)}` : ''}"></i><span class="t"><small>${kind === 'metal' ? t('typeMetal') : t('typeGem')}</small><b>${esc(name)}</b></span>`,
       `<div class="palette ${kind === 'gem' ? 'gems' : ''}" data-r="palette" role="listbox">${pal}</div>${fin}`)
       + (customOn ? acc('custom',
         `<i class="sw custom-sw" style="--sw:${sameC ?? this.customHex[kind]}"></i><span class="t"><small>${t('customColor')}</small><b class="hex">${cHex}</b></span>`,
@@ -509,6 +518,7 @@ export class UI {
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
       case 'photo': this.takePhoto(); break;
+      case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
       case 'ar': this.openAR(); break;
       case 'tryon': this.tryon.open(); break;
@@ -518,7 +528,8 @@ export class UI {
   /** Plein écran : sur iPhone (pas d'API Fullscreen) l'interface se réduit à la vue 3D + un bouton de sortie visible. */
   initTheme() {
     let th = null; try { th = localStorage.getItem('rc:theme'); } catch {}
-    if (th === 'light' || th === 'dark') document.documentElement.dataset.theme = th;
+    if (th !== 'light' && th !== 'dark') th = theme.defaultScheme === 'light' || theme.defaultScheme === 'dark' ? theme.defaultScheme : null;
+    if (th) document.documentElement.dataset.theme = th;
     this._syncThemeColor();
   }
   toggleTheme() {
@@ -550,7 +561,7 @@ export class UI {
     if (this.locked) m = 'client';
     this.mode = m;
     if (m !== 'client') prefs.set('mode', m);
-    this.app.viewer.setAutoRotate(m !== 'atelier' && this.autorotate !== false);
+    this.app.viewer.setAutoRotate(FEATURES.autoRotate && m !== 'atelier' && this.autorotate !== false);
     if (m === 'client') { this.app.clearSelection(); this.setPresent(false); }
     this.renderAll();
     setTimeout(() => this.app.viewer.resize(), 50);
@@ -635,7 +646,8 @@ export class UI {
     const d = this.html(`<div class="more-list">
       <button data-a="variants"><b>${t('variants')}</b><span>${t('variantsHint')}</span></button>
       <button data-a="share"><b>${t('share')}</b><span>${t('shareHint')}</span></button>
-      <button data-a="recap"><b>${t('recap')}</b><span>${t('recapHint')}</span></button></div>`);
+      <button data-a="recap"><b>${t('recap')}</b><span>${t('recapHint')}</span></button>
+      <button data-a="whatsnew"><b>${t('whatsNew')}</b><span>${t('whatsNewHint')}</span></button></div>`);
     this.openDialog(t('more'), d);
   }
 
@@ -762,6 +774,23 @@ export class UI {
     const d = this.html(`<p>${t('onboardBody')}</p><p class="muted tiny">${t('privacy')}</p><div class="row"><button class="btn primary" data-s="ok">${t('gotIt')}</button></div>`);
     d.addEventListener('click', (e) => { if (e.target.closest('[data-s=ok]')) { prefs.set('onboarded', true); this.dlg.close(); } });
     this.openDialog(t('onboardTitle'), d);
+  }
+
+  /** Fenêtre « Nouveautés » : une seule fois par version et par visiteur (pas à la toute première visite, ni en mode client). */
+  changelog({ force = false } = {}) {
+    const seen = prefs.get('seenVersion');
+    if (!force) {
+      if (!prefs.get('onboarded')) { prefs.set('seenVersion', CURRENT_VERSION); return; } // première visite : l'accueil suffit
+      if (this.locked || this.mode === 'client' || this.dlg.open) return;
+    }
+    const entries = force ? CHANGELOG.slice(0, 1) : unseenEntries(seen);
+    if (!entries.length) return;
+    const li = (e) => `<h3 class="cl-v">v${e.version} <small>${e.date}</small></h3><ul class="cl">${(e[LANG] || e.fr).map((x) => `<li>${x}</li>`).join('')}</ul>`;
+    const d = this.html(`${entries.map(li).join('')}<div class="row"><button class="btn primary" data-s="ok">${t('gotIt')}</button></div>`);
+    const done = () => prefs.set('seenVersion', CURRENT_VERSION);
+    d.addEventListener('click', (e) => { if (e.target.closest('[data-s=ok]')) { done(); this.dlg.close(); } });
+    this.dlg.addEventListener('close', done, { once: true });
+    this.openDialog(t('whatsNew'), d);
   }
 
   /** Génère les billes (WebGL temporaire) puis rafraîchit la palette. */

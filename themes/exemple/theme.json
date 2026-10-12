@@ -1,0 +1,64 @@
+{
+  "id": "exemple",
+  "brand": {
+    "name": "Maison Exemple",
+    "tagline": "Joaillerie",
+    "description": "Maison Exemple — configurez votre bague en 3D.",
+    "shareTitle": "Maison Exemple"
+  },
+  "logos": {},
+  "header": {
+    "logo": "text",
+    "showTagline": true
+  },
+  "fonts": {
+    "sans": "-apple-system, 'SF Pro Text', system-ui, sans-serif",
+    "display": "'New York', Georgia, serif",
+    "packages": []
+  },
+  "colors": {
+    "_note": "Charte : bordeaux #31161f, beige #e5e1c8, noir #000, gris-bleu #7d8e98, papier Arena #f0ece9.",
+    "light": {
+      "bg": "#f6f3ef",
+      "surface": "#ffffff",
+      "surface2": "#ebe6df",
+      "ink": "#1d2a3a",
+      "muted": "#5d6d78",
+      "line": "#c9c4a8",
+      "accent": "#1d2a3a",
+      "accentInk": "#ffffff",
+      "focus": "#1d2a3a",
+      "danger": "#9c2f2f",
+      "stageA": "#ffffff",
+      "stageB": "#d9d3ca",
+      "shadow": "0 10px 34px rgba(49, 22, 31, .16)"
+    },
+    "dark": {
+      "bg": "#190b10",
+      "surface": "#31161f",
+      "surface2": "#3e1f2a",
+      "ink": "#e5e1c8",
+      "muted": "#9aa8b1",
+      "line": "#4d2a37",
+      "accent": "#e5e1c8",
+      "accentInk": "#31161f",
+      "focus": "#e5e1c8",
+      "danger": "#e07a7a",
+      "stageA": "#4a2431",
+      "stageB": "#12070b",
+      "shadow": "0 10px 34px rgba(0, 0, 0, .55)"
+    }
+  },
+  "defaultScheme": "system",
+  "features": {},
+  "texts": {
+    "fr": {
+      "onboardTitle": "Bienvenue chez Maison Exemple"
+    },
+    "en": {}
+  },
+  "pwa": {
+    "name": "Maison Exemple",
+    "shortName": "Exemple"
+  }
+}

@@ -1,14 +1,14 @@
 // Visionneuse 3D « façon Sketchfab » : rendu à la demande, orbite, vues, capture, environnements.
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getEnvironment, disposeEnvironments } from './environments.js';
 
-const HIGHLIGHT = new THREE.Color('#ffe2a8'); // halo chaud discret (sélection)
 
 export class Viewer {
   constructor(container, { alpha = true } = {}) {
     this.container = container;
-    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha, powerPreference: 'high-performance' });
+    this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha, stencil: true, powerPreference: 'high-performance' }) // stencil : contours de sélection;
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.toneMapping = THREE.NeutralToneMapping;
     this.renderer.toneMappingExposure = 1;
@@ -136,8 +136,8 @@ export class Viewer {
 
   _stageTexture(dark) {
     const css = getComputedStyle(document.documentElement);
-    const a = dark ? '#2e2b27' : (css.getPropertyValue('--stage-a').trim() || '#e7e4e5');
-    const b = dark ? '#0d0c0b' : (css.getPropertyValue('--stage-b').trim() || '#b4b0b5');
+    const a = css.getPropertyValue('--stage-a').trim() || (dark ? '#2e2b27' : '#e7e4e5');
+    const b = css.getPropertyValue('--stage-b').trim() || (dark ? '#0d0c0b' : '#b4b0b5');
     const c = document.createElement('canvas');
     c.width = 512; c.height = 512;
     const g = c.getContext('2d');
@@ -209,12 +209,23 @@ export class Viewer {
   }
 
   /** Cadre une boîte (focus double-clic sur une zone). */
-  focusOn(box) {
+  focusOn(box, { minFrac = 0.18, margin = 1.3, lookFrom = null } = {}) {
     const c = box.getCenter(new THREE.Vector3());
-    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, this.radius * 0.18);
+    const r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, this.radius * minFrac);
+    const dir = this.camera.position.clone().sub(this.controls.target).normalize();
+    if (lookFrom) dir.multiplyScalar(0.3).add(lookFrom.clone().normalize()).normalize(); // vue plus frontale sur la sélection
+    const fov = (this.camera.fov * Math.PI) / 180;
+    const dist = (Math.max(r / Math.sin(fov / 2), r / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2))) * margin;
+    this.anim = { from: this.camera.position.clone(), to: c.clone().add(dir.multiplyScalar(dist)), fromT: this.controls.target.clone(), toT: c, start: performance.now(), dur: 600 };
+    this.invalidate();
+  }
+
+  /** Revient au cadrage d'ensemble en gardant l'angle de vue courant. */
+  frameAll() {
+    const c = this.box.getCenter(new THREE.Vector3());
     const dir = this.camera.position.clone().sub(this.controls.target).normalize();
     const fov = (this.camera.fov * Math.PI) / 180;
-    const dist = (r / Math.sin(fov / 2)) * 1.3;
+    const dist = (this.radius / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2)) * 1.12;
     this.anim = { from: this.camera.position.clone(), to: c.clone().add(dir.multiplyScalar(dist)), fromT: this.controls.target.clone(), toT: c, start: performance.now(), dur: 600 };
     this.invalidate();
   }
@@ -229,15 +240,73 @@ export class Viewer {
     this.invalidate();
   }
 
-  /** Surbrillance non destructive (émissive) des matériaux de pièces. kind: 'select' | 'hover' */
+  /**
+   * Surbrillance d'une pièce par un CONTOUR (coque inversée agrandie le long des normales, d'épaisseur constante à l'écran).
+   * On ne touche plus au matériau : la couleur de la pierre ou du métal reste exactement celle qui sera obtenue.
+   * kind: 'select' (contour plein) | 'hover' (contour léger).
+   */
   setHighlight(pieces, kind, on) {
     for (const p of pieces) {
-      const m = p.mesh.material;
-      if (!m || !m.emissive) continue;
-      if (on) { m.emissive.copy(HIGHLIGHT); m.emissiveIntensity = kind === 'select' ? 0.1 : 0.05; }
-      else { m.emissive.setRGB(0, 0, 0); m.emissiveIntensity = 1; }
+      if (!p?.mesh) continue;
+      const hl = (p._hl ||= {});
+      if (!on) { for (const h of Object.values(hl)) h.visible = false; continue; }
+      const k = kind === 'select' ? 'select' : 'hover';
+      if (!hl[k]) {
+        // masque (stencil) de la pièce + contour : le contour se dessine AUTOUR de la silhouette, par-dessus le reste (visible même
+        // quand la pierre est sertie), sans jamais recouvrir la pièce elle-même → sa couleur reste intacte
+        const mask = new THREE.Mesh(p.mesh.geometry, this._maskMaterial());
+        mask.raycast = () => {}; mask.renderOrder = 1; mask.userData.highlight = true; mask.frustumCulled = false;
+        const hull = new THREE.Mesh(this._hullGeometry(p), this._hullMaterial(k));
+        hull.raycast = () => {}; hull.renderOrder = 2; hull.name = 'hl-' + k; hull.userData.highlight = true; hull.frustumCulled = false;
+        const grp = new THREE.Group(); grp.userData.highlight = true; grp.add(mask, hull);
+        p.mesh.add(grp); hl[k] = grp; grp.material = hull.material;
+      }
+      hl[k].material.color.set(this._highlightColor());
+      hl[k].visible = true;
     }
     this.invalidate();
+  }
+
+  /** Couleur du contour : l'accent du thème (clair sur fond sombre, sombre sur fond clair). */
+  _highlightColor() {
+    try { return getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#ffe2a8'; } catch { return '#ffe2a8'; }
+  }
+
+  /** Géométrie de la coque : sommets soudés + normales lissées (les facettes plates des pierres ne se déchirent pas). */
+  _hullGeometry(p) {
+    if (p._hullGeo) return p._hullGeo;
+    let g = p.mesh.geometry.clone();
+    for (const n of Object.keys(g.attributes)) if (n !== 'position') g.deleteAttribute(n);
+    g.morphAttributes = {};
+    g.clearGroups();
+    g = mergeVertices(g, 1e-4);
+    g.computeVertexNormals();
+    p._hullGeo = g;
+    return g;
+  }
+
+  _maskMaterial() {
+    return new THREE.MeshBasicMaterial({
+      colorWrite: false, depthWrite: false, depthTest: false, side: THREE.DoubleSide,
+      stencilWrite: true, stencilRef: 1, stencilFunc: THREE.AlwaysStencilFunc, stencilZPass: THREE.ReplaceStencilOp,
+    });
+  }
+
+  _hullMaterial(kind) {
+    const m = new THREE.MeshBasicMaterial({
+      side: THREE.BackSide, toneMapped: false, fog: false, transparent: kind === 'hover', opacity: kind === 'hover' ? 0.55 : 1,
+      depthTest: false, depthWrite: false,
+      stencilWrite: true, stencilRef: 1, stencilFunc: THREE.NotEqualStencilFunc, stencilFail: THREE.KeepStencilOp, stencilZFail: THREE.KeepStencilOp, stencilZPass: THREE.KeepStencilOp,
+    });
+    const K = kind === 'hover' ? 0.0028 : 0.0055; // épaisseur ≈ fraction de la hauteur de vue (constante à l'écran)
+    m.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+        { vec4 mv = modelViewMatrix * vec4(position, 1.0);
+          float sc = length(modelViewMatrix[0].xyz);
+          transformed += normalize(normal) * (-mv.z) * ${K.toFixed(4)} / max(sc, 1e-6); }`);
+    };
+    m.customProgramCacheKey = () => 'hull-' + kind;
+    return m;
   }
 
   setPaused(p) { this.paused = p; if (!p) this.invalidate(); }

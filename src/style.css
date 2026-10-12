@@ -1,26 +1,7 @@
-/* Joaillerie 3D — thème « joaillerie » : crème chaud / encre / champagne. Mobile d'abord (iPhone). */
+/* Joaillerie 3D — mise en page. Les couleurs et polices viennent du thème client. Mobile d'abord (iPhone). */
 :root {
-  /* Clair : ivoire / champagne / bronze doux */
-  --bg: #f4efe6; --surface: #fbf8f2; --surface-2: #ece4d6; --ink: #2b2520; --muted: #8b7f70;
-  --line: #e0d6c5; --accent: #9a7440; --accent-ink: #fffaf0; --focus: #8a6a3a; --danger: #a8372c;
-  --stage-a: #f8f3ea; --stage-b: #d6c8b2; --shadow: 0 10px 34px rgba(80, 60, 30, .14);
+  /* Palettes (clair / sombre), polices et logos : injectés depuis le thème client (src/config/theme.js). */
   --radius: 14px; --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
-  --serif: 'Cormorant Garamond', ui-serif, 'New York', Georgia, 'Times New Roman', serif;
-  --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, Roboto, sans-serif;
-  color-scheme: light;
-}
-/* Sombre : noir chaud / or champagne */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --bg: #0d0c0b; --surface: #151412; --surface-2: #1f1d1a; --ink: #efe9df; --muted: #968d80; --line: #2a2723;
-    --accent: #c9a56a; --accent-ink: #14110a; --focus: #d9b97c; --stage-a: #2e2b27; --stage-b: #0d0c0b; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
-    color-scheme: dark;
-  }
-}
-:root[data-theme='dark'] {
-  --bg: #0d0c0b; --surface: #151412; --surface-2: #1f1d1a; --ink: #efe9df; --muted: #968d80; --line: #2a2723;
-  --accent: #c9a56a; --accent-ink: #14110a; --focus: #d9b97c; --stage-a: #2e2b27; --stage-b: #0d0c0b; --shadow: 0 10px 34px rgba(0, 0, 0, .55);
-  color-scheme: dark;
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); font: 15px/1.4 var(--sans); overscroll-behavior: none; -webkit-text-size-adjust: 100%; }
@@ -425,3 +406,35 @@ dialog { border-radius: 20px; }
 .theme-btn { width: 36px; height: 36px; flex: none; }
 .app[data-mode='client'] .theme-btn { position: absolute; right: 12px; top: calc(14px + var(--safe-t)); display: inline-flex !important; z-index: 5; }
 .app[data-mode='client']:not([data-locked='1']) .theme-btn { right: 190px; }
+
+/* Pastilles « gemme » (SVG facetté) */
+.gemic { background: var(--gem) center / contain no-repeat !important; border-radius: 0 !important; box-shadow: none !important; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .28)); }
+.dot span.gemic { width: 30px; height: 30px; margin: 3px; }
+.dot[aria-pressed='true'] span.gemic { box-shadow: none !important; filter: drop-shadow(0 0 0 transparent) drop-shadow(0 0 2.5px var(--accent)) drop-shadow(0 0 1.5px var(--accent)); transform: scale(1.12); }
+.sw-stack i.gemic { width: 28px; height: 28px; }
+.acc-h .sw.gemic { width: 32px; height: 32px; }
+
+/* Outils d'angle de vue : en ligne, en bas à droite (explosion, plein écran) ; plus de libellé « quitter » */
+.hud-right { top: auto; bottom: 10px; flex-direction: row; align-items: center; }
+.hud-right .icon-btn { width: 38px; height: 38px; }
+.app[data-present='1'] .hud-right { top: auto; bottom: calc(14px + var(--safe-b)); right: 14px; }
+.present-exit { display: none !important; }
+[data-a=present] .i-exit { display: none; }
+[data-a=present][aria-pressed='true'] .i-full { display: none; }
+[data-a=present][aria-pressed='true'] .i-exit { display: inline; }
+.app[data-mode='client'] .hud-right { bottom: 14px; }
+
+/* Logo du thème client (SVG en ligne, couleur du texte) */
+.brand .logo { display: inline-flex; align-items: center; color: var(--ink); }
+.brand .logo svg { height: var(--logo-h, 22px); width: auto; display: block; }
+.app[data-mode='client'] .brand .logo svg { height: var(--logo-h-client, 28px); }
+@media (max-width: 400px) { .brand .logo svg { height: calc(var(--logo-h, 22px) * .85); } }
+
+/* Mode client : boutons de la vue 3D bien visibles, y compris l'état actif (explosion) */
+.app[data-mode='client'] .hud-right .icon-btn { width: 44px; height: 44px; background: color-mix(in srgb, var(--surface) 70%, transparent); border-color: color-mix(in srgb, var(--ink) 35%, transparent); color: var(--ink); }
+.app[data-mode='client'] .hud-right .icon-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.icon-btn[aria-pressed='true'] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+/* Fenêtre « Nouveautés » */
+.cl-v { margin: 4px 0 6px; font: 500 15px var(--sans); letter-spacing: .06em; } .cl-v small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.cl { margin: 0 0 10px; padding-left: 18px; display: grid; gap: 6px; font-size: 14px; line-height: 1.4; } .cl li::marker { color: var(--accent); }

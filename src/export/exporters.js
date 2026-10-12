@@ -12,6 +12,13 @@ export async function withoutHighlight(app, fn) {
   try { return await fn(); } finally { app.selection = sel; app.hover = hov; app._refreshHighlight(); }
 }
 
+/** Retire les contours de sélection (coques de surbrillance) d'une copie du modèle avant export. */
+function stripHighlights(root) {
+  const hulls = [];
+  root.traverse((o) => { if (o.userData?.highlight) hulls.push(o); });
+  hulls.forEach((h) => h.parent?.remove(h));
+}
+
 /** Range la vue éclatée le temps d'un export (le fichier exporté contient toujours la bague assemblée). */
 async function assembled(app, fn) {
   const resume = app.exploder?.suspend?.();
@@ -24,7 +31,9 @@ export async function exportProjectGLB(app) {
     const scene = new THREE.Scene();
     scene.name = 'ring-project';
     scene.userData.ringConfig = app.config();
-    scene.add(app.viewer.root.clone(true));
+    const clone = app.viewer.root.clone(true);
+    stripHighlights(clone);
+    scene.add(clone);
     const buf = await new GLTFExporter().parseAsync(scene, { binary: true, onlyVisible: false });
     return new Blob([buf], { type: 'model/gltf-binary' });
   }));
@@ -38,6 +47,7 @@ export function buildARScene(app, scaleMode = 'real') {
   const k = scaleMode === 'big' ? 0.01 : 0.001;
   const holder = new THREE.Group();
   const clone = app.viewer.root.clone(true);
+  stripHighlights(clone);
   clone.traverse((o) => {
     if (!o.isMesh) return;
     const piece = app.pieces.find((p) => p.mesh.userData.pieceId === o.userData.pieceId);

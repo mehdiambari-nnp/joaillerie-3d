@@ -1,7 +1,6 @@
 // Point d'entrée : crée le configurateur, l'interface, charge la bague de démo (ou le fichier demandé).
-import '@fontsource/cormorant-garamond/latin-400.css';
-import '@fontsource/cormorant-garamond/latin-500.css';
-import '@fontsource/cormorant-garamond/latin-600.css';
+import theme from './config/theme.js'; // marque blanche : polices + palettes du thème (themes/<client>/theme.json)
+import { FEATURES } from './config/features.js';
 import './style.css';
 import * as THREE from 'three';
 import { Configurator } from './app.js';
@@ -69,18 +68,29 @@ async function boot() {
     await load(svc.last.buffer, svc.last.name, { ...svc.options, ...patch }, cfg, app.modelId);
   };
 
+  // Modèle par défaut du client (themes/<client>/<defaultModel>), repli : bague de démonstration
+  async function loadThemeModel() {
+    try {
+      const r = await fetch(import.meta.env.BASE_URL + theme.defaultModelUrl);
+      if (!r.ok) return false;
+      const name = theme.defaultModelUrl.split('/').pop();
+      await load(await r.arrayBuffer(), name, {}, null, name);
+      return true;
+    } catch (e) { console.warn('Modèle par défaut indisponible', e); return false; }
+  }
   // Modèle initial
   const dev = import.meta.env.DEV;
   if (dev && params.get('model') === 'gemv') {
     const buf = await (await fetch('/test-assets/MAQUETTE_GEMV.fbx')).arrayBuffer();
     await load(buf, 'MAQUETTE_GEMV.fbx', {}, null, 'MAQUETTE_GEMV.fbx');
-  } else {
+  } else if (!(theme.defaultModelUrl && await loadThemeModel())) {
     const glb = await buildDemoRingGLB();
     await load(glb, 'bague-demo.glb', {}, null, 'demo-ring');
   }
-  app.viewer.setAutoRotate(ui.mode !== 'atelier');
+  app.viewer.setAutoRotate(FEATURES.autoRotate && ui.mode !== 'atelier');
   ui.loadThumbnails();
   ui.onboard();
+  ui.changelog();
   if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);
 
   if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {
