@@ -116,3 +116,7 @@
 - Test E2E ajouté. Non vérifié : rendu sur iPhone réel, perf du premier affichage (génération du logo en texture + 1 lumière directionnelle).
 - **Retour client sur l'intro (v2)** : vue **de face, plongée légère (~17°)** ; le couvercle monte **à la verticale jusqu'à sortir complètement de l'écran** (distance calculée d'après le champ de la caméra) ; la bague sort et rejoint sa **pose exacte d'origine** ; la caméra glisse en continu (direction, distance, cible interpolées) de la vue de face vers la **vue d'accueil habituelle**, mémorisée avant l'intro → aucune coupure à la fin. L'ombre de contact et la lumière d'ambiance de l'intro s'estompent progressivement pour que la bague ne « saute » pas au retrait de l'écrin. Durée ≈ 3,9 s.
 - **Correctif (retour iPhone)** : pendant l'intro, le panneau masqué laissait voir le fond de l'app, plus sombre que le fond 3D → cassure à la jonction. Le bas de la vue 3D se fond maintenant vers la couleur du fond (`.viewport::after`, actif seulement pendant l'intro, estompé en 0,8 s à la fin) ; les boutons du bas (annuler/rétablir/ouvrir) sont aussi masqués pendant l'intro.
+
+## Itération 18 — épuration de l'essayage
+- Retrait du bouton « changer de caméra » (⟲), du libellé « Recherche de la main… / Main détectée » et du curseur « Vision ». Le champ de vision reste à sa valeur calibrée (66°, ou celle déjà mémorisée).
+- Nouveau curseur « Position » : déplace la bague le long du doigt (paramètre `along` de `computeRingPose`, 0,10–0,65, défaut 0,36, mémorisé).
