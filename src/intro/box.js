@@ -2,6 +2,7 @@
 // (dessus plat plus sombre), intérieur en suédine noire, logo marqué à chaud or (Kurtz 232) sous le couvercle.
 // Dimensions proportionnelles à S (côté de la boîte, en unités de la scène = mm).
 import * as THREE from 'three';
+import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 const COL = { lac: '#2a050c', lacTop: '#220409', lacRim: '#180306', suede: '#2a0612', suedeTop: '#16030a', rim: '#320713', black: '#070708', sheen: '#3a0f1b', blackSheen: '#16161a', gold: '#ddd5ac' };
 
@@ -18,8 +19,8 @@ function pile() {
   pileTex = new THREE.CanvasTexture(c); pileTex.wrapS = pileTex.wrapT = THREE.RepeatWrapping; pileTex.repeat.set(10, 10);
   return pileTex;
 }
-function suede(color, sheen, side = THREE.FrontSide, env = 0.5) {
-  return new THREE.MeshPhysicalMaterial({ color, roughness: 1, metalness: 0, sheen: 0.45, sheenColor: new THREE.Color(sheen), sheenRoughness: 0.5, bumpMap: pile(), bumpScale: 0.5, side, envMap: ENV, envMapIntensity: env });
+function suede(color, sheen, side = THREE.FrontSide, env = 0.5, sheenAmt = 0.45) {
+  return new THREE.MeshPhysicalMaterial({ color, roughness: 1, metalness: 0, sheen: sheenAmt, sheenColor: new THREE.Color(sheen), sheenRoughness: 0.5, bumpMap: pile(), bumpScale: 0.5, side, envMap: ENV, envMapIntensity: env });
 }
 
 /** Laque brillante (charte V3 : coffret bordeaux laqué) : base lisse + vernis, reflets de l'environnement. */
@@ -45,7 +46,24 @@ function logoTexture(svg, ratio) {
   });
 }
 
-const squareTube = (side, h, open = true) => new THREE.CylinderGeometry(side / Math.SQRT2, side / Math.SQRT2, h, 4, 1, open).rotateY(Math.PI / 4);
+/** Normales à plat : un CylinderGeometry à 4 segments aurait des normales radiales interpolées → faces bombées, reflets en traînées. */
+const flat = (g) => { const n = g.toNonIndexed(); n.computeVertexNormals(); g.dispose(); return n; };
+const squareTube = (side, h, open = true) => flat(new THREE.CylinderGeometry(side / Math.SQRT2, side / Math.SQRT2, h, 4, 1, open).rotateY(Math.PI / 4));
+
+/** Coque laquée à coins verticaux arrondis et arêtes adoucies (extrusion biseautée), de y = 0 à y = h ; `hole` = côté d'une ouverture carrée. */
+function roundedShell(w, h, hole = 0, rr = 0.07 * w, bev = 0.025 * w) {
+  const o = (w - 2 * bev) / 2, r = rr;
+  const sh = new THREE.Shape();
+  sh.moveTo(-o + r, -o); sh.lineTo(o - r, -o); sh.absarc(o - r, -o + r, r, -Math.PI / 2, 0);
+  sh.lineTo(o, o - r); sh.absarc(o - r, o - r, r, 0, Math.PI / 2);
+  sh.lineTo(-o + r, o); sh.absarc(-o + r, o - r, r, Math.PI / 2, Math.PI);
+  sh.lineTo(-o, -o + r); sh.absarc(-o + r, -o + r, r, Math.PI, 1.5 * Math.PI);
+  if (hole > 0) { const i = hole / 2 + bev, p = new THREE.Path(); p.moveTo(-i, -i); p.lineTo(i, -i); p.lineTo(i, i); p.lineTo(-i, i); p.closePath(); sh.holes.push(p); } // ouverture (sens inverse du contour)
+  let g = new THREE.ExtrudeGeometry(sh, { depth: h - 2 * bev, bevelEnabled: true, bevelThickness: bev, bevelSize: bev, bevelSegments: 5, curveSegments: 12 });
+  g.rotateX(-Math.PI / 2); g.translate(0, bev, 0);
+  g = toCreasedNormals(g, Math.PI / 5); // arêtes douces, plans bien plats
+  return g;
+}
 function squareRing(outer, inner) {
   const sh = new THREE.Shape(); const o = outer / 2, i = inner / 2;
   sh.moveTo(-o, -o); sh.lineTo(o, -o); sh.lineTo(o, o); sh.lineTo(-o, o); sh.closePath();
@@ -58,36 +76,28 @@ function squareRing(outer, inner) {
  */
 export async function buildBox(S, { logoSvg = null, logoRatio = 4.2, env = null } = {}) {
   ENV = env;
-  const hb = 0.32 * S, ins = 0.07 * S, hc = 0.07 * S, t = 0.03 * S;           // base, retrait du collier, hauteur du collier, épaisseur
-  const hw = 0.3 * S, rise = 0.17 * S, topW = 0.42 * S;                          // couvercle : paroi droite, pans coupés, dessus
+  const hb = 0.3 * S, ins = 0.09 * S, hc = 0.07 * S, t = 0.03 * S;           // base, retrait du collier, hauteur du collier, épaisseur
   const floorY = 0.62 * hb;                                                      // fond de l'écrin (coussin noir)
   const mats = []; const geos = [];
   const M = (m) => { mats.push(m); return m; }; const G = (g) => { geos.push(g); return g; };
-  const bord = M(lacquer(COL.lac)), bordTop = M(lacquer(COL.lacTop, 0.3)), bordRim = M(lacquer(COL.lacRim));
-  const blk = M(suede(COL.black, COL.blackSheen, THREE.FrontSide, 0.1)), blkIn = M(suede(COL.black, COL.blackSheen, THREE.BackSide, 0.1));
+  const bord = M(lacquer(COL.lac)), bordTop = M(lacquer('#3a0711', 0.3)), bordRim = M(lacquer(COL.lacRim));
+  const blk = M(suede(COL.black, COL.blackSheen, THREE.FrontSide, 0.03, 0.08)), blkIn = M(suede(COL.black, COL.blackSheen, THREE.BackSide, 0.03, 0.08));
   const group = new THREE.Group();
   const add = (parent, geo, mat, y = 0, rx = 0) => { const m = new THREE.Mesh(G(geo), mat); m.position.y = y; m.rotation.x = rx; parent.add(m); return m; };
 
-  // ----- Base : paroi, épaulement, collier, intérieur noir -----
-  add(group, squareTube(S, hb), bord, hb / 2);
-  add(group, new THREE.CylinderGeometry(S / Math.SQRT2, S / Math.SQRT2, 0.001, 4, 1).rotateY(Math.PI / 4), bordRim, 0.0005); // dessous
-  add(group, squareRing(S, S - 2 * ins), bordRim, hb, -Math.PI / 2);                       // épaulement
+  // ----- Base : coque laquée ouverte sur le dessus, collier et intérieur noir -----
+  const lidH = 0.4 * S;
+  add(group, roundedShell(S, hb, S - 2 * ins), bord);                                      // paroi + épaulement (ouvert au centre)
   add(group, squareTube(S - 2 * ins, hc), bord, hb + hc / 2);                              // collier (extérieur)
   add(group, squareRing(S - 2 * ins, S - 2 * ins - 2 * t), bordRim, hb + hc, -Math.PI / 2); // tranche du collier
   add(group, squareTube(S - 2 * ins - 2 * t, hb + hc - floorY), blkIn, floorY + (hb + hc - floorY) / 2); // intérieur noir
   add(group, squareRing(S - 2 * ins - 2 * t, 0), blk, floorY, -Math.PI / 2);                // coussin
 
-  // ----- Couvercle (origine = centre du bas du couvercle, posé sur l'épaulement) -----
+  // ----- Couvercle laqué (origine = centre du bas du couvercle, posé sur l'épaulement) -----
   const lid = new THREE.Group(); lid.position.y = hb; group.add(lid);
-  add(lid, squareTube(S, hw), bord, hw / 2);
-  const frustum = (top, bottom, h, y, mat) => add(lid, new THREE.CylinderGeometry(top / Math.SQRT2, bottom / Math.SQRT2, h, 4, 1, true).rotateY(Math.PI / 4), mat, y);
-  frustum(topW, S, rise, hw + rise / 2, bord);
-  add(lid, squareRing(topW, 0), bordTop, hw + rise, -Math.PI / 2);                           // dessus plat, plus sombre
-  // intérieur du couvercle : suédine noire + tranche bordeaux
-  add(lid, squareTube(S - 2 * t, hw), blkIn, hw / 2);
-  frustum(topW - 2 * t, S - 2 * t, rise, hw + rise / 2, blkIn);
-  add(lid, squareRing(topW - 2 * t, 0), blk, hw + rise - 0.01, Math.PI / 2);                  // plafond (face vers le bas)
-  add(lid, squareRing(S, S - 2 * t), bordRim, 0, Math.PI / 2);                                // tranche basse du couvercle
+  add(lid, roundedShell(S, lidH), [bordTop, bord]); // [dessus et dessous, côtés]
+  // dessous du couvercle : plafond noir encadré d'une tranche laquée
+  add(lid, squareRing(S - 2 * t, 0), blk, -0.02, Math.PI / 2);
 
   // logo or marqué à chaud, centré sous le plafond
   const tex = await logoTexture(logoSvg, logoRatio);
@@ -96,13 +106,13 @@ export async function buildBox(S, { logoSvg = null, logoRatio = 4.2, env = null 
     const w = 0.3 * S, h = w / logoRatio;
     logoMat = M(new THREE.MeshStandardMaterial({ color: COL.gold, metalness: 0.85, roughness: 0.38, alphaMap: tex, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, envMap: ENV, envMapIntensity: 1.2 }));
     const p = new THREE.Mesh(G(new THREE.PlaneGeometry(w, h)), logoMat);
-    p.rotation.x = Math.PI / 2; p.position.y = hw + rise - 0.03; lid.add(p);
+    p.rotation.x = Math.PI / 2; p.position.y = -0.04; lid.add(p);
   }
 
-  const totalH = hb + hw + rise;
+  const totalH = hb + lidH;
   const setOpacity = (o) => {
     for (const m of mats) { m.transparent = o < 1 || m === logoMat; m.opacity = o; m.needsUpdate = false; }
   };
   const dispose = () => { geos.forEach((g) => g.dispose()); mats.forEach((m) => m.dispose()); tex?.dispose(); };
-  return { group, lid, S, floorY, totalH, lidH: hw + rise, hb, setOpacity, dispose, logo: !!tex };
+  return { group, lid, S, floorY, totalH, lidH, hb, setOpacity, dispose, logo: !!tex };
 }
