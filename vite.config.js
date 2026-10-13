@@ -3,6 +3,21 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import fs from 'node:fs';
 import path from 'node:path';
 import themePlugin from './config/vite-theme.js';
+import { handleModels, memoryStore } from './netlify/lib/models-api.mjs';
+
+// Dev / preview local : même API d'hébergement des modèles que la fonction Netlify, avec un stockage en mémoire.
+const modelsApi = () => {
+  const store = memoryStore();
+  const mw = async (req, res, next) => {
+    if (!req.url.startsWith('/api/models')) return next();
+    const chunks = []; for await (const c of req) chunks.push(c);
+    const body = Buffer.concat(chunks);
+    const r = await handleModels(new Request('http://localhost' + req.url, { method: req.method, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body }), store);
+    res.statusCode = r.status; r.headers.forEach((v, k) => res.setHeader(k, v));
+    res.end(Buffer.from(await r.arrayBuffer()));
+  };
+  return { name: 'models-api', configureServer(s) { s.middlewares.use(mw); }, configurePreviewServer(s) { s.middlewares.use(mw); } };
+};
 
 // En dev uniquement : sert assets/test/* sous /test-assets (le FBX de test n'est JAMAIS copié dans le build publié).
 const testAssets = () => ({
@@ -21,7 +36,7 @@ const testAssets = () => ({
 const useHttps = !process.env.E2E;
 export default defineConfig(({ command }) => ({
   base: './',
-  plugins: [themePlugin(), testAssets(), ...(command === 'serve' && useHttps ? [basicSsl()] : [])],
+  plugins: [themePlugin(), testAssets(), modelsApi(), ...(command === 'serve' && useHttps ? [basicSsl()] : [])],
   server: { host: true, port: 5173 },
   build: {
     target: 'es2022',

@@ -9,6 +9,8 @@ import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, s
 import { ENVIRONMENTS } from '../core/environments.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl } from '../state/store.js';
+import { uploadModel } from '../share/remote.js';
+import { saveProject, listProjects, deleteProject, newId, thumbnail } from '../projects/projects.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
 import { TryOn } from '../tryon/tryon.js';
@@ -34,6 +36,7 @@ const ICON = {
   eye: ic('<path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>'),
   eyeOff: ic('<path d="M2 12s3.6-6.5 10-6.5c2 0 3.7.6 5.1 1.5M22 12s-3.6 6.5-10 6.5c-2 0-3.7-.6-5.1-1.5M4 4l16 16"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'),
   explode: ic('<rect x="9" y="9" width="6" height="6" rx="1"/><path d="M12 3v3M10.5 4.5 12 3l1.5 1.5M12 21v-3M10.5 19.5 12 21l1.5-1.5M3 12h3M4.5 10.5 3 12l1.5 1.5M21 12h-3M19.5 10.5 21 12l-1.5 1.5"/>'),
+  burger: ic('<path d="M4 7h16M4 12h16M4 17h16"/>'),
   open: ic('<path d="M12 16V4M7.5 8.5 12 4l4.5 4.5"/><path d="M5 20h14"/>'),
 };
 const CHEV = ic('<path d="m6 9 6 6 6-6"/>').replace('class=""','').replace('<svg ','<svg class="chev" ');
@@ -64,6 +67,7 @@ export class UI {
     this.root.innerHTML = `
     <div class="app" data-mode="${this.mode}">
       <header class="topbar">
+        <button class="icon-btn burger" data-a="projects" aria-label="${t('projects')}" title="${t('projects')}">${ICON.burger}</button>
         <div class="brand">${brandHTML(MARK)}</div>
         <div class="spacer"></div>
         <button class="icon-btn theme-btn" data-a="theme" aria-label="${t('theme')}" title="${t('theme')}"><span class="i-sun">${ICON.sun}</span><span class="i-moon">${ICON.moon}</span></button>
@@ -110,6 +114,8 @@ export class UI {
       <input type="file" id="file" hidden>
       <dialog id="dlg"><div class="dlg-h"><h2></h2><button class="icon-btn" data-a="dlg-close" aria-label="${t('close')}">✕</button></div><div class="dlg-b"></div></dialog>
       <div class="tooltip" hidden></div>
+      <div class="scrim" data-a="projects-close" hidden></div>
+      <aside class="drawer" data-r="drawer" aria-label="${t('projects')}" hidden></aside>
     </div>`;
     this.el = $('.app', this.root);
     this.viewport = $('.viewport', this.root);
@@ -546,6 +552,12 @@ export class UI {
       case 'more': this.openMore(); break;
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
+      case 'projects': this.openProjects(); break;
+      case 'projects-close': this.closeProjects(); break;
+      case 'proj-save': this.saveCurrentProject(false); break;
+      case 'proj-save-new': this.saveCurrentProject(true); break;
+      case 'proj-open': this.svc.openProject?.(el.closest('[data-id]').dataset.id).then((ok) => { if (ok) this.closeProjects(); }); break;
+      case 'proj-del': this.removeProject(el.closest('[data-id]').dataset.id); break;
       case 'photo': this.takePhoto(); break;
       case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
@@ -662,12 +674,65 @@ export class UI {
 
   html(s) { const d = document.createElement('div'); d.innerHTML = s; return d; }
 
-  shareUrl(client = false) {
+  shareUrl(client = false, remote = null) {
     const a = this.app;
     return buildShareUrl(location.origin + location.pathname, {
-      client, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden],
+      client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden],
       env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI),
     });
+  }
+
+  // ---------- Projets (menu burger) ----------
+  async openProjects() {
+    const dr = $('[data-r=drawer]', this.root), sc = $('.scrim', this.root);
+    dr.hidden = sc.hidden = false;
+    requestAnimationFrame(() => this.el.dataset.drawer = '1');
+    await this.renderProjects();
+  }
+  closeProjects() {
+    this.el.dataset.drawer = '0';
+    setTimeout(() => { if (this.el.dataset.drawer !== '1') { $('[data-r=drawer]', this.root).hidden = true; $('.scrim', this.root).hidden = true; } }, 250);
+  }
+  async renderProjects() {
+    const dr = $('[data-r=drawer]', this.root);
+    let list = [], failed = false;
+    try { list = await listProjects(); } catch (e) { failed = true; console.warn(e); }
+    const cur = list.find((p) => p.id === this.svc.projectId);
+    const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    dr.innerHTML = `
+      <div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div>
+      <div class="dr-save">
+        <input type="text" data-r="projname" maxlength="60" placeholder="${esc(t('projectName'))}" value="${esc(cur?.name ?? '')}" aria-label="${esc(t('projectName'))}">
+        <div class="row">
+          <button class="btn primary" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
+          ${cur ? `<button class="btn" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
+        </div>
+      </div>
+      <p class="palette-title">${t('projectsList')}</p>
+      ${failed ? `<p class="muted tiny">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="muted tiny">${t('projectsEmpty')}</p>` : ''}
+      <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
+        <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
+          <span><b>${esc(p.name)}</b><small>${esc(p.modelName)} · ${fmt(p.updated)}</small></span></button>
+        <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
+      <p class="muted tiny">${t('projectsNote')}</p>`;
+  }
+  async saveCurrentProject(asNew) {
+    const app = this.app, s = this.svc;
+    if (!app.model || !s.last) return;
+    const name = ($('[data-r=projname]', this.root).value || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
+    try {
+      let thumb = null;
+      try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg] })); }); } catch { /* vignette facultative */ }
+      const id = asNew || !s.projectId ? newId() : s.projectId;
+      await saveProject({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
+      s.projectId = id;
+      this.toast(t('projectSaved'));
+      await this.renderProjects();
+    } catch (e) { console.warn(e); this.toast(t('projectsUnavailable')); }
+  }
+  async removeProject(id) {
+    if (!confirm(t('projectDeleteAsk'))) return;
+    try { await deleteProject(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
   }
 
   /** Actions secondaires, rangées dans un menu pour garder la barre d'actions propre. */
@@ -680,8 +745,23 @@ export class UI {
     this.openDialog(t('more'), d);
   }
 
+  /** Héberge le fichier du joaillier (une seule fois) pour que le lien rouvre CE modèle et pas celui par défaut. */
+  async hostModel(onProgress) {
+    const s = this.svc;
+    if (!s.isHostable?.() || !s.last) return null;
+    if (!s.last.remote) s.last.remote = await uploadModel({ buffer: s.last.buffer, name: s.last.name, options: s.options }, { onProgress });
+    return s.last.remote;
+  }
+
   async openShare() {
-    const urls = { client: this.shareUrl(true), jeweler: this.shareUrl(false) };
+    let remote = null, hostFailed = false;
+    if (this.svc.isHostable?.() && !this.svc.last?.remote) {
+      const wait = this.html(`<p class="muted">${t('sharePrep')}</p><div class="progress-inline"><i></i></div>`);
+      this.openDialog(t('share'), wait);
+      try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.width = Math.round(p * 100) + '%'; }); }
+      catch (e) { console.warn('Hébergement du modèle impossible', e); hostFailed = true; }
+    } else remote = await this.hostModel().catch(() => null);
+    const urls = { client: this.shareUrl(true, remote), jeweler: this.shareUrl(false, remote) };
     const field = (k, label) => `<p class="palette-title">${label}</p>
       <input type="url" readonly value="${esc(urls[k])}" data-r="shareurl-${k}" aria-label="${esc(label)}">
       <div class="row"><button class="btn ${k === 'client' ? 'primary' : ''}" data-s="copy" data-k="${k}">${t('copyLink')}</button>
@@ -691,7 +771,7 @@ export class UI {
       ${field('client', t('clientLink'))}
       <img class="qr" alt="QR" width="180" height="180">
       ${field('jeweler', t('jewelerLink'))}
-      <p class="muted tiny">${t('shareNote')}</p>
+      <p class="muted tiny">${hostFailed ? t('shareNoHost') : remote ? t('shareHosted') : t('shareNote')}</p>
       <div class="row"><button class="btn" data-s="project">${t('exportProject')}</button></div>`);
     d.addEventListener('click', async (e) => {
       const b = e.target.closest('[data-s]'); if (!b) return;

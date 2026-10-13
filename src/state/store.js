@@ -67,8 +67,8 @@ export function decodeShare(str) {
 }
 
 /** Construit l'URL de partage de la configuration courante. */
-export function buildShareUrl(base, { modelId, assign, env, envRot, hidden, client = false }) {
-  const payload = { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden, ...(client ? { k: 1 } : {}) };
+export function buildShareUrl(base, { modelId, assign, env, envRot, hidden, client = false, remote = null }) {
+  const payload = { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden, ...(client ? { k: 1 } : {}), ...(remote ? { u: remote } : {}) };
   return `${base}#c=${encodeShare(payload)}`;
 }
 
@@ -77,7 +77,7 @@ export function parseShareHash(hash) {
   if (!m) return null;
   const p = decodeShare(m[1]);
   if (!p || p.v !== 1) return null;
-  return { modelId: p.model, assign: unpackAssign(p.a || []), env: p.e, envRot: p.r, hidden: p.h || [], client: !!p.k };
+  return { modelId: p.model, assign: unpackAssign(p.a || []), env: p.e, envRot: p.r, hidden: p.h || [], client: !!p.k, remote: typeof p.u === 'string' && /^[a-f0-9]{32}$/.test(p.u) ? p.u : null };
 }
 
 /** Préférences par viewer (jamais bloquant si le stockage est indisponible : mode privé iOS, etc.). */
