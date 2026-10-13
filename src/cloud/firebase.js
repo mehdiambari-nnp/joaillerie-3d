@@ -50,6 +50,11 @@ export function create(config) {
     },
   };
 
+  const shares = {
+    async put(id, json) { const d = doc(db, 'shares', id); uid(); if (!(await getDoc(d)).exists()) await setDoc(d, { p: json, created: Date.now() }); },
+    async get(id) { const s = await getDoc(doc(db, 'shares', id)); if (!s.exists()) throw new Error('partage introuvable'); return s.data().p; },
+  };
+
   const col = () => collection(db, 'users', uid(), 'projects');
   const projects = {
     async list() {
@@ -73,5 +78,5 @@ export function create(config) {
     remove: (id) => deleteDoc(doc(col(), id)),
   };
 
-  return { kind: 'firebase', auth: authApi, models, projects };
+  return { kind: 'firebase', auth: authApi, models, projects, shares };
 }

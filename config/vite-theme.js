@@ -44,15 +44,19 @@ export function manifestOf(theme) {
 
 export default function themePlugin() {
   const { dir, theme, logos, defaultModel } = loadTheme();
+  let mode = 'production'; // `vite build --mode firebase` : le thème reçoit la configuration Firebase (themes/<client>/firebase.json)
   const icons = ['icon-180.png', 'icon-192.png', 'icon-512.png'];
   const iconPath = (n) => path.join(dir, 'icons', n);
   return {
     name: 'white-label-theme',
+    configResolved(c) { mode = c.mode; },
     resolveId(id) { return id === VID ? RID : null; },
     load(id) {
       if (id !== RID) return null;
       const fonts = (theme.fonts?.packages || []).map((p) => `import ${JSON.stringify(p)};`).join('\n');
-      return `${fonts}\nexport default ${JSON.stringify({ ...theme, logoSvg: logos, defaultModelUrl: defaultModel ? `model/${defaultModel}` : null })};`;
+      const fbFile = path.join(dir, 'firebase.json');
+      const firebase = mode === 'firebase' && fs.existsSync(fbFile) ? JSON.parse(fs.readFileSync(fbFile, 'utf8')) : theme.firebase;
+      return `${fonts}\nexport default ${JSON.stringify({ ...theme, ...(firebase ? { firebase } : {}), logoSvg: logos, defaultModelUrl: defaultModel ? `model/${defaultModel}` : null })};`;
     },
     transformIndexHtml(html) {
       const b = theme.brand;

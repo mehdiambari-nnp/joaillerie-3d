@@ -8,7 +8,7 @@ import { UI } from './ui/ui.js';
 import { t } from './ui/i18n.js';
 import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
-import { parseShareHash } from './state/store.js';
+import { parseShareHash, shortShareRef, parseShareJson } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
 import { getCloud } from './cloud/index.js';
 
@@ -27,7 +27,13 @@ async function boot() {
   const app = new Configurator(holder);
   const svc = { options: {}, last: null, cloud: getCloud };
   let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV); // vrai tant que l'intro n'a pas pris la main
-  let pending = parseShareHash(location.hash); // configuration d'un lien de partage
+  let pending = parseShareHash(location.hash); // lien long (#c=) : configuration lue sur place
+  let shareFailed = false;
+  const shortRef = shortShareRef(location.hash); // lien court (#s=) : configuration à récupérer sur le serveur
+  if (shortRef) {
+    try { pending = parseShareJson(await (await getCloud()).shares.get(shortRef)); if (!pending) throw new Error('lien illisible'); }
+    catch (e) { console.warn('Lien de partage introuvable', e); shareFailed = true; }
+  }
 
   const ui = new UI(root, app, svc);
   ui.initTheme(); app.viewer._applyBackground();
@@ -62,7 +68,7 @@ async function boot() {
   }
 
   // Coller un lien de partage dans l'onglet déjà ouvert ne recharge pas la page : on la recharge pour repartir d'un état neuf (assemblé).
-  window.addEventListener('hashchange', () => { if (/[#&]c=/.test(location.hash)) location.reload(); });
+  window.addEventListener('hashchange', () => { if (/[#&][cs]=/.test(location.hash)) location.reload(); });
 
   svc.openFile = async (file) => {
     const buffer = await file.arrayBuffer();
@@ -135,7 +141,8 @@ async function boot() {
   if (app.model) app.model.root.visible = true; // filet de sécurité (intro ignorée ou en erreur)
   ui.onboard();
   ui.changelog();
-  if (remoteFailed) ui.toast(t('remoteFailed'), 6000);
+  if (shareFailed) ui.toast(t('shareLinkFailed'), 6000);
+  else if (remoteFailed) ui.toast(t('remoteFailed'), 6000);
   else if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);
 
   if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {

@@ -13,8 +13,10 @@
     "fetch-models": "node scripts/fetch-models.mjs",
     "postinstall": "node scripts/copy-wasm.mjs",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
-    "deploy:hosting": "npm run build && firebase deploy --only hosting",
-    "deploy:all": "npm run build && firebase deploy"
+    "deploy:hosting": "npm run build:firebase && firebase deploy --only hosting",
+    "deploy:all": "npm run build:firebase && firebase deploy",
+    "build:firebase": "vite build --mode firebase",
+    "dev:firebase": "vite --host --mode firebase"
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "2.3.0",

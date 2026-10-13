@@ -8,7 +8,7 @@ import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
-import { prefs, buildShareUrl } from '../state/store.js';
+import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
 import { newId, thumbnail } from '../projects/projects.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
@@ -767,6 +767,17 @@ export class UI {
     try { await (await this.svc.cloud()).projects.remove(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
   }
 
+  /** Lien court (#s=<12 caractères>) : la configuration est déposée sur le serveur. Repli : lien long si le dépôt échoue. */
+  async shortShareUrl(client, remote) {
+    const a = this.app, base = location.origin + location.pathname;
+    const opts = { client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI) };
+    try {
+      const json = JSON.stringify(sharePayload(opts)), id = await shareId(json);
+      await (await this.svc.cloud()).shares.put(id, json);
+      return `${base}#s=${id}`;
+    } catch (e) { console.warn('Lien court impossible, lien long utilisé', e); return buildShareUrl(base, opts); }
+  }
+
   /** Actions secondaires, rangées dans un menu pour garder la barre d'actions propre. */
   openMore() {
     const d = this.html(`<div class="more-list">
@@ -799,7 +810,7 @@ export class UI {
       try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.width = Math.round(p * 100) + '%'; }); }
       catch (e) { console.warn('Hébergement du modèle impossible', e); hostFailed = true; }
     } else remote = await this.hostModel().catch(() => null);
-    const urls = { client: this.shareUrl(true, remote), jeweler: this.shareUrl(false, remote) };
+    const urls = { client: await this.shortShareUrl(true, remote), jeweler: await this.shortShareUrl(false, remote) };
     const field = (k, label) => `<p class="palette-title">${label}</p>
       <input type="url" readonly value="${esc(urls[k])}" data-r="shareurl-${k}" aria-label="${esc(label)}">
       <div class="row"><button class="btn ${k === 'client' ? 'primary' : ''}" data-s="copy" data-k="${k}">${t('copyLink')}</button>

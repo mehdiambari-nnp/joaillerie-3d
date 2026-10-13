@@ -1,7 +1,7 @@
 # Firebase : mise en route
 
 Tout l'hébergement passe par Firebase : pages (Hosting), comptes joailliers (Authentication), modèles partagés (Cloud Storage), projets synchronisés (Firestore).
-Sans configuration Firebase dans le thème, l'application reste en mode « local » (projets sur l'appareil, API `/api/models`) : c'est le mode des tests et du développement.
+Sans le mode `firebase` (build normal), l'application reste en mode « local » (projets sur l'appareil, API `/api/models`) : c'est le mode des tests et du développement.
 
 ## À faire une fois (≈ 20 min)
 1. Console Firebase → **Créer un projet** (ex. `domuse`). Passer au plan **Blaze** (carte requise, usage actuel quasi gratuit ; ajouter une alerte de budget).
@@ -9,9 +9,7 @@ Sans configuration Firebase dans le thème, l'application reste en mode « local
 3. **Build → Firestore Database** → Créer (mode production, région `eur3` ou `europe-west9`).
 4. **Build → Storage** → Commencer (même région).
 5. **Paramètres du projet → Vos applications → Web (`</>`)** → copier l'objet `firebaseConfig`.
-6. Coller cet objet dans `themes/<client>/theme.json`, clé `"firebase"` :
-   `"firebase": { "apiKey": "…", "authDomain": "…", "projectId": "…", "storageBucket": "…", "messagingSenderId": "…", "appId": "…" }`
-   (ces valeurs sont publiques par conception ; la sécurité vient des règles).
+6. Coller cet objet dans `themes/<client>/firebase.json` (valeurs publiques par conception ; la sécurité vient des règles). Elles ne sont prises en compte que par `npm run build:firebase` / `npm run dev:firebase` (mode Vite `firebase`) : un build normal (Netlify) reste en mode local.
 7. Mettre l'identifiant du projet dans `.firebaserc`.
 8. En local : `npx firebase login`, puis `npm run deploy:rules` (règles Firestore et Storage).
 9. CORS du bucket Storage (nécessaire pour télécharger les modèles depuis le navigateur) :
