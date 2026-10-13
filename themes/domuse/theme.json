@@ -76,5 +76,13 @@
   "intro": {
     "enabled": true,
     "logo": "wordmark"
+  },
+  "firebase": {
+    "apiKey": "AIzaSyB-Vr_NqXoPqvAd1Ogj93xIa9G0aJt338k",
+    "authDomain": "jewel3d-e8caa.firebaseapp.com",
+    "projectId": "jewel3d-e8caa",
+    "storageBucket": "jewel3d-e8caa.firebasestorage.app",
+    "messagingSenderId": "223586695940",
+    "appId": "1:223586695940:web:efa160df591876fad32e51"
   }
 }
