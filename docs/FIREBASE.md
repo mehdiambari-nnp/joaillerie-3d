@@ -26,3 +26,7 @@ Sans configuration Firebase dans le thème, l'application reste en mode « local
 ## Règles de sécurité (résumé)
 - **Storage** `models/{empreinte}` : lecture par quiconque a l'identifiant (lien client), pas de listing ; création réservée aux joailliers connectés, 60 Mo max, jamais d'écrasement.
 - **Firestore** `users/{uid}/projects/{id}` : lecture et écriture réservées au propriétaire.
+
+## Raccourci : tout déployer en une commande
+Depuis le dépôt, sur ton ordinateur : `npx firebase login`, puis `npm run deploy:all` (règles Firestore et Storage + index + Hosting). Reste le CORS du bucket, à faire une fois dans Google Cloud Shell (console.cloud.google.com, icône `>_`) :
+`echo '[{"origin":["*"],"method":["GET","HEAD"],"maxAgeSeconds":3600}]' > cors.json && gcloud storage buckets update gs://jewel3d-e8caa.firebasestorage.app --cors-file=cors.json`
