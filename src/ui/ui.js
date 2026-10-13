@@ -9,8 +9,7 @@ import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, s
 import { ENVIRONMENTS } from '../core/environments.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl } from '../state/store.js';
-import { uploadModel } from '../share/remote.js';
-import { saveProject, listProjects, deleteProject, newId, thumbnail } from '../projects/projects.js';
+import { newId, thumbnail } from '../projects/projects.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
 import { TryOn } from '../tryon/tryon.js';
@@ -19,6 +18,8 @@ import { frenchRingSize } from '../import/zones.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
 
+const AUTH_ERR = { 'auth/invalid-credential': 'authBad', 'auth/wrong-password': 'authBad', 'auth/user-not-found': 'authBad', 'auth/invalid-email': 'authEmail', 'auth/email-already-in-use': 'authExists',
+  'auth/weak-password': 'authWeak', 'auth/popup-closed-by-user': 'authCancelled', 'auth/cancelled-popup-request': 'authCancelled', 'auth/network-request-failed': 'authNetwork', 'auth/too-many-requests': 'authMany' };
 const BG = { light: '#e9e0d0', dark: '#16140f', transparent: null };
 
 // Icônes au trait (cohérentes, sans emoji)
@@ -553,6 +554,7 @@ export class UI {
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
       case 'projects': this.openProjects(); break;
+      case 'signout': (await this.svc.cloud()).auth.signOut().then(() => this.renderProjects()); break;
       case 'projects-close': this.closeProjects(); break;
       case 'proj-save': this.saveCurrentProject(false); break;
       case 'proj-save-new': this.saveCurrentProject(true); break;
@@ -695,8 +697,13 @@ export class UI {
   }
   async renderProjects() {
     const dr = $('[data-r=drawer]', this.root);
+    const cloud = await this.svc.cloud();
+    if (cloud.auth.enabled && !cloud.auth.user) { // compte requis : projets et modèles partagés sont liés au joaillier
+      dr.replaceChildren(this.html(`<div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div><p class="muted tiny">${t('signInWhy')}</p>`), this.authForm(() => this.renderProjects()));
+      return;
+    }
     let list = [], failed = false;
-    try { list = await listProjects(); } catch (e) { failed = true; console.warn(e); }
+    try { list = await cloud.projects.list(); } catch (e) { failed = true; console.warn(e); }
     const cur = list.find((p) => p.id === this.svc.projectId);
     const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     dr.innerHTML = `
@@ -714,7 +721,32 @@ export class UI {
         <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
           <span><b>${esc(p.name)}</b><small>${esc(p.modelName)} · ${fmt(p.updated)}</small></span></button>
         <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
-      <p class="muted tiny">${t('projectsNote')}</p>`;
+      <p class="muted tiny">${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
+      ${cloud.auth.enabled ? `<p class="muted tiny acct">${esc(cloud.auth.user.email || '')} · <button class="link" data-a="signout">${t('signOut')}</button></p>` : ''}`;
+  }
+
+  /** Formulaire de connexion / création de compte (Firebase Auth). `done` est appelé une fois connecté. */
+  authForm(done) {
+    const d = this.html(`<form class="auth" novalidate>
+      <input type="email" name="email" autocomplete="email" placeholder="${esc(t('email'))}" aria-label="${esc(t('email'))}" required>
+      <input type="password" name="pw" autocomplete="current-password" placeholder="${esc(t('password'))}" aria-label="${esc(t('password'))}" required>
+      <p class="auth-err muted tiny" role="alert" hidden></p>
+      <div class="row"><button class="btn primary" type="submit" data-k="in">${t('signIn')}</button><button class="btn" type="button" data-k="up">${t('signUp')}</button></div>
+      <div class="row"><button class="btn" type="button" data-k="google">${t('signInGoogle')}</button><button class="link" type="button" data-k="reset">${t('forgotPw')}</button></div></form>`);
+    const form = $('form', d), err = $('.auth-err', d);
+    const run = async (fn, okMsg) => {
+      err.hidden = true;
+      try { await fn(await this.svc.cloud(), form.email.value.trim(), form.pw.value); if (okMsg) { this.toast(okMsg); return; } done?.(); }
+      catch (e) { err.textContent = t(AUTH_ERR[e.code] || 'authError'); err.hidden = false; console.warn(e); }
+    };
+    form.addEventListener('submit', (e) => { e.preventDefault(); run((c, m, p) => c.auth.signIn(m, p)); });
+    form.addEventListener('click', (e) => {
+      const k = e.target.closest('[data-k]')?.dataset.k;
+      if (k === 'up') run((c, m, p) => c.auth.signUp(m, p));
+      else if (k === 'google') run((c) => c.auth.signInGoogle());
+      else if (k === 'reset') { if (!form.email.value.trim()) { err.textContent = t('authEmailFirst'); err.hidden = false; } else run((c, m) => c.auth.reset(m), t('resetSent')); }
+    });
+    return d;
   }
   async saveCurrentProject(asNew) {
     const app = this.app, s = this.svc;
@@ -724,7 +756,7 @@ export class UI {
       let thumb = null;
       try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg] })); }); } catch { /* vignette facultative */ }
       const id = asNew || !s.projectId ? newId() : s.projectId;
-      await saveProject({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
+      await (await s.cloud()).projects.save({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
       s.projectId = id;
       this.toast(t('projectSaved'));
       await this.renderProjects();
@@ -732,7 +764,7 @@ export class UI {
   }
   async removeProject(id) {
     if (!confirm(t('projectDeleteAsk'))) return;
-    try { await deleteProject(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
+    try { await (await this.svc.cloud()).projects.remove(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
   }
 
   /** Actions secondaires, rangées dans un menu pour garder la barre d'actions propre. */
@@ -749,12 +781,18 @@ export class UI {
   async hostModel(onProgress) {
     const s = this.svc;
     if (!s.isHostable?.() || !s.last) return null;
-    if (!s.last.remote) s.last.remote = await uploadModel({ buffer: s.last.buffer, name: s.last.name, options: s.options }, { onProgress });
+    if (!s.last.remote) s.last.remote = await (await s.cloud()).models.upload({ buffer: s.last.buffer, name: s.last.name, options: s.options }, { onProgress });
     return s.last.remote;
   }
 
   async openShare() {
     let remote = null, hostFailed = false;
+    const cloud = await this.svc.cloud();
+    if (cloud.auth.enabled && !cloud.auth.user && this.svc.isHostable?.() && !this.svc.last?.remote) { // héberger le modèle exige un compte joaillier
+      const d = this.html(`<p class="muted tiny">${t('signInShare')}</p>`); d.append(this.authForm(() => this.openShare()));
+      this.openDialog(t('share'), d);
+      return;
+    }
     if (this.svc.isHostable?.() && !this.svc.last?.remote) {
       const wait = this.html(`<p class="muted">${t('sharePrep')}</p><div class="progress-inline"><i></i></div>`);
       this.openDialog(t('share'), wait);

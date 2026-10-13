@@ -10,8 +10,7 @@ import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
 import { parseShareHash } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
-import { downloadModel } from './share/remote.js';
-import { getProject } from './projects/projects.js';
+import { getCloud } from './cloud/index.js';
 
 const root = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -26,7 +25,7 @@ async function boot() {
 
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
   const app = new Configurator(holder);
-  const svc = { options: {}, last: null };
+  const svc = { options: {}, last: null, cloud: getCloud };
   let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV); // vrai tant que l'intro n'a pas pris la main
   let pending = parseShareHash(location.hash); // configuration d'un lien de partage
 
@@ -74,7 +73,7 @@ async function boot() {
   /** Ouvre un projet enregistré (fichier + configuration + lumière). */
   svc.openProject = async (id) => {
     try {
-      const p = await getProject(id);
+      const p = await (await getCloud()).projects.get(id);
       if (!p) return false;
       const { meta } = p;
       const model = await load(p.buffer, meta.modelName, meta.options || {}, meta.config || null, meta.modelId);
@@ -112,7 +111,7 @@ async function boot() {
   async function loadRemote(id) {
     try {
       ui.progress(1, t('loading'));
-      const m = await downloadModel(id, { onProgress: (p) => ui.progress(Math.max(1, Math.round(p * 60)), t('loading')) });
+      const m = await (await getCloud()).models.download(id, { onProgress: (p) => ui.progress(Math.max(1, Math.round(p * 60)), t('loading')) });
       await load(m.buffer, m.name, m.options, null, pending.modelId);
       if (svc.last) svc.last.remote = id; // déjà hébergé : inutile de le renvoyer au prochain partage
       return true;

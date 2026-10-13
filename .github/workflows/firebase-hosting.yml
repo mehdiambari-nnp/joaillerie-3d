@@ -1,0 +1,23 @@
+# Déploiement Firebase Hosting : aperçu sur chaque pull request, production à chaque push sur main.
+# Secret requis : FIREBASE_SERVICE_ACCOUNT (clé JSON du compte de service). Variable de dépôt : FIREBASE_PROJECT_ID.
+name: Firebase Hosting
+on:
+  push: { branches: [main] }
+  pull_request: { branches: [main] }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions: { contents: read, pull-requests: write, checks: write }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
+          channelId: ${{ github.event_name == 'push' && 'live' || '' }}

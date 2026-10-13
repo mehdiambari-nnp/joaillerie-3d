@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Projets d'un joaillier : lui seul les lit et les écrit.
+    match /users/{uid}/projects/{pid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.modelHash is string && request.resource.data.modelHash.matches('[a-f0-9]{32}');
+    }
+  }
+}
