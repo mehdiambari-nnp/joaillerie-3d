@@ -25,6 +25,7 @@ async function boot() {
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
   const app = new Configurator(holder);
   const svc = { options: {}, last: null };
+  let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV); // vrai tant que l'intro n'a pas pris la main
   let pending = parseShareHash(location.hash); // configuration d'un lien de partage
 
   const ui = new UI(root, app, svc);
@@ -41,6 +42,7 @@ async function boot() {
       let cfg = config ?? model.project ?? null;
       if (pending && (pending.modelId === modelId)) { cfg = { ...(cfg || {}), assign: pending.assign, hidden: pending.hidden }; }
       app.setModel(model, modelId, cfg);
+      if (introPending) model.root.visible = false; // masquée jusqu'à ce que l'écrin soit prêt (pas d'apparition avant l'intro)
       if (model.project?.variants) { app.variants = model.project.variants; app.emit('variants'); }
       if (pending && pending.modelId === modelId) {
         if (pending.env) app.viewer.setEnvironment(pending.env);
@@ -94,7 +96,9 @@ async function boot() {
   }
   app.viewer.setAutoRotate(FEATURES.autoRotate && ui.mode !== 'atelier');
   ui.loadThumbnails();
-  if (app.model && shouldPlayIntro(theme, params, dev)) await playIntro(app, ui, theme).catch((e) => console.warn('Intro ignorée', e));
+  if (app.model && introPending) await playIntro(app, ui, theme).catch((e) => console.warn('Intro ignorée', e));
+  introPending = false;
+  if (app.model) app.model.root.visible = true; // filet de sécurité (intro ignorée ou en erreur)
   ui.onboard();
   ui.changelog();
   if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);

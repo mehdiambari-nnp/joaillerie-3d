@@ -1,9 +1,9 @@
-// Écrin de la marque, d'après la charte (Storez Studio) : boîte carrée en suédine bordeaux, couvercle à pans coupés
+// Écrin de la marque, d'après la charte (Storez Studio) : boîte carrée en laque bordeaux, couvercle à pans coupés
 // (dessus plat plus sombre), intérieur en suédine noire, logo marqué à chaud or (Kurtz 232) sous le couvercle.
 // Dimensions proportionnelles à S (côté de la boîte, en unités de la scène = mm).
 import * as THREE from 'three';
 
-const COL = { suede: '#2a0612', suedeTop: '#16030a', rim: '#320713', black: '#070708', sheen: '#3a0f1b', blackSheen: '#16161a', gold: '#ddd5ac' };
+const COL = { lac: '#2a050c', lacTop: '#220409', lacRim: '#180306', suede: '#2a0612', suedeTop: '#16030a', rim: '#320713', black: '#070708', sheen: '#3a0f1b', blackSheen: '#16161a', gold: '#ddd5ac' };
 
 let pileTex = null;
 let ENV = null; // environnement de la scène : sans lui, envMapIntensity du matériau est sans effet (three ≥ r163)
@@ -20,6 +20,11 @@ function pile() {
 }
 function suede(color, sheen, side = THREE.FrontSide, env = 0.5) {
   return new THREE.MeshPhysicalMaterial({ color, roughness: 1, metalness: 0, sheen: 0.45, sheenColor: new THREE.Color(sheen), sheenRoughness: 0.5, bumpMap: pile(), bumpScale: 0.5, side, envMap: ENV, envMapIntensity: env });
+}
+
+/** Laque brillante (charte V3 : coffret bordeaux laqué) : base lisse + vernis, reflets de l'environnement. */
+function lacquer(color, env = 0.75) {
+  return new THREE.MeshPhysicalMaterial({ color, roughness: 0.32, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, reflectivity: 0.5, envMap: ENV, envMapIntensity: env });
 }
 
 /** SVG du logo en or → texture (canvas) ; `svg` utilise currentColor. */
@@ -58,7 +63,7 @@ export async function buildBox(S, { logoSvg = null, logoRatio = 4.2, env = null 
   const floorY = 0.62 * hb;                                                      // fond de l'écrin (coussin noir)
   const mats = []; const geos = [];
   const M = (m) => { mats.push(m); return m; }; const G = (g) => { geos.push(g); return g; };
-  const bord = M(suede(COL.suede, COL.sheen)), bordTop = M(suede(COL.suedeTop, COL.sheen)), bordRim = M(suede(COL.rim, COL.sheen));
+  const bord = M(lacquer(COL.lac)), bordTop = M(lacquer(COL.lacTop, 0.3)), bordRim = M(lacquer(COL.lacRim));
   const blk = M(suede(COL.black, COL.blackSheen, THREE.FrontSide, 0.1)), blkIn = M(suede(COL.black, COL.blackSheen, THREE.BackSide, 0.1));
   const group = new THREE.Group();
   const add = (parent, geo, mat, y = 0, rx = 0) => { const m = new THREE.Mesh(G(geo), mat); m.position.y = y; m.rotation.x = rx; parent.add(m); return m; };

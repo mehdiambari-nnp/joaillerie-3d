@@ -37,6 +37,7 @@ export async function playIntro(app, ui, theme) {
   const ringStartMinY = ringBox.min.y - L;
   box.group.position.set(c.x, ringStartMinY - box.floorY, c.z);
   viewer.scene.add(box.group);
+  root.visible = true; // la bague (masquée dès le chargement) n'apparaît que dans l'écrin fermé
   const KEY = 2.6; const key = new THREE.DirectionalLight(0xf6f0ff, KEY); key.position.set(-1, 1.6, 1.2).multiplyScalar(S).add(c); key.target.position.copy(c); viewer.scene.add(key, key.target); // faces de l'écrin bien distinctes
   if (window.__rc) window.__rc.introBox = box;
   const sh = viewer._shadow, shSave = sh ? { p: sh.position.clone(), s: sh.scale.clone(), v: sh.visible } : null;

@@ -132,3 +132,7 @@
 ## Itération 20 — liens de partage toujours assemblés
 - L'état éclaté n'a jamais fait partie du lien (le lien ne contient que modèle, matières, parties masquées, environnement), et un lien ouvert dans un nouvel onglet arrive assemblé (vérifié en test). Cas restant : coller le lien dans l'onglet déjà éclaté ne recharge pas la page (seul le `#` change) → la page se recharge maintenant sur tout changement de lien de partage.
 - Ceinture et bretelles : à l'ouverture d'un lien de partage, la bague est rangée de force (`assembleNow`) après application de la configuration.
+
+## Itération 21 — écrin laqué, bague cachée avant l'intro
+- **Laque** (charte V3, photo de coffret bordeaux laqué) : l'extérieur de l'écrin passe de la suédine à une laque : `MeshPhysicalMaterial` avec vernis (`clearcoat` 1, rugosité 0,05) sur base bordeaux très sombre (#2a050c), reflets de l'environnement de la scène ; dessus plus mat (moins de reflet blanc). L'intérieur reste en suédine noire. Arêtes encore vives (pas de chanfrein arrondi comme sur la photo) : piste d'amélioration.
+- **Bague visible avant l'écrin** : le modèle est maintenant masqué dès son chargement quand l'intro doit jouer, et n'est affiché qu'une fois l'écrin posé autour (même image) ; filet de sécurité si l'intro est ignorée ou échoue.
