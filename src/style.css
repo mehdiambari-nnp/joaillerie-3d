@@ -459,3 +459,27 @@ dialog { border-radius: 20px; }
 .viewport::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 30%; pointer-events: none; z-index: 1; opacity: 0; transition: opacity .8s ease;
   background: linear-gradient(to bottom, transparent, var(--bg) 92%); }
 .app[data-intro='1'] .viewport::after { opacity: 1; transition: none; }
+
+.progress-inline { height: 4px; border-radius: 4px; background: var(--surface-2); overflow: hidden; }
+.progress-inline i { display: block; height: 100%; width: 8%; background: var(--accent); transition: width .2s; }
+
+/* Menu burger : tiroir des projets du joaillier */
+.app[data-mode='client'] .burger, .app[data-locked='1'] .burger { display: none; }
+.scrim { position: fixed; inset: 0; background: rgba(10, 8, 4, .45); z-index: 40; opacity: 0; transition: opacity .22s; }
+.drawer { position: fixed; top: 0; bottom: 0; left: 0; width: min(340px, 88vw); z-index: 41; background: var(--surface); color: var(--ink); border-right: 1px solid var(--line); box-shadow: var(--shadow);
+  padding: calc(14px + var(--safe-t)) 16px calc(16px + var(--safe-b, 0px)); overflow-y: auto; transform: translateX(-102%); transition: transform .24s ease; }
+.app[data-drawer='1'] .drawer { transform: none; }
+.app[data-drawer='1'] .scrim { opacity: 1; }
+.dr-h { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.dr-h h2 { margin: 0; font: 400 22px var(--serif); }
+.dr-save input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); }
+.dr-save .row { display: flex; gap: 8px; margin: 10px 0 14px; flex-wrap: wrap; }
+.proj-list { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 8px; }
+.proj-list li { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 6px; background: var(--surface-2); }
+.proj-list li.on { border-color: var(--accent); }
+.proj-open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; border: 0; background: transparent; color: inherit; text-align: left; padding: 0; }
+.proj-open img, .proj-open .ph { width: 64px; height: 48px; border-radius: 8px; object-fit: cover; background: var(--surface); flex: none; }
+.proj-open span:last-child { min-width: 0; display: grid; gap: 2px; }
+.proj-open b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-open small { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.proj-list .icon-btn { width: 32px; height: 32px; font-size: 13px; flex: none; }

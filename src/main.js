@@ -10,6 +10,8 @@ import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
 import { parseShareHash } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
+import { downloadModel } from './share/remote.js';
+import { getProject } from './projects/projects.js';
 
 const root = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -35,7 +37,7 @@ async function boot() {
 
   /** Importe un buffer et l'installe dans le configurateur. */
   async function load(buffer, name, opts = {}, config = null, modelId = name) {
-    svc.last = { buffer, name }; svc.options = opts;
+    svc.last = { buffer, name, remote: null }; svc.options = opts;
     ui.progress(1, t('loading'));
     try {
       const model = await importModel(buffer, name, { ...opts, onProgress: (p, l) => ui.progress(p, l) });
@@ -66,7 +68,24 @@ async function boot() {
   svc.openFile = async (file) => {
     const buffer = await file.arrayBuffer();
     if (!sniffFormat(buffer, file.name)) { ui.fatal(t('errorFormat')); return; }
-    await load(buffer, file.name, {}, null, file.name);
+    if (await load(buffer, file.name, {}, null, file.name)) svc.projectId = null; // nouveau fichier : ce n'est plus un projet enregistré
+  };
+
+  /** Ouvre un projet enregistré (fichier + configuration + lumière). */
+  svc.openProject = async (id) => {
+    try {
+      const p = await getProject(id);
+      if (!p) return false;
+      const { meta } = p;
+      const model = await load(p.buffer, meta.modelName, meta.options || {}, meta.config || null, meta.modelId);
+      if (!model) return false;
+      if (meta.config?.variants) { app.variants = meta.config.variants; app.emit('variants'); }
+      if (meta.env) app.viewer.setEnvironment(meta.env);
+      if (meta.envRot != null) app.viewer.setEnvironmentRotation(meta.envRot);
+      app.exploder.assembleNow();
+      svc.projectId = id;
+      return true;
+    } catch (e) { console.warn(e); ui.toast(t('projectsUnavailable')); return false; }
   };
 
   svc.reimport = async (patch) => {
@@ -85,9 +104,25 @@ async function boot() {
       return true;
     } catch (e) { console.warn('Modèle par défaut indisponible', e); return false; }
   }
+  /** Modèle par défaut (thème), ou bague de démo : ils n'ont pas besoin d'être hébergés pour un lien de partage. */
+  const defaultName = theme.defaultModelUrl?.split('/').pop();
+  svc.isHostable = () => !!app.model && app.modelId !== defaultName && app.modelId !== 'demo-ring';
+
+  // Lien de partage d'un modèle hébergé : on recharge le fichier du joaillier plutôt que le modèle par défaut
+  async function loadRemote(id) {
+    try {
+      ui.progress(1, t('loading'));
+      const m = await downloadModel(id, { onProgress: (p) => ui.progress(Math.max(1, Math.round(p * 60)), t('loading')) });
+      await load(m.buffer, m.name, m.options, null, pending.modelId);
+      if (svc.last) svc.last.remote = id; // déjà hébergé : inutile de le renvoyer au prochain partage
+      return true;
+    } catch (e) { console.warn('Modèle partagé indisponible', e); ui.progress(100); remoteFailed = true; return false; }
+  }
+  let remoteFailed = false;
   // Modèle initial
   const dev = import.meta.env.DEV;
-  if (dev && params.get('model') === 'gemv') {
+  if (pending?.remote && await loadRemote(pending.remote)) { /* modèle du joaillier chargé */ }
+  else if (dev && params.get('model') === 'gemv') {
     const buf = await (await fetch('/test-assets/MAQUETTE_GEMV.fbx')).arrayBuffer();
     await load(buf, 'MAQUETTE_GEMV.fbx', {}, null, 'MAQUETTE_GEMV.fbx');
   } else if (!(theme.defaultModelUrl && await loadThemeModel())) {
@@ -101,7 +136,8 @@ async function boot() {
   if (app.model) app.model.root.visible = true; // filet de sécurité (intro ignorée ou en erreur)
   ui.onboard();
   ui.changelog();
-  if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);
+  if (remoteFailed) ui.toast(t('remoteFailed'), 6000);
+  else if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);
 
   if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

@@ -64,6 +64,56 @@ function roundedShell(w, h, hole = 0, rr = 0.07 * w, bev = 0.025 * w) {
   g = toCreasedNormals(g, Math.PI / 5); // arêtes douces, plans bien plats
   return g;
 }
+
+/** Contour carré à coins arrondis (sens trigonométrique vu de dessus), à la hauteur y. */
+function roundedRing(side, r, y, n = 6) {
+  const pts = [], c = side / 2 - r;
+  for (const [cx, cz, a0] of [[c, c, 0], [-c, c, 90], [-c, -c, 180], [c, -c, 270]]) {
+    for (let i = 0; i <= n; i++) { const a = ((a0 + (90 * i) / n) * Math.PI) / 180; pts.push(new THREE.Vector3(cx + r * Math.cos(a), y, cz + r * Math.sin(a))); }
+  }
+  return pts;
+}
+/** Habillage entre contours superposés (normales vers l'extérieur) ; `cap` ferme le dernier contour (éventail). */
+function loft(rings, capTop, capBottom) {
+  const pos = [], push = (a, b, c) => { // oriente chaque triangle vers l'extérieur de la pièce
+    const n = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(b, a), new THREE.Vector3().subVectors(c, a));
+    const m = new THREE.Vector3().add(a).add(b).add(c).divideScalar(3); m.y = 0;
+    const out = capTop || capBottom ? 0 : 1;
+    pos.push(...(out && n.dot(m) < 0 ? [a, c, b] : [a, b, c]).flatMap((v) => [v.x, v.y, v.z]));
+  };
+  for (let k = 0; k < rings.length - 1; k++) {
+    const A = rings[k], B = rings[k + 1], N = A.length;
+    for (let i = 0; i < N; i++) { const j = (i + 1) % N; push(A[i], A[j], B[j]); push(A[i], B[j], B[i]); }
+  }
+  return pos;
+}
+function cap(ring, up) {
+  const c = new THREE.Vector3(0, ring[0].y, 0), pos = [];
+  for (let i = 0; i < ring.length; i++) {
+    const a = ring[i], b = ring[(i + 1) % ring.length];
+    const ny = new THREE.Vector3().crossVectors(new THREE.Vector3().subVectors(a, c), new THREE.Vector3().subVectors(b, c)).y; // >0 : triangle vers le haut
+    pos.push(...((ny > 0) === up ? [c, a, b] : [c, b, a]).flatMap((v) => [v.x, v.y, v.z]));
+  }
+  return pos;
+}
+/** Couvercle à pans coupés (pyramide plate) : paroi droite arrondie, épaule inclinée, dessus plat plus sombre. */
+function lidGeometries(S, h1, h, topSide) {
+  const r = 0.07 * S, rt = 0.045 * S, b = 0.012 * S;
+  const rings = [roundedRing(S - 2 * b, r, 0), roundedRing(S, r + b, b), roundedRing(S, r + b, h1), roundedRing(S - 0.012 * S, r + b, h1 + 0.012 * S), roundedRing(topSide + 0.02 * S, rt + 0.01 * S, h - 0.006 * S), roundedRing(topSide, rt, h)];
+  const mk = (pos, creased) => {
+    let g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g = creased ? toCreasedNormals(g, Math.PI / 6) : (g.computeVertexNormals(), g);
+    return g;
+  };
+  const side = mk(loft(rings), true), P = side.attributes.position, Nn = side.attributes.normal, wall = [], wn = [], slope = [], sn = [];
+  for (let i = 0; i < P.count; i += 3) { // sépare la paroi verticale de l'épaule inclinée (reflets différents)
+    const dst = (P.getY(i) + P.getY(i + 1) + P.getY(i + 2)) / 3 > h1 ? [slope, sn] : [wall, wn];
+    for (let k = 0; k < 3; k++) { dst[0].push(P.getX(i + k), P.getY(i + k), P.getZ(i + k)); dst[1].push(Nn.getX(i + k), Nn.getY(i + k), Nn.getZ(i + k)); }
+  }
+  const part = (a, n) => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(n, 3)); return g; };
+  side.dispose();
+  return { wall: part(wall, wn), slope: part(slope, sn), top: mk(cap(rings.at(-1), true), false), bottom: mk(cap(rings[0], false), false) };
+}
 function squareRing(outer, inner) {
   const sh = new THREE.Shape(); const o = outer / 2, i = inner / 2;
   sh.moveTo(-o, -o); sh.lineTo(o, -o); sh.lineTo(o, o); sh.lineTo(-o, o); sh.closePath();
@@ -80,7 +130,7 @@ export async function buildBox(S, { logoSvg = null, logoRatio = 4.2, env = null 
   const floorY = 0.62 * hb;                                                      // fond de l'écrin (coussin noir)
   const mats = []; const geos = [];
   const M = (m) => { mats.push(m); return m; }; const G = (g) => { geos.push(g); return g; };
-  const bord = M(lacquer(COL.lac)), bordTop = M(lacquer('#3a0711', 0.3)), bordRim = M(lacquer(COL.lacRim));
+  const bord = M(lacquer(COL.lac)), bordTop = M(lacquer('#3a0711', 0.03)), bordRim = M(lacquer(COL.lacRim));
   const blk = M(suede(COL.black, COL.blackSheen, THREE.FrontSide, 0.03, 0.08)), blkIn = M(suede(COL.black, COL.blackSheen, THREE.BackSide, 0.03, 0.08));
   const group = new THREE.Group();
   const add = (parent, geo, mat, y = 0, rx = 0) => { const m = new THREE.Mesh(G(geo), mat); m.position.y = y; m.rotation.x = rx; parent.add(m); return m; };
@@ -95,7 +145,8 @@ export async function buildBox(S, { logoSvg = null, logoRatio = 4.2, env = null 
 
   // ----- Couvercle laqué (origine = centre du bas du couvercle, posé sur l'épaulement) -----
   const lid = new THREE.Group(); lid.position.y = hb; group.add(lid);
-  add(lid, roundedShell(S, lidH), [bordTop, bord]); // [dessus et dessous, côtés]
+  const lg = lidGeometries(S, 0.2 * S, lidH, 0.42 * S);
+  add(lid, lg.wall, bord); add(lid, lg.slope, M(lacquer('#34060f', 0.1))); add(lid, lg.top, bordTop); add(lid, lg.bottom, bord);
   // dessous du couvercle : plafond noir encadré d'une tranche laquée
   add(lid, squareRing(S - 2 * t, 0), blk, -0.02, Math.PI / 2);
 
