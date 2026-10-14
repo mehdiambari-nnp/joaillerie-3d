@@ -3,6 +3,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getEnvironment, disposeEnvironments } from './environments.js';
+import { Fx } from './fx.js';
+import { QUALITY } from './quality.js';
+import { ContactShadow } from './contactShadow.js';
+import { Reflection } from './reflection.js';
 
 
 export class Viewer {
@@ -49,8 +53,12 @@ export class Viewer {
     this.root = null;
     this.radius = 20;
 
+    this.fx = QUALITY.post ? new Fx(this) : null; // accumulation d'images, bloom, profondeur de champ (voir fx.js)
     this._shadow = this._makeShadow();
     this.scene.add(this._shadow);
+    this.reflection = QUALITY.reflection ? new Reflection(this, this._shadow) : null; // reflet discret sur le sol (ordinateur)
+    if (this.reflection) this.scene.add(this.reflection.mesh);
+    this.contact = QUALITY.contactShadow ? new ContactShadow(this, this._shadow) : null; // ombre de contact calculée (voir contactShadow.js)
 
     this.controls.addEventListener('start', () => { this.controls.autoRotate = false; this._autoRotateResume = Infinity; this.anim = null; });
     this.controls.addEventListener('end', () => { this._autoRotateResume = performance.now() + 4000; });
@@ -101,6 +109,17 @@ export class Viewer {
   }
 
   invalidate() { this.needsRender = true; }
+
+  /** Recalcule les éléments « cuits » (ombre de contact, sonde de reflets) peu après le dernier changement de la bague. */
+  requestBake(delay = 300) {
+    clearTimeout(this._bakeT);
+    this._bakeT = setTimeout(() => {
+      if (!this.root || this.paused) return;
+      if (this.reflection) this.reflection.dirty = true;
+      try { this.contact?.bake(); } catch (e) { console.warn('[fx] ombre de contact', e); }
+      this.invalidate();
+    }, delay);
+  }
 
   /** Charge (si besoin) et applique un environnement ; renvoie une promesse (HDRI : téléchargement). */
   async setEnvironment(id) {
@@ -169,6 +188,7 @@ export class Viewer {
       sc.background = this._bgTex;
       this._shadow.visible = true;
     }
+    if (this.reflection) this.reflection.mesh.visible = this._shadow.visible;
     this.invalidate();
   }
 
@@ -193,8 +213,10 @@ export class Viewer {
     const s = this._shadow;
     s.position.set(sphere.center.x, box.min.y - 0.05, sphere.center.z);
     s.scale.setScalar(this.radius * 3.2);
+    this.reflection?.place(s.position, s.position.y, this.radius * 5.5);
     this.views = views || [];
     this.setView([0.62, 0.45, 0.64], false);
+    this.requestBake();
   }
 
   /** Oriente la caméra selon une direction (depuis la cible) en gardant la distance de cadrage. */
@@ -325,13 +347,21 @@ export class Viewer {
     }
     const moved = this.controls.update();
     for (const f of this.onFrame) if (f(now)) this.needsRender = true;
+    const fx = this.fx;
     if (this.needsRender || moved || this.controls.autoRotate) {
       this.needsRender = false;
       if (this._hq) this._setHQ(false); // pendant le mouvement : résolution normale (fluidité, batterie)
       this._lastRender = now;
-      this.renderer.render(this.scene, this.camera);
-    } else if (!this._hq && !this.anim && now - this._lastRender > 400 && (window.devicePixelRatio || 1) > this.maxPixelRatio) {
-      this._setHQ(true); // à l'arrêt : une image fixe en pleine résolution de l'écran
+      if (this.reflection) this.reflection.dirty = true; // caméra ou scène en mouvement : reflet à recalculer
+      if (fx && QUALITY.motionPost) { fx.updateDof(this.camera, this.controls.target, this.radius, false); fx.render(this.scene, this.camera, { still: false }); }
+      else { fx?.reset(); this.renderer.render(this.scene, this.camera); }
+    } else if (fx && !this.anim && fx.pending && now - this._lastRender > 120) {
+      // à l'arrêt : cumul d'images (anti-crénelage, pierres stables), mise au point progressive, pleine résolution de l'écran
+      if (!this._hq && (window.devicePixelRatio || 1) > this.maxPixelRatio && now - this._lastRender > 400) this._setHQ(true);
+      fx.updateDof(this.camera, this.controls.target, this.radius, true);
+      fx.render(this.scene, this.camera, { still: true });
+    } else if (!fx && !this._hq && !this.anim && now - this._lastRender > 400 && (window.devicePixelRatio || 1) > this.maxPixelRatio) {
+      this._setHQ(true); // sans pipeline : une image fixe en pleine résolution de l'écran
       this.renderer.render(this.scene, this.camera);
     }
   }
@@ -342,13 +372,17 @@ export class Viewer {
     this.renderer.setSize(this.container.clientWidth || 1, this.container.clientHeight || 1, false);
   }
 
-  /** Capture PNG (échelle ×k, fond transparent ou rempli). */
+  /** Capture PNG (échelle ×k, fond transparent ou rempli). Avec le pipeline : images cumulées + mise au point, comme à l'arrêt. */
   async capture({ scale = 2, background = null } = {}) {
     const prevPR = this.renderer.getPixelRatio();
     const w = this.container.clientWidth, h = this.container.clientHeight;
     this.renderer.setPixelRatio(Math.min(scale, 3));
     this.renderer.setSize(w, h, false);
-    this.renderer.render(this.scene, this.camera);
+    if (this.fx) {
+      this.fx.reset();
+      this.fx.updateDof(this.camera, this.controls.target, this.radius, true, true);
+      for (let i = 0; i < (QUALITY.mobile ? 6 : 14); i++) this.fx.render(this.scene, this.camera, { still: true });
+    } else this.renderer.render(this.scene, this.camera);
     const out = document.createElement('canvas');
     out.width = this.canvas.width; out.height = this.canvas.height;
     const ctx = out.getContext('2d');
@@ -356,12 +390,16 @@ export class Viewer {
     ctx.drawImage(this.canvas, 0, 0);
     this.renderer.setPixelRatio(prevPR);
     this.renderer.setSize(w, h, false);
+    this.fx?.reset();
     this.invalidate();
     return new Promise((res) => out.toBlob(res, 'image/png'));
   }
 
   dispose() {
     this._ro.disconnect();
+    this.fx?.dispose();
+    this.contact?.dispose();
+    this.reflection?.dispose();
     disposeEnvironments();
     this.renderer.dispose();
   }
