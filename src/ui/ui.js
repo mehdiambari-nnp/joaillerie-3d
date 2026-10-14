@@ -554,7 +554,7 @@ export class UI {
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
       case 'projects': this.openProjects(); break;
-      case 'signout': (await this.svc.cloud()).auth.signOut().then(() => this.renderProjects()); break;
+      case 'signout': (await this.svc.cloud()).auth.signOut().then(() => location.reload()); break;
       case 'projects-close': this.closeProjects(); break;
       case 'proj-save': this.saveCurrentProject(false); break;
       case 'proj-save-new': this.saveCurrentProject(true); break;

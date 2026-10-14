@@ -21,6 +21,11 @@ function hasWebGL2() {
 
 async function boot() {
   if (!hasWebGL2()) { root.innerHTML = `<p style="padding:24px;font:16px system-ui">${t('webgl')}</p>`; return; }
+  // Porte d'entrée : sans lien de partage, l'outil exige un compte joaillier (Firebase). Un lien client s'ouvre directement.
+  if (!/[#&][cs]=/.test(location.hash)) {
+    const cloud = await getCloud();
+    if (cloud.auth.enabled) await (await import('./ui/login.js')).showLogin(root, cloud);
+  }
   if (import.meta.env.DEV && params.has('debug')) import('eruda').then((m) => m.default.init()); // console intégrée (iPhone sans Mac) ; absente du build publié
 
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
