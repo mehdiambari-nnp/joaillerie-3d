@@ -38,9 +38,14 @@ function build(root, cloud) {
         <button type="button" role="tab" data-m="up" aria-selected="false">${t('signUp')}</button>
       </div>
       <form novalidate>
+        <div class="fld-row" hidden>
+          <label class="fld"><span>${t('firstName')}</span><input type="text" name="first" autocomplete="given-name" maxlength="40"></label>
+          <label class="fld"><span>${t('lastName')}</span><input type="text" name="last" autocomplete="family-name" maxlength="40"></label>
+        </div>
         <label class="fld"><span>${t('email')}</span><input type="email" name="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required></label>
         <label class="fld"><span>${t('password')}</span>
-          <span class="pw"><input type="password" name="pw" autocomplete="current-password" required><button type="button" class="pw-toggle" data-k="show" aria-label="${esc(t('showPw'))}">${t('showPw')}</button></span></label>
+          <span class="pw"><input type="password" name="pw" autocomplete="current-password" required><button type="button" class="pw-toggle" data-k="show" aria-label="${esc(t('showPw'))}" aria-pressed="false">${t('showPw')}</button></span>
+          <small class="pw-help" hidden>${t('pwHint')}</small></label>
         <p class="login-err" role="alert" hidden></p>
         <button class="btn primary wide" type="submit" data-k="submit">${t('signIn')}</button>
         <div class="auth-or" aria-hidden="true"><span>${t('or')}</span></div>
@@ -56,22 +61,30 @@ function build(root, cloud) {
     el.querySelectorAll('[data-m]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.m === m)));
     submit.textContent = m === 'in' ? t('signIn') : t('loginUp');
     pw.autocomplete = m === 'in' ? 'current-password' : 'new-password';
-    $('.forgot').hidden = m === 'up'; err.hidden = true;
+    $('.fld-row').hidden = m === 'in'; $('.pw-help').hidden = m === 'in'; $('.forgot').hidden = m === 'up'; err.hidden = true;
   };
-  const fail = (msg) => { err.textContent = msg; err.hidden = false; };
-  const run = async (fn, okMsg) => {
-    err.hidden = true; el.classList.add('busy');
-    try { await fn(form.email.value.trim(), form.pw.value); if (okMsg) { err.textContent = okMsg; err.hidden = false; err.classList.add('ok'); } }
-    catch (e) { err.classList.remove('ok'); fail(t(AUTH_ERR[e.code] || 'authError')); console.warn(e); }
-    finally { el.classList.remove('busy'); }
+  const fail = (msg, field) => { err.classList.remove('ok'); err.textContent = msg; err.hidden = false; field?.focus(); };
+  const FIELD = { 'auth/invalid-email': form.email, 'auth/email-already-in-use': form.email, 'auth/weak-password': pw };
+  const run = async (fn, { label, okMsg } = {}) => {
+    err.hidden = true; el.classList.add('busy'); el.setAttribute('aria-busy', 'true');
+    const prev = submit.textContent; if (label) { submit.textContent = label; submit.disabled = true; }
+    try { await fn(form.email.value.trim(), form.pw.value); if (okMsg) { err.textContent = okMsg; err.classList.add('ok'); err.hidden = false; } }
+    catch (e) { fail(t(AUTH_ERR[e.code] || 'authError'), FIELD[e.code]); console.warn(e); }
+    finally { el.classList.remove('busy'); el.removeAttribute('aria-busy'); submit.disabled = false; submit.textContent = prev; }
   };
-  form.addEventListener('submit', (e) => { e.preventDefault(); err.classList.remove('ok'); run((m, p) => (mode === 'in' ? cloud.auth.signIn(m, p) : cloud.auth.signUp(m, p))); });
+  form.addEventListener('submit', (e) => {
+    e.preventDefault(); err.classList.remove('ok');
+    if (mode === 'in') return run((m, p) => cloud.auth.signIn(m, p), { label: t('signingIn') });
+    const first = form.first.value.trim(), last = form.last.value.trim();
+    if (!first || !last) return fail(t('authName'), first ? form.last : form.first);
+    run((m, p) => cloud.auth.signUp(m, p, `${first} ${last}`), { label: t('creating') });
+  });
   el.addEventListener('click', (e) => {
     const m = e.target.closest('[data-m]')?.dataset.m; if (m) return setMode(m);
     const k = e.target.closest('[data-k]')?.dataset.k;
     if (k === 'google') { err.classList.remove('ok'); run(() => cloud.auth.signInGoogle()); }
-    else if (k === 'reset') { if (!form.email.value.trim()) { err.classList.remove('ok'); fail(t('authEmailFirst')); form.email.focus(); } else run((m) => cloud.auth.reset(m), t('resetSent')); }
-    else if (k === 'show') { const on = pw.type === 'password'; pw.type = on ? 'text' : 'password'; e.target.textContent = on ? t('hidePw') : t('showPw'); }
+    else if (k === 'reset') { if (!form.email.value.trim()) fail(t('authEmailFirst'), form.email); else run((m) => cloud.auth.reset(m), { okMsg: t('resetSent') }); }
+    else if (k === 'show') { const on = pw.type === 'password'; pw.type = on ? 'text' : 'password'; e.target.textContent = on ? t('hidePw') : t('showPw'); e.target.setAttribute('aria-pressed', String(on)); }
   });
   requestAnimationFrame(() => { el.classList.add('in'); form.email.focus({ preventScroll: true }); });
   return el;

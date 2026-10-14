@@ -1,5 +1,6 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
+import { displayName } from '../cloud/name.js';
 import { FEATURES } from '../config/features.js';
 import { CHANGELOG, CURRENT_VERSION, unseenEntries } from '../config/changelog.js';
 import { LANG } from './i18n.js';
@@ -727,7 +728,7 @@ export class UI {
           <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
       </section>
       <footer class="dr-foot">
-        ${cloud.auth.enabled ? `<p class="dr-who"><small>${t('signedInAs')}</small><span>${esc(cloud.auth.user.email || '')}</span></p>
+        ${cloud.auth.enabled ? `<p class="dr-who"><small>${t('signedInAs')}</small><span title="${esc(cloud.auth.user.email || '')}">${esc(displayName(cloud.auth.user))}</span></p>
         <button class="btn wide" data-a="signout">${t('signOut')}</button>` : ''}
         <p class="dr-note">${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
       </footer>`;
