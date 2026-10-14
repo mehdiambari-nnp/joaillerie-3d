@@ -14,8 +14,8 @@ export async function modelId(buffer) {
 async function pipe(buffer, stream) {
   return new Response(new Blob([buffer]).stream().pipeThrough(stream)).arrayBuffer();
 }
-const gzip = async (b) => (typeof CompressionStream === 'undefined' ? null : pipe(b, new CompressionStream('gzip')));
-const gunzip = (b) => pipe(b, new DecompressionStream('gzip'));
+export const gzip = async (b) => (typeof CompressionStream === 'undefined' ? null : pipe(b, new CompressionStream('gzip')));
+export const gunzip = (b) => pipe(b, new DecompressionStream('gzip'));
 
 async function ok(r, what) { if (!r.ok) throw new Error(`${what} (${r.status})`); return r; }
 

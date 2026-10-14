@@ -8,9 +8,8 @@ import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
-import { prefs, buildShareUrl } from '../state/store.js';
-import { uploadModel } from '../share/remote.js';
-import { saveProject, listProjects, deleteProject, newId, thumbnail } from '../projects/projects.js';
+import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
+import { newId, thumbnail } from '../projects/projects.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
 import { TryOn } from '../tryon/tryon.js';
@@ -19,6 +18,8 @@ import { frenchRingSize } from '../import/zones.js';
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
 
+const AUTH_ERR = { 'auth/invalid-credential': 'authBad', 'auth/wrong-password': 'authBad', 'auth/user-not-found': 'authBad', 'auth/invalid-email': 'authEmail', 'auth/email-already-in-use': 'authExists',
+  'auth/weak-password': 'authWeak', 'auth/popup-closed-by-user': 'authCancelled', 'auth/cancelled-popup-request': 'authCancelled', 'auth/network-request-failed': 'authNetwork', 'auth/too-many-requests': 'authMany' };
 const BG = { light: '#e9e0d0', dark: '#16140f', transparent: null };
 
 // Icônes au trait (cohérentes, sans emoji)
@@ -553,6 +554,7 @@ export class UI {
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
       case 'projects': this.openProjects(); break;
+      case 'signout': (await this.svc.cloud()).auth.signOut().then(() => this.renderProjects()); break;
       case 'projects-close': this.closeProjects(); break;
       case 'proj-save': this.saveCurrentProject(false); break;
       case 'proj-save-new': this.saveCurrentProject(true); break;
@@ -695,26 +697,60 @@ export class UI {
   }
   async renderProjects() {
     const dr = $('[data-r=drawer]', this.root);
+    const cloud = await this.svc.cloud();
+    if (cloud.auth.enabled && !cloud.auth.user) { // compte requis : projets et modèles partagés sont liés au joaillier
+      dr.replaceChildren(this.html(`<div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div><p class="auth-intro">${t('signInWhy')}</p>`), this.authForm(() => this.renderProjects()));
+      return;
+    }
     let list = [], failed = false;
-    try { list = await listProjects(); } catch (e) { failed = true; console.warn(e); }
+    try { list = await cloud.projects.list(); } catch (e) { failed = true; console.warn(e); }
     const cur = list.find((p) => p.id === this.svc.projectId);
     const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     dr.innerHTML = `
       <div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div>
       <div class="dr-save">
-        <input type="text" data-r="projname" maxlength="60" placeholder="${esc(t('projectName'))}" value="${esc(cur?.name ?? '')}" aria-label="${esc(t('projectName'))}">
-        <div class="row">
-          <button class="btn primary" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
-          ${cur ? `<button class="btn" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
+        <label class="fld"><span>${t('projectName')}</span><input type="text" data-r="projname" maxlength="60" value="${esc(cur?.name ?? '')}"></label>
+        <div class="col">
+          <button class="btn primary wide" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
+          ${cur ? `<button class="btn wide" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
         </div>
       </div>
       <p class="palette-title">${t('projectsList')}</p>
-      ${failed ? `<p class="muted tiny">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="muted tiny">${t('projectsEmpty')}</p>` : ''}
+      ${failed ? `<p class="proj-empty">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="proj-empty">${t('projectsEmpty')}</p>` : ''}
       <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
         <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
           <span><b>${esc(p.name)}</b><small>${esc(p.modelName)} · ${fmt(p.updated)}</small></span></button>
         <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
-      <p class="muted tiny">${t('projectsNote')}</p>`;
+      <div class="dr-foot">
+        <p>${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
+        ${cloud.auth.enabled ? `<p class="acct"><span>${esc(cloud.auth.user.email || '')}</span><button class="link" data-a="signout">${t('signOut')}</button></p>` : ''}
+      </div>`;
+  }
+
+  /** Formulaire de connexion / création de compte (Firebase Auth). `done` est appelé une fois connecté. */
+  authForm(done) {
+    const d = this.html(`<form class="auth" novalidate>
+      <label class="fld"><span>${t('email')}</span><input type="email" name="email" autocomplete="email" required></label>
+      <label class="fld"><span>${t('password')}</span><input type="password" name="pw" autocomplete="current-password" required></label>
+      <p class="auth-err" role="alert" hidden></p>
+      <button class="btn primary wide" type="submit" data-k="in">${t('signIn')}</button>
+      <div class="auth-or" aria-hidden="true"><span>${t('or')}</span></div>
+      <button class="btn wide" type="button" data-k="google">${t('signInGoogle')}</button>
+      <div class="auth-links"><button class="link" type="button" data-k="up">${t('signUp')}</button><button class="link" type="button" data-k="reset">${t('forgotPw')}</button></div></form>`);
+    const form = $('form', d), err = $('.auth-err', d);
+    const run = async (fn, okMsg) => {
+      err.hidden = true;
+      try { await fn(await this.svc.cloud(), form.email.value.trim(), form.pw.value); if (okMsg) { this.toast(okMsg); return; } done?.(); }
+      catch (e) { err.textContent = t(AUTH_ERR[e.code] || 'authError'); err.hidden = false; console.warn(e); }
+    };
+    form.addEventListener('submit', (e) => { e.preventDefault(); run((c, m, p) => c.auth.signIn(m, p)); });
+    form.addEventListener('click', (e) => {
+      const k = e.target.closest('[data-k]')?.dataset.k;
+      if (k === 'up') run((c, m, p) => c.auth.signUp(m, p));
+      else if (k === 'google') run((c) => c.auth.signInGoogle());
+      else if (k === 'reset') { if (!form.email.value.trim()) { err.textContent = t('authEmailFirst'); err.hidden = false; } else run((c, m) => c.auth.reset(m), t('resetSent')); }
+    });
+    return d;
   }
   async saveCurrentProject(asNew) {
     const app = this.app, s = this.svc;
@@ -724,7 +760,7 @@ export class UI {
       let thumb = null;
       try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg] })); }); } catch { /* vignette facultative */ }
       const id = asNew || !s.projectId ? newId() : s.projectId;
-      await saveProject({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
+      await (await s.cloud()).projects.save({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
       s.projectId = id;
       this.toast(t('projectSaved'));
       await this.renderProjects();
@@ -732,7 +768,18 @@ export class UI {
   }
   async removeProject(id) {
     if (!confirm(t('projectDeleteAsk'))) return;
-    try { await deleteProject(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
+    try { await (await this.svc.cloud()).projects.remove(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
+  }
+
+  /** Lien court (#s=<12 caractères>) : la configuration est déposée sur le serveur. Repli : lien long si le dépôt échoue. */
+  async shortShareUrl(client, remote) {
+    const a = this.app, base = location.origin + location.pathname;
+    const opts = { client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI) };
+    try {
+      const json = JSON.stringify(sharePayload(opts)), id = await shareId(json);
+      await (await this.svc.cloud()).shares.put(id, json);
+      return `${base}#s=${id}`;
+    } catch (e) { console.warn('Lien court impossible, lien long utilisé', e); return buildShareUrl(base, opts); }
   }
 
   /** Actions secondaires, rangées dans un menu pour garder la barre d'actions propre. */
@@ -749,19 +796,25 @@ export class UI {
   async hostModel(onProgress) {
     const s = this.svc;
     if (!s.isHostable?.() || !s.last) return null;
-    if (!s.last.remote) s.last.remote = await uploadModel({ buffer: s.last.buffer, name: s.last.name, options: s.options }, { onProgress });
+    if (!s.last.remote) s.last.remote = await (await s.cloud()).models.upload({ buffer: s.last.buffer, name: s.last.name, options: s.options }, { onProgress });
     return s.last.remote;
   }
 
   async openShare() {
     let remote = null, hostFailed = false;
+    const cloud = await this.svc.cloud();
+    if (cloud.auth.enabled && !cloud.auth.user && this.svc.isHostable?.() && !this.svc.last?.remote) { // héberger le modèle exige un compte joaillier
+      const d = this.html(`<p class="auth-intro">${t('signInShare')}</p>`); d.append(this.authForm(() => this.openShare()));
+      this.openDialog(t('share'), d);
+      return;
+    }
     if (this.svc.isHostable?.() && !this.svc.last?.remote) {
       const wait = this.html(`<p class="muted">${t('sharePrep')}</p><div class="progress-inline"><i></i></div>`);
       this.openDialog(t('share'), wait);
       try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.width = Math.round(p * 100) + '%'; }); }
       catch (e) { console.warn('Hébergement du modèle impossible', e); hostFailed = true; }
     } else remote = await this.hostModel().catch(() => null);
-    const urls = { client: this.shareUrl(true, remote), jeweler: this.shareUrl(false, remote) };
+    const urls = { client: await this.shortShareUrl(true, remote), jeweler: await this.shortShareUrl(false, remote) };
     const field = (k, label) => `<p class="palette-title">${label}</p>
       <input type="url" readonly value="${esc(urls[k])}" data-r="shareurl-${k}" aria-label="${esc(label)}">
       <div class="row"><button class="btn ${k === 'client' ? 'primary' : ''}" data-s="copy" data-k="${k}">${t('copyLink')}</button>

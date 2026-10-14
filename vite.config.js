@@ -3,16 +3,16 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import fs from 'node:fs';
 import path from 'node:path';
 import themePlugin from './config/vite-theme.js';
-import { handleModels, memoryStore } from './netlify/lib/models-api.mjs';
+import { handleApi, memoryStore } from './dev/local-api.mjs';
 
-// Dev / preview local : même API d'hébergement des modèles que la fonction Netlify, avec un stockage en mémoire.
+// Dev / preview local : API d'hébergement locale (mode `offline`, tests) avec un stockage en mémoire.
 const modelsApi = () => {
   const store = memoryStore();
   const mw = async (req, res, next) => {
-    if (!req.url.startsWith('/api/models')) return next();
+    if (!req.url.startsWith('/api/models') && !req.url.startsWith('/api/shares')) return next();
     const chunks = []; for await (const c of req) chunks.push(c);
     const body = Buffer.concat(chunks);
-    const r = await handleModels(new Request('http://localhost' + req.url, { method: req.method, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body }), store);
+    const r = await handleApi(new Request('http://localhost' + req.url, { method: req.method, body: ['GET', 'HEAD'].includes(req.method) ? undefined : body }), store);
     res.statusCode = r.status; r.headers.forEach((v, k) => res.setHeader(k, v));
     res.end(Buffer.from(await r.arrayBuffer()));
   };

@@ -8,10 +8,9 @@ import { UI } from './ui/ui.js';
 import { t } from './ui/i18n.js';
 import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
-import { parseShareHash } from './state/store.js';
+import { parseShareHash, shortShareRef, parseShareJson } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
-import { downloadModel } from './share/remote.js';
-import { getProject } from './projects/projects.js';
+import { getCloud } from './cloud/index.js';
 
 const root = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -22,13 +21,19 @@ function hasWebGL2() {
 
 async function boot() {
   if (!hasWebGL2()) { root.innerHTML = `<p style="padding:24px;font:16px system-ui">${t('webgl')}</p>`; return; }
-  if (params.has('debug')) import('eruda').then((m) => m.default.init()); // console intégrée (iPhone sans Mac)
+  if (import.meta.env.DEV && params.has('debug')) import('eruda').then((m) => m.default.init()); // console intégrée (iPhone sans Mac) ; absente du build publié
 
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
   const app = new Configurator(holder);
-  const svc = { options: {}, last: null };
+  const svc = { options: {}, last: null, cloud: getCloud };
   let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV); // vrai tant que l'intro n'a pas pris la main
-  let pending = parseShareHash(location.hash); // configuration d'un lien de partage
+  let pending = parseShareHash(location.hash); // lien long (#c=) : configuration lue sur place
+  let shareFailed = false;
+  const shortRef = shortShareRef(location.hash); // lien court (#s=) : configuration à récupérer sur le serveur
+  if (shortRef) {
+    try { pending = parseShareJson(await (await getCloud()).shares.get(shortRef)); if (!pending) throw new Error('lien illisible'); }
+    catch (e) { console.warn('Lien de partage introuvable', e); shareFailed = true; }
+  }
 
   const ui = new UI(root, app, svc);
   ui.initTheme(); app.viewer._applyBackground();
@@ -63,7 +68,7 @@ async function boot() {
   }
 
   // Coller un lien de partage dans l'onglet déjà ouvert ne recharge pas la page : on la recharge pour repartir d'un état neuf (assemblé).
-  window.addEventListener('hashchange', () => { if (/[#&]c=/.test(location.hash)) location.reload(); });
+  window.addEventListener('hashchange', () => { if (/[#&][cs]=/.test(location.hash)) location.reload(); });
 
   svc.openFile = async (file) => {
     const buffer = await file.arrayBuffer();
@@ -74,7 +79,7 @@ async function boot() {
   /** Ouvre un projet enregistré (fichier + configuration + lumière). */
   svc.openProject = async (id) => {
     try {
-      const p = await getProject(id);
+      const p = await (await getCloud()).projects.get(id);
       if (!p) return false;
       const { meta } = p;
       const model = await load(p.buffer, meta.modelName, meta.options || {}, meta.config || null, meta.modelId);
@@ -112,7 +117,7 @@ async function boot() {
   async function loadRemote(id) {
     try {
       ui.progress(1, t('loading'));
-      const m = await downloadModel(id, { onProgress: (p) => ui.progress(Math.max(1, Math.round(p * 60)), t('loading')) });
+      const m = await (await getCloud()).models.download(id, { onProgress: (p) => ui.progress(Math.max(1, Math.round(p * 60)), t('loading')) });
       await load(m.buffer, m.name, m.options, null, pending.modelId);
       if (svc.last) svc.last.remote = id; // déjà hébergé : inutile de le renvoyer au prochain partage
       return true;
@@ -136,7 +141,8 @@ async function boot() {
   if (app.model) app.model.root.visible = true; // filet de sécurité (intro ignorée ou en erreur)
   ui.onboard();
   ui.changelog();
-  if (remoteFailed) ui.toast(t('remoteFailed'), 6000);
+  if (shareFailed) ui.toast(t('shareLinkFailed'), 6000);
+  else if (remoteFailed) ui.toast(t('remoteFailed'), 6000);
   else if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);
 
   if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {

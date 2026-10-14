@@ -1,13 +1,17 @@
-// API d'hébergement des modèles partagés (liens client). Logique pure, indépendante de Netlify : le « store » est injecté
-// (Netlify Blobs en production, mémoire en dev/tests). Les modèles sont adressés par leur empreinte (SHA-256 tronquée) :
-// un même fichier n'est stocké qu'une fois. Un modèle est découpé en morceaux (la limite d'une fonction Netlify est ~6 Mo).
+// API d'hébergement des modèles partagés (liens client). Logique pure, indépendante de l'hébergeur : le « store » est injecté
+// (mémoire en dev/tests ; en production, Firebase remplace cette API). Les modèles sont adressés par leur empreinte (SHA-256 tronquée) :
+// un même fichier n'est stocké qu'une fois. Un modèle est découpé en morceaux (limite de taille d'une requête).
 //
 //   GET  /api/models/:id        → méta JSON { name, opts, gz, parts, size }
 //   GET  /api/models/:id/:n     → morceau n (binaire)
 //   PUT  /api/models/:id/:n     → dépose le morceau n
 //   PUT  /api/models/:id        → valide : écrit la méta (tous les morceaux doivent exister)
+//
+// Liens courts : la configuration d'un partage est stockée côté serveur, adressée par son empreinte (12 hex).
+//   GET  /api/shares/:id        → { p } (configuration sérialisée)
+//   PUT  /api/shares/:id        → dépose { p } (sans écrasement)
 
-export const LIMITS = { chunk: 5 * 1024 * 1024, parts: 12, name: 200 };
+export const LIMITS = { chunk: 5 * 1024 * 1024, parts: 12, name: 200, share: 16 * 1024 };
 const ID = /^[a-f0-9]{32}$/;
 
 const json = (o, status = 200, extra = {}) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store', ...extra } });
@@ -49,7 +53,32 @@ export async function handleModels(req, store, base = '/api/models') {
   return err(405, 'méthode non permise');
 }
 
-/** Store en mémoire (dev, tests) : même interface minimale que Netlify Blobs. */
+const SHARE_ID = /^[a-f0-9]{12}$/;
+export async function handleShares(req, store, base = '/api/shares') {
+  const url = new URL(req.url);
+  const rest = url.pathname.startsWith(base) ? url.pathname.slice(base.length).split('/').filter(Boolean) : [];
+  const id = rest[0];
+  if (!id || rest.length !== 1 || !SHARE_ID.test(id)) return err(400, 'identifiant invalide');
+  const key = `shares/${id}`;
+  if (req.method === 'GET') {
+    const v = await store.get(key, { type: 'json' });
+    return v ? json(v, 200, { 'cache-control': 'public, max-age=31536000, immutable' }) : err(404, 'introuvable');
+  }
+  if (req.method === 'PUT') {
+    const text = await req.text();
+    if (!text || text.length > LIMITS.share) return err(413, 'configuration trop grosse ou vide');
+    let body; try { body = JSON.parse(text); } catch { return err(400, 'JSON invalide'); }
+    if (typeof body?.p !== 'string') return err(400, 'champ p manquant');
+    if (!(await store.get(key, { type: 'json' }))) await store.set(key, JSON.stringify({ p: body.p }));
+    return json({ ok: true });
+  }
+  return err(405, 'méthode non permise');
+}
+
+/** Point d'entrée unique : /api/models/* et /api/shares/*. */
+export const handleApi = (req, store) => (new URL(req.url).pathname.startsWith('/api/shares') ? handleShares(req, store) : handleModels(req, store));
+
+/** Store en mémoire (dev, tests) : interface minimale d'un store clé/valeur. */
 export function memoryStore() {
   const m = new Map();
   return {

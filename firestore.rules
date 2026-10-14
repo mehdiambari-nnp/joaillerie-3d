@@ -1,0 +1,21 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Liens courts : lisibles par quiconque connaît l'identifiant (pas de listing), créés une fois par un joaillier connecté.
+    match /shares/{id} {
+      allow get: if true;
+      allow create: if request.auth != null && id.matches('[a-f0-9]{12}')
+        && request.resource.data.keys().hasOnly(['p', 'created'])
+        && request.resource.data.p is string && request.resource.data.p.size() < 16000;
+      allow update, delete: if false;
+    }
+
+    // Projets d'un joaillier : lui seul les lit et les écrit.
+    match /users/{uid}/projects/{pid} {
+      allow read, delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.modelHash is string && request.resource.data.modelHash.matches('[a-f0-9]{32}');
+    }
+  }
+}

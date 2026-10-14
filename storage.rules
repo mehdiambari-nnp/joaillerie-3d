@@ -1,0 +1,15 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Modèles partagés : lisibles par quiconque connaît l'identifiant (lien client), pas listables ;
+    // déposés une seule fois (pas d'écrasement) par un joaillier connecté, 60 Mo maximum.
+    match /models/{id} {
+      allow get: if true;
+      allow create: if request.auth != null
+        && id.matches('[a-f0-9]{32}')
+        && request.resource.size > 0 && request.resource.size < 60 * 1024 * 1024
+        && request.resource.contentType == 'application/octet-stream';
+      allow update, delete: if false;
+    }
+  }
+}

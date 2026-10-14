@@ -13,6 +13,6 @@ Tout ce qui change d'une joaillerie à l'autre vit dans `themes/<client>/` :
 1. `cp -r themes/exemple themes/<client>` puis éditer `theme.json` (couleurs, polices, textes) et déposer les logos.
 2. Logo en image ? `python3 scripts/trace-logo.py logo.jpg themes/<client>/wordmark.svg` (noir sur blanc → SVG).
 3. `node scripts/make-icons.mjs <client>` pour les icônes.
-4. Aperçu : `THEME=<client> npm run dev`. Publication : un site Netlify par client avec la variable d'environnement `THEME=<client>`.
+4. Aperçu : `THEME=<client> npm run dev`. Publication : un projet Firebase par client (`themes/<client>/firebase.json`), build avec `THEME=<client>`.
 
 Sans logo (`"header": {"logo": "text"}`), le nom de la marque s'affiche en texte. Polices : ajouter le paquet `@fontsource/...` et le lister dans `fonts.packages`.

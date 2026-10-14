@@ -66,18 +66,39 @@ export function decodeShare(str) {
   try { return JSON.parse(LZString.decompressFromEncodedURIComponent(str)); } catch { return null; }
 }
 
-/** Construit l'URL de partage de la configuration courante. */
-export function buildShareUrl(base, { modelId, assign, env, envRot, hidden, client = false, remote = null }) {
-  const payload = { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden, ...(client ? { k: 1 } : {}), ...(remote ? { u: remote } : {}) };
-  return `${base}#c=${encodeShare(payload)}`;
+/** Contenu d'un partage (ce qu'encode le lien). */
+export function sharePayload({ modelId, assign, env, envRot, hidden, client = false, remote = null }) {
+  return { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden, ...(client ? { k: 1 } : {}), ...(remote ? { u: remote } : {}) };
 }
 
-export function parseShareHash(hash) {
-  const m = /[#&]c=([^&]+)/.exec(hash || '');
-  if (!m) return null;
-  const p = decodeShare(m[1]);
+/** Lien long : toute la configuration est dans l'adresse (#c=). Sert de repli quand le lien court est impossible. */
+export function buildShareUrl(base, opts) {
+  return `${base}#c=${encodeShare(sharePayload(opts))}`;
+}
+
+/** Identifiant court d'un partage : 12 premiers caractères hexadécimaux du SHA-256 de son contenu. */
+export async function shareId(json) {
+  const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(json)));
+  return [...h.slice(0, 6)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+function fromPayload(p) {
   if (!p || p.v !== 1) return null;
   return { modelId: p.model, assign: unpackAssign(p.a || []), env: p.e, envRot: p.r, hidden: p.h || [], client: !!p.k, remote: typeof p.u === 'string' && /^[a-f0-9]{32}$/.test(p.u) ? p.u : null };
+}
+
+/** Lien long (#c=) : lecture immédiate. */
+export function parseShareHash(hash) {
+  const m = /[#&]c=([^&]+)/.exec(hash || '');
+  return m ? fromPayload(decodeShare(m[1])) : null;
+}
+
+/** Identifiant d'un lien court (#s=), ou null. */
+export const shortShareRef = (hash) => /[#&]s=([a-f0-9]{12})(?:&|$)/.exec(hash || '')?.[1] ?? null;
+
+/** Configuration d'un lien court une fois récupérée sur le serveur (chaîne JSON). */
+export function parseShareJson(json) {
+  try { return fromPayload(JSON.parse(json)); } catch { return null; }
 }
 
 /** Préférences par viewer (jamais bloquant si le stockage est indisponible : mode privé iOS, etc.). */
