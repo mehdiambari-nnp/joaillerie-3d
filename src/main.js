@@ -34,13 +34,13 @@ async function boot() {
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
   const app = new Configurator(holder);
   const svc = { options: {}, last: null, cloud: getCloud };
-  let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV); // vrai tant que l'intro n'a pas pris la main
+  let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV, /[#&][cs]=/.test(location.hash)); // vrai tant que l'intro n'a pas pris la main
   let pending = parseShareHash(location.hash); // lien long (#c=) : configuration lue sur place
   let shareFailed = false;
   const shortRef = shortShareRef(location.hash); // lien court (#s=) : configuration à récupérer sur le serveur
   if (shortRef) {
     try { pending = parseShareJson(await (await getCloud()).shares.get(shortRef)); if (!pending) throw new Error('lien illisible'); }
-    catch (e) { console.warn('Lien de partage introuvable', e); shareFailed = true; }
+    catch (e) { console.warn('Lien de partage introuvable', e); shareFailed = true; introPending = false; } // lien introuvable : modèle par défaut, sans l'écrin
   }
 
   const ui = new UI(root, app, svc);
