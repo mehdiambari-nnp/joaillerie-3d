@@ -709,20 +709,22 @@ export class UI {
     dr.innerHTML = `
       <div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div>
       <div class="dr-save">
-        <input type="text" data-r="projname" maxlength="60" placeholder="${esc(t('projectName'))}" value="${esc(cur?.name ?? '')}" aria-label="${esc(t('projectName'))}">
-        <div class="row">
-          <button class="btn primary" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
-          ${cur ? `<button class="btn" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
+        <label class="fld"><span>${t('projectName')}</span><input type="text" data-r="projname" maxlength="60" value="${esc(cur?.name ?? '')}"></label>
+        <div class="col">
+          <button class="btn primary wide" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
+          ${cur ? `<button class="btn wide" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
         </div>
       </div>
       <p class="palette-title">${t('projectsList')}</p>
-      ${failed ? `<p class="muted tiny">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="muted tiny">${t('projectsEmpty')}</p>` : ''}
+      ${failed ? `<p class="proj-empty">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="proj-empty">${t('projectsEmpty')}</p>` : ''}
       <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
         <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
           <span><b>${esc(p.name)}</b><small>${esc(p.modelName)} · ${fmt(p.updated)}</small></span></button>
         <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
-      <p class="muted tiny">${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
-      ${cloud.auth.enabled ? `<p class="muted tiny acct">${esc(cloud.auth.user.email || '')} · <button class="link" data-a="signout">${t('signOut')}</button></p>` : ''}`;
+      <div class="dr-foot">
+        <p>${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
+        ${cloud.auth.enabled ? `<p class="acct"><span>${esc(cloud.auth.user.email || '')}</span><button class="link" data-a="signout">${t('signOut')}</button></p>` : ''}
+      </div>`;
   }
 
   /** Formulaire de connexion / création de compte (Firebase Auth). `done` est appelé une fois connecté. */
