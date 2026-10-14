@@ -6,14 +6,14 @@ export const CHANGELOG = [
     fr: [
       'Rendu plus net et plus stable : images cumulées à l’arrêt (arêtes fines lissées, éclats des pierres sans scintillement)',
       'Ombre de contact réaliste sous la bague, et reflet très discret sur le sol (ordinateur)',
-      'Léger éclat lumineux sur les points les plus brillants, et flou de profondeur en gros plan (ordinateur)',
-      'Pierres de couleur : zonation et inclusions discrètes ; or poli : micro-rayures d’usage visibles de très près',
+      'Flou de profondeur en gros plan, avec mise au point progressive (ordinateur)',
+      'Pierres de couleur : zonation et inclusions discrètes',
     ],
     en: [
       'Sharper, steadier rendering: frames accumulate when still (fine edges smoothed, no more gem flicker)',
       'Realistic contact shadow under the ring, and a very subtle floor reflection (desktop)',
-      'Soft glow on the brightest highlights, and depth of field in close-ups (desktop)',
-      'Coloured stones: subtle zoning and inclusions; polished gold: fine wear scratches visible up close',
+      'Depth of field in close-ups, with progressive focus (desktop)',
+      'Coloured stones: subtle zoning and inclusions',
     ],
   },
   {

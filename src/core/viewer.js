@@ -53,7 +53,7 @@ export class Viewer {
     this.root = null;
     this.radius = 20;
 
-    this.fx = QUALITY.post ? new Fx(this) : null; // accumulation d'images, bloom, profondeur de champ (voir fx.js)
+    this.fx = QUALITY.post ? new Fx(this) : null; // accumulation d'images, profondeur de champ (voir fx.js)
     this._shadow = this._makeShadow();
     this.scene.add(this._shadow);
     this.reflection = QUALITY.reflection ? new Reflection(this, this._shadow) : null; // reflet discret sur le sol (ordinateur)

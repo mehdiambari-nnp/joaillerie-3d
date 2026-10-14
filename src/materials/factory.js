@@ -105,50 +105,20 @@ export function setGrainFrame(center, axis = new THREE.Vector3(0, 0, 1)) {
 }
 function installGrain(m) {
   if (m.userData.grainU) return;
-  m.userData.scratchU = { value: 0 }; m.userData.grainU = { value: 0 }; m.userData.hamU = { value: 0 }; m.userData.hamSizeU = { value: 1.1 }; m.userData.grainAngU = { value: 0 };
+  m.userData.grainU = { value: 0 }; m.userData.hamU = { value: 0 }; m.userData.hamSizeU = { value: 1.1 }; m.userData.grainAngU = { value: 0 };
   m.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, grainShared, { uGrainAmt: m.userData.grainU, uHamAmt: m.userData.hamU, uHamSize: m.userData.hamSizeU, uGrainAng: m.userData.grainAngU, uScratchAmt: m.userData.scratchU });
+    Object.assign(sh.uniforms, grainShared, { uGrainAmt: m.userData.grainU, uHamAmt: m.userData.hamU, uHamSize: m.userData.hamSizeU, uGrainAng: m.userData.grainAngU });
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainWP; varying vec3 vGrainOP; varying mat3 vGrainM;')
-      .replace('#include <project_vertex>', '#include <project_vertex>\nvGrainWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vGrainOP = transformed; vGrainM = mat3(modelMatrix);');
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGrainWP; varying vec3 vGrainOP;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvGrainWP = (modelMatrix * vec4(transformed, 1.0)).xyz; vGrainOP = transformed;');
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec3 vGrainWP; varying vec3 vGrainOP; varying mat3 vGrainM;
-uniform float uScratchAmt; float gScr = 0.0; vec3 gScrTilt = vec3(0.0);
+varying vec3 vGrainWP; varying vec3 vGrainOP;
 uniform vec3 uGrainCenter; uniform vec3 uGrainAxis; uniform float uGrainAmt; uniform float uHamAmt; uniform float uHamSize; uniform float uGrainAng;
 vec3 gH3(vec3 p) { p = vec3(dot(p, vec3(127.1, 311.7, 74.7)), dot(p, vec3(269.5, 183.3, 246.1)), dot(p, vec3(113.5, 271.9, 124.6))); return fract(sin(p) * 43758.5453) * 2.0 - 1.0; }
 float gH(float n) { return fract(sin(n * 127.1) * 43758.5453); }
 float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i)) * 6.0 * f * (1.0 - f); }`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-      if (uScratchAmt > 0.0) {
-        // Micro-rayures d'usage (poli) : une courte rayure fine par cellule, sur deux échelles, projetée selon la face dominante.
-        // Visibles surtout en gros plan : elles inclinent la normale de part et d'autre du sillon et ternissent un peu la rugosité.
-        vec3 nO = normalize(cross(dFdx(vGrainOP), dFdy(vGrainOP))); vec3 an = abs(nO);
-        vec2 suv; vec3 sta; vec3 stb;
-        if (an.x > an.y && an.x > an.z) { suv = vGrainOP.yz; sta = vec3(0.0, 1.0, 0.0); stb = vec3(0.0, 0.0, 1.0); }
-        else if (an.y > an.z) { suv = vGrainOP.xz; sta = vec3(1.0, 0.0, 0.0); stb = vec3(0.0, 0.0, 1.0); }
-        else { suv = vGrainOP.xy; sta = vec3(1.0, 0.0, 0.0); stb = vec3(0.0, 1.0, 0.0); }
-        for (int L = 0; L < 2; L++) {
-          float cell = L == 0 ? 1.4 : 0.55;
-          vec2 sq = suv / cell; vec2 sip = floor(sq); vec2 sfp = fract(sq);
-          vec3 h1 = gH3(vec3(sip, float(L) * 7.0)); vec3 h2 = gH3(vec3(sip + 31.0, float(L)));
-          if (h2.x > 0.2) {
-            float ang = h1.x * 3.14159; vec2 sdir = vec2(cos(ang), sin(ang)); vec2 spt = vec2(0.5) + 0.3 * h1.yz;
-            vec2 sd = sfp - spt; float along = dot(sd, sdir); float perp = dot(sd, vec2(-sdir.y, sdir.x));
-            float slen = 0.16 + 0.14 * h2.y; float sw = 0.012 * (L == 0 ? 1.0 : 0.8);
-            float sm = smoothstep(slen, slen * 0.6, abs(along)) * smoothstep(sw * 2.0, sw * 0.4, abs(perp));
-            gScr += sm; gScrTilt += (sta * (-sdir.y) + stb * sdir.x) * sign(perp) * sm;
-          }
-        }
-        gScr = clamp(gScr, 0.0, 1.0);
-        roughnessFactor = clamp(roughnessFactor + gScr * 0.12 * uScratchAmt, 0.0, 1.0);
-      }`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-      if (uScratchAmt > 0.0 && gScr > 0.0) {
-        vec3 nWs = inverseTransformDirection(normal, viewMatrix);
-        nWs = normalize(nWs + (vGrainM * gScrTilt) * 0.14 * uScratchAmt);
-        normal = normalize((viewMatrix * vec4(nWs, 0.0)).xyz);
-      }
       if (uGrainAmt > 0.0) {
         vec3 rel = vGrainWP - uGrainCenter;
         float ax = dot(rel, uGrainAxis);
@@ -189,7 +159,7 @@ float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i
         normal = normalize((viewMatrix * vec4(nW2, 0.0)).xyz);
       }`);
   };
-  m.customProgramCacheKey = () => 'grain2';
+  m.customProgramCacheKey = () => 'grain1';
 }
 
 /** Paramètres cibles (sans créer de matériau) pour une affectation de métal. */
@@ -207,7 +177,6 @@ export function metalParams(a) {
     hamSize: r.fin.hamSize ?? 1.1,
     grainAngle: r.fin.grainAngle ?? 0,
     normalScale: r.fin.normalScale ?? 0.6,
-    scratch: r.fin.id === 'polish' ? 1 : 0, // micro-rayures d'usage : poli uniquement
   };
 }
 
@@ -234,7 +203,7 @@ export function createMaterial(kind, a, gemData = null) {
   const p = metalParams(a);
   const m = new THREE.MeshPhysicalMaterial({ color: p.color, metalness: 1, roughness: p.roughness, envMapIntensity: 1.2 });
   installGrain(m);
-  m.userData.scratchU.value = p.scratch; m.userData.grainU.value = p.grain; m.userData.hamU.value = p.ham; m.userData.hamSizeU.value = p.hamSize; m.userData.grainAngU.value = p.grainAngle;
+  m.userData.grainU.value = p.grain; m.userData.hamU.value = p.ham; m.userData.hamSizeU.value = p.hamSize; m.userData.grainAngU.value = p.grainAngle;
   m.anisotropy = p.anisotropy;
   m.normalMap = metalNormal(p);
   m.normalScale.set(p.normalScale, p.normalScale);
@@ -286,7 +255,7 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
   } else {
     const p = metalParams(a);
     installGrain(material);
-    material.userData.scratchU.value = p.scratch; material.userData.grainU.value = p.grain; material.userData.hamU.value = p.ham; material.userData.hamSizeU.value = p.hamSize; material.userData.grainAngU.value = p.grainAngle;
+    material.userData.grainU.value = p.grain; material.userData.hamU.value = p.ham; material.userData.hamSizeU.value = p.hamSize; material.userData.grainAngU.value = p.grainAngle;
     material.anisotropy = p.anisotropy;
     material.normalMap = metalNormal(p);
     material.normalScale.set(p.normalScale, p.normalScale);

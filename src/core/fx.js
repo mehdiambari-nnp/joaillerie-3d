@@ -2,30 +2,41 @@
 //  1. La scène (sans son fond) est rendue dans un tampon HDR à alpha (anti-crénelage matériel pendant le mouvement).
 //  2. À l'arrêt, des images à décalage sous-pixel (suite de Halton) sont CUMULÉES : c'est du suréchantillonnage temporel.
 //     Il lisse les arêtes fines (griffes) et stabilise la scintillation des pierres, dont le shader est très haute fréquence.
-//  3. Effets : bloom très léger sur les éclats (ordinateur) et profondeur de champ en gros plan (mise au point progressive).
-//  4. Sortie : le fond est dessiné tel quel (sans tone mapping, comme avant), puis l'image HDR est tone-mappée et posée dessus.
+//     Chaque image est TONE-MAPPÉE AVANT le cumul (comme le rendu direct) : cumuler en HDR étalerait un éclat de pierre (plusieurs
+//     centaines) sur les pixels voisins et gonflerait la luminosité de toute la bague.
+//  3. Profondeur de champ en gros plan (ordinateur), mise au point progressive.
+//  4. Sortie : le fond est dessiné tel quel (sans tone mapping, comme avant), puis l'image est encodée et posée dessus.
 // Le tampon est prémultiplié (alpha = couverture de la scène) : la bague se détache toujours proprement du fond.
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { QUALITY } from './quality.js';
 
 const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
 const VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
 
 const COPY_FRAG = 'uniform sampler2D t; varying vec2 vUv; void main(){ gl_FragColor = texture2D(t, vUv); }';
-// Copie avec écrêtage HDR : un éclat de pierre peut valoir plusieurs centaines ; non borné, il noierait toute la bague dans le bloom / le flou.
+// Copie (les valeurs sont déjà tone-mappées : 0..1).
 const CLAMP_FRAG = 'uniform sampler2D t; varying vec2 vUv; void main(){ vec4 c = texture2D(t, vUv); gl_FragColor = vec4(min(c.rgb, vec3(10.0)), c.a); }';
+
+// Cumul : tone mapping (Neutral, comme le renderer) de chaque image AVANT la moyenne. Rendu dans un tampon : three n'y injecte pas
+// les fonctions de tone mapping, on les inclut donc ici (ce matériau ne sert jamais à l'écran).
+const ACCUM_FRAG = /* glsl */`
+uniform sampler2D t; varying vec2 vUv;
+#include <tonemapping_pars_fragment>
+void main(){
+  vec4 c = texture2D(t, vUv);
+  float a = max(c.a, 1e-4);
+  gl_FragColor = vec4(NeutralToneMapping(c.rgb / a) * c.a, c.a);   // déprémultiplie → tone mapping → reprémultiplie
+}`;
 
 const BLIT_FRAG = /* glsl */`
 uniform sampler2D tScene; varying vec2 vUv;
 void main(){
   vec4 c = texture2D(tScene, vUv);
   float a = max(c.a, 1e-4);
-  gl_FragColor = vec4(c.rgb / a, 1.0);          // déprémultiplie : le tone mapping porte sur la couleur réelle
-  #include <tonemapping_fragment>
+  gl_FragColor = vec4(c.rgb / a, 1.0);          // déprémultiplie : l'encodage sRGB porte sur la couleur réelle
   #include <colorspace_fragment>
-  gl_FragColor = vec4(gl_FragColor.rgb * c.a, c.a); // re-prémultiplie pour se poser sur le fond
+  gl_FragColor = vec4(gl_FragColor.rgb * c.a, c.a); // reprémultiplie pour se poser sur le fond
 }`;
 
 // Profondeur de champ : flou en disque dont le rayon dépend de l'écart à la mise au point. Un échantillon net ne « bave » jamais
@@ -59,19 +70,18 @@ export class Fx {
     this.dofTarget = 0;
     this.w = 0; this.h = 0; this.scale = 1;
     this.rtScene = this.rtAccum = this.rtA = this.rtB = null;
-    this.bloom = null;
     this.bgScene = new THREE.Scene();
     this.bgCam = new THREE.PerspectiveCamera();
     this.quad = new FullScreenQuad(null);
     const mk = (frag, extra = {}) => new THREE.ShaderMaterial({ vertexShader: VERT, fragmentShader: frag, depthTest: false, depthWrite: false, ...extra });
     this.copyMat = mk(CLAMP_FRAG, { uniforms: { t: { value: null } }, blending: THREE.NoBlending });
-    this.accumMat = mk(COPY_FRAG, {
+    this.accumMat = mk(ACCUM_FRAG, {
       uniforms: { t: { value: null } }, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
       blendSrc: THREE.ConstantAlphaFactor, blendDst: THREE.OneMinusConstantAlphaFactor,
       blendSrcAlpha: THREE.ConstantAlphaFactor, blendDstAlpha: THREE.OneMinusConstantAlphaFactor,
     });
     this.blitMat = mk(BLIT_FRAG, {
-      uniforms: { tScene: { value: null } }, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
+      toneMapped: false, uniforms: { tScene: { value: null } }, blending: THREE.CustomBlending, blendEquation: THREE.AddEquation,
       blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor,
     });
     this.dofMat = mk(DOF_FRAG, {
@@ -101,12 +111,8 @@ export class Fx {
       this.rtScene.depthTexture = dt;
     }
     this.rtAccum = new THREE.WebGLRenderTarget(w, h, opt);
-    this.rtA = (this.q.bloom || this.dofOk) ? new THREE.WebGLRenderTarget(w, h, opt) : null;
+    this.rtA = this.dofOk ? new THREE.WebGLRenderTarget(w, h, opt) : null;
     this.rtB = this.dofOk ? new THREE.WebGLRenderTarget(w, h, opt) : null;
-    if (this.q.bloom) {
-      if (!this.bloom) this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.025, 0.2, 5.0);
-      else this.bloom.setSize(w, h);
-    }
   }
 
   _disposeTargets() { for (const k of ['rtScene', 'rtAccum', 'rtA', 'rtB']) { this[k]?.dispose(); this[k] = null; } }
@@ -143,12 +149,11 @@ export class Fx {
 
     // effets sur une copie (le cumul reste intact)
     let out = this.rtAccum;
-    if (effects && this.rtA && (this.bloom || (this.dofOk && this.dof > 0.01))) {
+    if (effects && this.rtA && this.dofOk && this.dof > 0.01) {
       this.copyMat.uniforms.t.value = this.rtAccum.texture;
       this._blit(this.copyMat, this.rtA);
       out = this.rtA;
-      if (this.bloom) this.bloom.render(r, null, this.rtA, 0, false);
-      if (this.dofOk && this.dof > 0.01 && this.rtScene.depthTexture) {
+      if (this.rtScene.depthTexture) {
         const u = this.dofMat.uniforms, v = this.v;
         u.tColor.value = this.rtA.texture; u.tDepth.value = this.rtScene.depthTexture;
         u.uTexel.value.set(1 / this.w, 1 / this.h);
@@ -182,5 +187,5 @@ export class Fx {
     if (Math.abs(this.dof - this.dofTarget) < 0.01) this.dof = this.dofTarget;
   }
 
-  dispose() { this._disposeTargets(); this.bloom?.dispose(); this.quad.dispose(); for (const m of [this.copyMat, this.accumMat, this.blitMat, this.dofMat]) m.dispose(); }
+  dispose() { this._disposeTargets(); this.quad.dispose(); for (const m of [this.copyMat, this.accumMat, this.blitMat, this.dofMat]) m.dispose(); }
 }

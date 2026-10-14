@@ -6,7 +6,7 @@ import { Reflector } from 'three/examples/jsm/objects/Reflector.js';
 
 const SHADER = {
   name: 'FloorReflection',
-  uniforms: { color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null }, uStrength: { value: 0.14 }, uTexel: { value: 1 / 768 } },
+  uniforms: { color: { value: null }, tDiffuse: { value: null }, textureMatrix: { value: null }, uStrength: { value: 0.1 }, uTexel: { value: 1 / 768 } },
   vertexShader: /* glsl */`
     uniform mat4 textureMatrix; varying vec4 vUv; varying vec2 vPlane;
     void main(){ vUv = textureMatrix * vec4(position, 1.0); vPlane = position.xy; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
