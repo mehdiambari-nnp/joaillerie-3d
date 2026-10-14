@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { handleModels, handleApi, memoryStore } from '../../netlify/lib/api.mjs';
+import { handleModels, handleApi, memoryStore } from '../../dev/local-api.mjs';
 import { uploadModel, downloadModel, modelId } from '../../src/share/remote.js';
 
 const rig = () => {

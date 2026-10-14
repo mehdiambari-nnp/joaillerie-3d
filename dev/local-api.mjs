@@ -1,6 +1,6 @@
-// API d'hébergement des modèles partagés (liens client). Logique pure, indépendante de Netlify : le « store » est injecté
-// (Netlify Blobs en production, mémoire en dev/tests). Les modèles sont adressés par leur empreinte (SHA-256 tronquée) :
-// un même fichier n'est stocké qu'une fois. Un modèle est découpé en morceaux (la limite d'une fonction Netlify est ~6 Mo).
+// API d'hébergement des modèles partagés (liens client). Logique pure, indépendante de l'hébergeur : le « store » est injecté
+// (mémoire en dev/tests ; en production, Firebase remplace cette API). Les modèles sont adressés par leur empreinte (SHA-256 tronquée) :
+// un même fichier n'est stocké qu'une fois. Un modèle est découpé en morceaux (limite de taille d'une requête).
 //
 //   GET  /api/models/:id        → méta JSON { name, opts, gz, parts, size }
 //   GET  /api/models/:id/:n     → morceau n (binaire)
@@ -78,7 +78,7 @@ export async function handleShares(req, store, base = '/api/shares') {
 /** Point d'entrée unique : /api/models/* et /api/shares/*. */
 export const handleApi = (req, store) => (new URL(req.url).pathname.startsWith('/api/shares') ? handleShares(req, store) : handleModels(req, store));
 
-/** Store en mémoire (dev, tests) : même interface minimale que Netlify Blobs. */
+/** Store en mémoire (dev, tests) : interface minimale d'un store clé/valeur. */
 export function memoryStore() {
   const m = new Map();
   return {

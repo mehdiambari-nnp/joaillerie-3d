@@ -3,9 +3,9 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import fs from 'node:fs';
 import path from 'node:path';
 import themePlugin from './config/vite-theme.js';
-import { handleApi, memoryStore } from './netlify/lib/api.mjs';
+import { handleApi, memoryStore } from './dev/local-api.mjs';
 
-// Dev / preview local : même API d'hébergement des modèles que la fonction Netlify, avec un stockage en mémoire.
+// Dev / preview local : API d'hébergement locale (mode `local`, tests) avec un stockage en mémoire.
 const modelsApi = () => {
   const store = memoryStore();
   const mw = async (req, res, next) => {

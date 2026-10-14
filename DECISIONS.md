@@ -160,3 +160,8 @@
 - **Repli** : si le dépôt échoue (réseau, pas de compte en mode Firebase), le lien long `#c=` est généré comme avant ; les anciens liens longs continuent de fonctionner. Un lien court introuvable affiche un message et le modèle par défaut.
 - **Serveur** : `/api/shares/:id` (GET/PUT, 16 Ko max, sans écrasement) ajouté à la fonction Netlify, renommée `netlify/functions/api.mjs` (routes `/api/models/*` et `/api/shares/*`) ; collection Firestore `shares/{id}` côté Firebase (lecture publique par identifiant, création par un joaillier connecté, pas de modification). Interface `cloud.shares` {put, get} pour les deux services.
 - **Firebase en option de build** : la configuration n'est plus dans `theme.json` mais dans `themes/<client>/firebase.json`, injectée uniquement avec `vite build --mode firebase` (`npm run build:firebase`, `dev:firebase`, `deploy:all`). Un build normal (Netlify) reste en mode local, sans Firebase : la production Netlify n'est pas affectée tant que la bascule n'est pas faite. Le workflow GitHub utilise `build:firebase`.
+
+## Bascule complète sur Firebase
+- **Netlify retiré** : `netlify.toml`, fonctions et `@netlify/blobs` supprimés. Hébergement, comptes, modèles et liens courts passent par Firebase (`themes/<client>/firebase.json`, utilisé par tous les builds).
+- **Mode `local`** (`--mode local`, `npm run dev:local`) : seul mode sans Firebase, utilisé par les tests E2E et le dev hors ligne ; l'API en mémoire est dans `dev/local-api.mjs`.
+- **Déploiement** : `npm run deploy:all` ou GitHub Actions (aperçu par PR, production sur `main`).

@@ -1,5 +1,5 @@
-// Service « local » (sans Firebase) : modèles via l'API /api/models (fonction Netlify ou middleware de dev), projets dans IndexedDB.
-// Pas de comptes. Sert au développement, aux tests et aux déploiements sans configuration Firebase.
+// Service « local » (sans Firebase) : modèles via l'API /api/models (middleware de dev Vite), projets dans IndexedDB.
+// Pas de comptes. Sert au développement hors ligne et aux tests (`--mode local`).
 import { uploadModel, downloadModel } from '../share/remote.js';
 import { saveProject, listProjects, getProject, deleteProject } from '../projects/projects.js';
 
