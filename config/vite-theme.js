@@ -44,7 +44,7 @@ export function manifestOf(theme) {
 
 export default function themePlugin() {
   const { dir, theme, logos, defaultModel } = loadTheme();
-  let mode = 'production'; // le thème reçoit la configuration Firebase (themes/<client>/firebase.json), sauf en `--mode local` (tests, hors ligne)
+  let mode = 'production'; // le thème reçoit la configuration Firebase (themes/<client>/firebase.json), sauf en `--mode offline` (tests, hors ligne)
   const icons = ['icon-180.png', 'icon-192.png', 'icon-512.png'];
   const iconPath = (n) => path.join(dir, 'icons', n);
   return {
@@ -55,7 +55,7 @@ export default function themePlugin() {
       if (id !== RID) return null;
       const fonts = (theme.fonts?.packages || []).map((p) => `import ${JSON.stringify(p)};`).join('\n');
       const fbFile = path.join(dir, 'firebase.json');
-      const firebase = mode !== 'local' && fs.existsSync(fbFile) ? JSON.parse(fs.readFileSync(fbFile, 'utf8')) : theme.firebase;
+      const firebase = mode !== 'offline' && fs.existsSync(fbFile) ? JSON.parse(fs.readFileSync(fbFile, 'utf8')) : theme.firebase;
       return `${fonts}\nexport default ${JSON.stringify({ ...theme, ...(firebase ? { firebase } : {}), logoSvg: logos, defaultModelUrl: defaultModel ? `model/${defaultModel}` : null })};`;
     },
     transformIndexHtml(html) {

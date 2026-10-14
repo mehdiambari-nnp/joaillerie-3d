@@ -15,8 +15,8 @@
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
     "deploy:all": "npm run build && firebase deploy",
-    "dev:local": "vite --host --mode local",
-    "build:local": "vite build --mode local"
+    "dev:offline": "vite --host --mode offline",
+    "build:offline": "vite build --mode offline"
   },
   "devDependencies": {
     "@vitejs/plugin-basic-ssl": "2.3.0",

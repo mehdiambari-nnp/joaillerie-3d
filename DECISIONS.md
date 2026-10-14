@@ -163,5 +163,5 @@
 
 ## Bascule complète sur Firebase
 - **Netlify retiré** : `netlify.toml`, fonctions et `@netlify/blobs` supprimés. Hébergement, comptes, modèles et liens courts passent par Firebase (`themes/<client>/firebase.json`, utilisé par tous les builds).
-- **Mode `local`** (`--mode local`, `npm run dev:local`) : seul mode sans Firebase, utilisé par les tests E2E et le dev hors ligne ; l'API en mémoire est dans `dev/local-api.mjs`.
+- **Mode `offline`** (`--mode offline`, `npm run dev:offline`) : seul mode sans Firebase, utilisé par les tests E2E et le dev hors ligne ; l'API en mémoire est dans `dev/local-api.mjs`.
 - **Déploiement** : `npm run deploy:all` ou GitHub Actions (aperçu par PR, production sur `main`).

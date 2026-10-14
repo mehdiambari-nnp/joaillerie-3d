@@ -699,7 +699,7 @@ export class UI {
     const dr = $('[data-r=drawer]', this.root);
     const cloud = await this.svc.cloud();
     if (cloud.auth.enabled && !cloud.auth.user) { // compte requis : projets et modèles partagés sont liés au joaillier
-      dr.replaceChildren(this.html(`<div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div><p class="muted tiny">${t('signInWhy')}</p>`), this.authForm(() => this.renderProjects()));
+      dr.replaceChildren(this.html(`<div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div><p class="auth-intro">${t('signInWhy')}</p>`), this.authForm(() => this.renderProjects()));
       return;
     }
     let list = [], failed = false;
@@ -728,11 +728,13 @@ export class UI {
   /** Formulaire de connexion / création de compte (Firebase Auth). `done` est appelé une fois connecté. */
   authForm(done) {
     const d = this.html(`<form class="auth" novalidate>
-      <input type="email" name="email" autocomplete="email" placeholder="${esc(t('email'))}" aria-label="${esc(t('email'))}" required>
-      <input type="password" name="pw" autocomplete="current-password" placeholder="${esc(t('password'))}" aria-label="${esc(t('password'))}" required>
-      <p class="auth-err muted tiny" role="alert" hidden></p>
-      <div class="row"><button class="btn primary" type="submit" data-k="in">${t('signIn')}</button><button class="btn" type="button" data-k="up">${t('signUp')}</button></div>
-      <div class="row"><button class="btn" type="button" data-k="google">${t('signInGoogle')}</button><button class="link" type="button" data-k="reset">${t('forgotPw')}</button></div></form>`);
+      <label class="fld"><span>${t('email')}</span><input type="email" name="email" autocomplete="email" required></label>
+      <label class="fld"><span>${t('password')}</span><input type="password" name="pw" autocomplete="current-password" required></label>
+      <p class="auth-err" role="alert" hidden></p>
+      <button class="btn primary wide" type="submit" data-k="in">${t('signIn')}</button>
+      <div class="auth-or" aria-hidden="true"><span>${t('or')}</span></div>
+      <button class="btn wide" type="button" data-k="google">${t('signInGoogle')}</button>
+      <div class="auth-links"><button class="link" type="button" data-k="up">${t('signUp')}</button><button class="link" type="button" data-k="reset">${t('forgotPw')}</button></div></form>`);
     const form = $('form', d), err = $('.auth-err', d);
     const run = async (fn, okMsg) => {
       err.hidden = true;
@@ -800,7 +802,7 @@ export class UI {
     let remote = null, hostFailed = false;
     const cloud = await this.svc.cloud();
     if (cloud.auth.enabled && !cloud.auth.user && this.svc.isHostable?.() && !this.svc.last?.remote) { // héberger le modèle exige un compte joaillier
-      const d = this.html(`<p class="muted tiny">${t('signInShare')}</p>`); d.append(this.authForm(() => this.openShare()));
+      const d = this.html(`<p class="auth-intro">${t('signInShare')}</p>`); d.append(this.authForm(() => this.openShare()));
       this.openDialog(t('share'), d);
       return;
     }

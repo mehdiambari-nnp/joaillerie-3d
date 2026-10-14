@@ -1,7 +1,7 @@
 # Firebase : mise en route
 
 Tout l'hébergement passe par Firebase : pages (Hosting), comptes joailliers (Authentication), modèles partagés (Cloud Storage), projets synchronisés (Firestore).
-Le mode « local » (`npm run dev:local`, `--mode local`, projets sur l'appareil, API `/api/models` en mémoire) sert uniquement aux tests et au développement hors ligne.
+Le mode « offline » (`npm run dev:offline`, `--mode offline`, projets sur l'appareil, API `/api/models` en mémoire) sert uniquement aux tests et au développement hors ligne.
 
 ## À faire une fois (≈ 20 min)
 1. Console Firebase → **Créer un projet** (ex. `domuse`). Passer au plan **Blaze** (carte requise, usage actuel quasi gratuit ; ajouter une alerte de budget).
@@ -9,7 +9,7 @@ Le mode « local » (`npm run dev:local`, `--mode local`, projets sur l'appareil
 3. **Build → Firestore Database** → Créer (mode production, région `eur3` ou `europe-west9`).
 4. **Build → Storage** → Commencer (même région).
 5. **Paramètres du projet → Vos applications → Web (`</>`)** → copier l'objet `firebaseConfig`.
-6. Coller cet objet dans `themes/<client>/firebase.json` (valeurs publiques par conception ; la sécurité vient des règles). Elles sont utilisées par tous les builds sauf `--mode local`.
+6. Coller cet objet dans `themes/<client>/firebase.json` (valeurs publiques par conception ; la sécurité vient des règles). Elles sont utilisées par tous les builds sauf `--mode offline`.
 7. Mettre l'identifiant du projet dans `.firebaserc`.
 8. En local : `npx firebase login`, puis `npm run deploy:rules` (règles Firestore et Storage).
 9. CORS du bucket Storage (nécessaire pour télécharger les modèles depuis le navigateur) :

@@ -7,7 +7,7 @@ export const CHROMIUM = fs.existsSync('/opt/pw-browsers/chromium-1194/chrome-lin
 
 export async function startServer(port = 5199) {
   process.env.E2E = '1';
-  const server = await createServer({ mode: 'local', server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
+  const server = await createServer({ mode: 'offline', server: { port, host: '127.0.0.1', strictPort: true }, logLevel: 'error' });
   await server.listen();
   return { server, url: `http://127.0.0.1:${port}/` };
 }
