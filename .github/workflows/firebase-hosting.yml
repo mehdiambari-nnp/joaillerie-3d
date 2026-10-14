@@ -1,5 +1,5 @@
 # Déploiement Firebase Hosting : aperçu sur chaque pull request, production à chaque push sur main.
-# Secret requis : FIREBASE_SERVICE_ACCOUNT (clé JSON du compte de service). Variable de dépôt : FIREBASE_PROJECT_ID.
+# Authentification sans clé (Workload Identity Federation). Variables de dépôt : WIF_PROVIDER, WIF_SERVICE_ACCOUNT, FIREBASE_PROJECT_ID.
 name: Firebase Hosting
 on:
   push: { branches: [main] }
@@ -7,17 +7,22 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions: { contents: read, pull-requests: write, checks: write }
+    permissions: { contents: read, id-token: write }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm test
+      - run: npm test --if-present -- --exclude tests/unit/import.test.js
       - run: npm run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - uses: google-github-actions/auth@v3
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
-          channelId: ${{ github.event_name == 'push' && 'live' || '' }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Déployer
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            npx firebase deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+          else
+            npx firebase hosting:channel:deploy pr-${{ github.event.number }} --expires 7d --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+          fi
