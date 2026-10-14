@@ -51,7 +51,7 @@ function build(root, cloud) {
         <button class="btn primary wide" type="submit" data-k="submit">${t('signIn')}</button>
         <div class="auth-or" aria-hidden="true"><span>${t('or')}</span></div>
         <button class="btn wide google" type="button" data-k="google">${GOOGLE}<span>${t('signInGoogle')}</span></button>
-        <span class="reveal in-only forgot-wrap"><span><button class="link forgot" type="button" data-k="reset">${t('forgotPw')}</button></span></span>
+        <span class="reveal in-only forgot-wrap"><span><button class="link forgot" type="button" data-k="reset"><span>${t('forgotPw')}</span></button></span></span>
       </form>
       <p class="login-note">${t('loginNote')}</p>
     </section>`;
