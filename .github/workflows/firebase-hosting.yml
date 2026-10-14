@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22, cache: npm }
+        with: { node-version: 22 }
       - run: npm ci
       - run: npm test --if-present -- --exclude tests/unit/import.test.js
       - run: npm run build
@@ -22,7 +22,7 @@ jobs:
       - name: Déployer
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
-            npx firebase deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive --debug
+            npx firebase deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
           else
-            npx firebase hosting:channel:deploy pr-${{ github.event.number }} --expires 7d --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive --debug
+            npx firebase hosting:channel:deploy pr-${{ github.event.number }} --expires 7d --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
           fi
