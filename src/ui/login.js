@@ -33,24 +33,25 @@ function build(root, cloud) {
       <p class="login-eyebrow">${esc(theme.brand.tagline || '')}</p>
       <h1 id="login-h">${t('loginTitle')}</h1>
       <p class="login-lead">${t('loginLead')}</p>
-      <div class="login-tabs" role="tablist">
+      <div class="login-tabs" role="tablist" data-mode="in">
+        <span class="login-ink" aria-hidden="true"></span>
         <button type="button" role="tab" data-m="in" aria-selected="true">${t('signIn')}</button>
         <button type="button" role="tab" data-m="up" aria-selected="false">${t('signUp')}</button>
       </div>
-      <form novalidate>
-        <div class="fld-row" hidden>
+      <form novalidate data-mode="in">
+        <div class="reveal up-only names"><div class="fld-row">
           <label class="fld"><span>${t('firstName')}</span><input type="text" name="first" autocomplete="given-name" maxlength="40"></label>
           <label class="fld"><span>${t('lastName')}</span><input type="text" name="last" autocomplete="family-name" maxlength="40"></label>
-        </div>
+        </div></div>
         <label class="fld"><span>${t('email')}</span><input type="email" name="email" autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false" required></label>
         <label class="fld"><span>${t('password')}</span>
           <span class="pw"><input type="password" name="pw" autocomplete="current-password" required><button type="button" class="pw-toggle" data-k="show" aria-label="${esc(t('showPw'))}" aria-pressed="false">${t('showPw')}</button></span>
-          <small class="pw-help" hidden>${t('pwHint')}</small></label>
+          <span class="reveal up-only help"><small class="pw-help">${t('pwHint')}</small></span></label>
         <p class="login-err" role="alert" hidden></p>
         <button class="btn primary wide" type="submit" data-k="submit">${t('signIn')}</button>
         <div class="auth-or" aria-hidden="true"><span>${t('or')}</span></div>
         <button class="btn wide google" type="button" data-k="google">${GOOGLE}<span>${t('signInGoogle')}</span></button>
-        <button class="link forgot" type="button" data-k="reset">${t('forgotPw')}</button>
+        <span class="reveal in-only forgot-wrap"><span><button class="link forgot" type="button" data-k="reset">${t('forgotPw')}</button></span></span>
       </form>
       <p class="login-note">${t('loginNote')}</p>
     </section>`;
@@ -61,7 +62,7 @@ function build(root, cloud) {
     el.querySelectorAll('[data-m]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.m === m)));
     submit.textContent = m === 'in' ? t('signIn') : t('loginUp');
     pw.autocomplete = m === 'in' ? 'current-password' : 'new-password';
-    $('.fld-row').hidden = m === 'in'; $('.pw-help').hidden = m === 'in'; $('.forgot').hidden = m === 'up'; err.hidden = true;
+    form.dataset.mode = m; $('.login-tabs').dataset.mode = m; err.hidden = true; // les panneaux se replient / déploient en CSS
   };
   const fail = (msg, field) => { err.classList.remove('ok'); err.textContent = msg; err.hidden = false; field?.focus(); };
   const FIELD = { 'auth/invalid-email': form.email, 'auth/email-already-in-use': form.email, 'auth/weak-password': pw };

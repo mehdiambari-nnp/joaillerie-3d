@@ -540,10 +540,16 @@ button.link { border: 0; background: none; color: var(--muted); text-decoration:
 .login-eyebrow { margin: 0 0 30px; font-size: 10.5px; letter-spacing: .34em; text-transform: uppercase; color: var(--muted); padding-left: .34em; }
 .login-card h1 { margin: 0; font: 300 34px/1.15 var(--serif); letter-spacing: .01em; }
 .login-lead { margin: 12px auto 32px; max-width: 30ch; font: italic 400 15.5px/1.55 var(--serif); color: var(--muted); }
-.login-tabs { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
-.login-tabs button { background: none; border: 0; border-bottom: 2px solid transparent; margin-bottom: -1px; padding: 0 4px; min-height: 48px; font-size: 11.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); transition: color .2s, border-color .2s; }
-.login-tabs button[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--ink); }
-.login-tabs button:hover { color: var(--ink); }
+.login-tabs { position: relative; display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--line); margin-bottom: 26px; }
+.login-tabs button { background: none; border: 0; padding: 0 4px; min-height: 48px; font-size: 11.5px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); transition: color .3s; }
+.login-tabs button[aria-selected='true'], .login-tabs button:hover { color: var(--ink); }
+.login-ink { position: absolute; left: 0; bottom: -1px; width: 50%; height: 2px; background: var(--ink); transition: transform .4s cubic-bezier(.65, 0, .25, 1); }
+.login-tabs[data-mode='up'] .login-ink { transform: translateX(100%); }
+/* Panneaux qui se déploient / se replient en douceur (hauteur animée par grid-template-rows, sans mesurer en JS) */
+.login .reveal { display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden; transition: grid-template-rows .4s cubic-bezier(.65, 0, .25, 1), opacity .25s ease, margin .4s cubic-bezier(.65, 0, .25, 1), visibility 0s linear .4s; }
+.login .reveal > * { min-height: 0; overflow: hidden; }
+.login .reveal.names { margin-bottom: -22px; } .login .reveal.forgot-wrap { margin-top: -22px; } .login .reveal.help { margin-top: -6px; }
+.login form[data-mode='up'] .reveal.up-only, .login form[data-mode='in'] .reveal.in-only { grid-template-rows: 1fr; opacity: 1; visibility: visible; margin: 0; transition-delay: 0s, .1s, 0s, 0s; }
 .login form { display: grid; gap: 22px; text-align: left; }
 .login .fld { display: grid; gap: 6px; }
 .login .fld > span:first-child { font-size: 11px; letter-spacing: .2em; text-transform: uppercase; color: var(--muted); }
@@ -560,7 +566,7 @@ button.link { border: 0; background: none; color: var(--muted); text-decoration:
 .login .btn.primary { margin-top: 4px; }
 .login .btn.google { gap: 10px; text-transform: none; letter-spacing: .02em; font-size: 14px; }
 .login .auth-or { margin: -2px 0; }
-.login .forgot { justify-self: center; margin-top: -2px; min-height: 44px; font-size: 11px; letter-spacing: .16em; border-bottom: 1px solid transparent; padding: 0; }
+.login .forgot { margin: 0 auto; display: flex; min-height: 44px; font-size: 11px; letter-spacing: .16em; border-bottom: 1px solid transparent; padding: 0; }
 .login .forgot:hover { color: var(--ink); border-bottom-color: var(--ink); }
 .login-err { margin: -6px 0 0; font-size: 13px; line-height: 1.45; color: var(--danger); text-align: center; }
 .login-err.ok { color: var(--muted); }
@@ -569,4 +575,4 @@ button.link { border: 0; background: none; color: var(--muted); text-decoration:
 @media (min-width: 720px) {
   .login-card { padding: 52px 52px 44px; background: color-mix(in srgb, var(--surface) 72%, transparent); border: 1px solid var(--line); border-radius: 3px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); box-shadow: var(--shadow); width: 480px; }
 }
-@media (prefers-reduced-motion: reduce) { .login, .login-card { transition: none; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .login, .login-card, .login-ink, .login .reveal, .login-tabs button { transition: none !important; transform: none; } .login-tabs[data-mode='up'] .login-ink { transform: translateX(100%) !important; } }
