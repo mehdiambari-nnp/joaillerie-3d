@@ -104,7 +104,7 @@ export class Fx {
     this.rtA = (this.q.bloom || this.dofOk) ? new THREE.WebGLRenderTarget(w, h, opt) : null;
     this.rtB = this.dofOk ? new THREE.WebGLRenderTarget(w, h, opt) : null;
     if (this.q.bloom) {
-      if (!this.bloom) this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.06, 0.25, 4.0);
+      if (!this.bloom) this.bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.025, 0.2, 5.0);
       else this.bloom.setSize(w, h);
     }
   }
