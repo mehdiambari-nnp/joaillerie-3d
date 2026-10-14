@@ -21,7 +21,7 @@ function hasWebGL2() {
 
 async function boot() {
   if (!hasWebGL2()) { root.innerHTML = `<p style="padding:24px;font:16px system-ui">${t('webgl')}</p>`; return; }
-  if (params.has('debug')) import('eruda').then((m) => m.default.init()); // console intégrée (iPhone sans Mac)
+  if (import.meta.env.DEV && params.has('debug')) import('eruda').then((m) => m.default.init()); // console intégrée (iPhone sans Mac) ; absente du build publié
 
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
   const app = new Configurator(holder);

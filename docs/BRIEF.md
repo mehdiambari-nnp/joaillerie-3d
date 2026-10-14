@@ -96,7 +96,7 @@ Librairies supplémentaires (v2) :
 | Alternative suivi de la main | WebAR.rocks.hand | Démos de bague déjà faites, mais **licence GPLv3** → incompatible avec un usage commercial fermé sans licence payante. Ne pas l'utiliser ; s'en inspirer conceptuellement uniquement. |
 | Lissage du tracking | Filtre **One Euro** (implémentation maison, ~40 lignes) | Supprime le tremblement sans latence visible |
 | Simplification de maillage (LOD) | **meshoptimizer** (`meshoptimizer` npm, `MeshoptSimplifier`) | Le modèle de test fait 378 k triangles : il faut un LOD allégé (~60–80 k) pour l'essayage sur la main sur iPhone |
-| Débogage sur iPhone sans Mac | **eruda** (console in-page, chargée seulement en `?debug=1`) | Mehdi travaille sur PC Windows : pas de Web Inspector Safari |
+| Débogage sur iPhone sans Mac | **eruda** (console in-page, chargée seulement en `?debug` et uniquement en développement (retirée du build publié)) | Mehdi travaille sur PC Windows : pas de Web Inspector Safari |
 
 ### 2.4 Contraintes iOS (plateforme prioritaire) [DÉCISION]
 

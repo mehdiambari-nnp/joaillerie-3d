@@ -18,7 +18,7 @@ npm run build          # dist/ statique, à héberger en HTTPS
 
 ## Tester sur iPhone (voir docs/IOS_TESTS.md)
 1. Mac/PC et iPhone sur le même Wi‑Fi, `npm run dev`, ouvrir l'URL « Network » (https://192.168.x.x:5173) dans Safari ou Chrome iOS, accepter le certificat.
-2. Ouvrir la maquette : bouton ⤒ (sélecteur de fichiers). Ajouter `?debug` à l'URL pour une console intégrée.
+2. Ouvrir la maquette : bouton ⤒ (sélecteur de fichiers). En développement (`npm run dev`), ajouter `?debug` à l'URL pour une console intégrée (absente du site publié).
 3. « Essayer » → caméra → main ouverte, paume ou dos face à l'iPhone.
 4. « AR » → Quick Look (USDZ, échelle réelle).
 
