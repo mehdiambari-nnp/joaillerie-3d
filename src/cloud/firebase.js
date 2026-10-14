@@ -1,7 +1,7 @@
 // Service Firebase : Auth (joaillier), Cloud Storage (modèles, adressés par empreinte, lisibles par lien), Firestore (projets par utilisateur).
 // Le SDK n'est chargé qu'à la demande (import dynamique depuis ./index.js).
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getBytes, getMetadata } from 'firebase/storage';
 import { modelId, gzip, gunzip } from '../share/remote.js';
@@ -10,7 +10,7 @@ export function create(config) {
   const app = initializeApp(config);
   const auth = getAuth(app), db = getFirestore(app), storage = getStorage(app);
   const state = { user: undefined, subs: new Set() }; // undefined : état pas encore connu
-  onAuthStateChanged(auth, (u) => { state.user = u ? { uid: u.uid, email: u.email } : null; state.subs.forEach((f) => f(state.user)); });
+  onAuthStateChanged(auth, (u) => { state.user = u ? { uid: u.uid, email: u.email, name: u.displayName || '' } : null; state.subs.forEach((f) => f(state.user)); });
   const uid = () => { if (!auth.currentUser) throw Object.assign(new Error('Connexion requise'), { code: 'auth/required' }); return auth.currentUser.uid; };
 
   const authApi = {
@@ -18,7 +18,11 @@ export function create(config) {
     get user() { return state.user ?? null; },
     onChange(cb) { state.subs.add(cb); if (state.user !== undefined) cb(state.user); return () => state.subs.delete(cb); },
     signIn: (email, pw) => signInWithEmailAndPassword(auth, email, pw),
-    signUp: (email, pw) => createUserWithEmailAndPassword(auth, email, pw),
+    async signUp(email, pw, name = '') { // le nom (prénom + nom) est enregistré dans le profil du compte
+      const cred = await createUserWithEmailAndPassword(auth, email, pw);
+      if (name) { try { await updateProfile(cred.user, { displayName: name }); if (state.user) state.user.name = name; } catch (e) { console.warn('Nom non enregistré', e); } }
+      return cred;
+    },
     signInGoogle: () => signInWithPopup(auth, new GoogleAuthProvider()),
     reset: (email) => sendPasswordResetEmail(auth, email),
     signOut: () => signOut(auth),
