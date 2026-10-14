@@ -523,6 +523,7 @@ button.link { border: 0; background: none; color: var(--muted); text-decoration:
   background: radial-gradient(120% 90% at 50% 0%, var(--stage-a), var(--stage-b)); color: var(--ink); opacity: 0; transition: opacity .5s ease; }
 .login.in { opacity: 1; } .login.leaving { opacity: 0; pointer-events: none; transition-duration: .3s; }
 .login-mark { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: var(--ink); opacity: .03; overflow: hidden; }
+:root[data-theme='light'] .login-mark { opacity: .022; }
 .login-mark svg { width: min(120vmin, 900px); height: auto; flex: none; }
 .login-card { position: relative; width: min(400px, 100%); display: grid; text-align: center; transform: translateY(10px); transition: transform .6s cubic-bezier(.2, .7, .2, 1); }
 .login.in .login-card { transform: none; }

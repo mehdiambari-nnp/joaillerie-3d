@@ -24,7 +24,10 @@ async function boot() {
   // Porte d'entrée : sans lien de partage, l'outil exige un compte joaillier (Firebase). Un lien client s'ouvre directement.
   if (!/[#&][cs]=/.test(location.hash)) {
     const cloud = await getCloud();
-    if (cloud.auth.enabled) await (await import('./ui/login.js')).showLogin(root, cloud);
+    if (cloud.auth.enabled) {
+      await (await import('./ui/login.js')).showLogin(root, cloud);
+      cloud.auth.onChange((user) => { if (!user) location.reload(); }); // session expirée ou déconnexion : retour à la page de connexion
+    }
   }
   if (import.meta.env.DEV && params.has('debug')) import('eruda').then((m) => m.default.init()); // console intégrée (iPhone sans Mac) ; absente du build publié
 
