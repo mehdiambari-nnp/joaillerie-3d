@@ -8,8 +8,10 @@ const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const seg = (time, a, b) => clamp01((time - a) / (b - a));
 
-export function shouldPlayIntro(theme, params, dev) {
+/** L'ouverture de l'écrin est réservée à la vision client : elle ne se joue que sur un lien de partage (`hasShare`), jamais pour le joaillier. `?intro` la force (tests, captures). */
+export function shouldPlayIntro(theme, params, dev, hasShare = false) {
   if (!theme.intro?.enabled) return false;
+  if (!hasShare && !params.has('intro')) return false;
   if (params.has('nointro')) return false;
   if (dev && params.get('model') === 'gemv' && !params.has('intro')) return false; // tests E2E / captures
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
