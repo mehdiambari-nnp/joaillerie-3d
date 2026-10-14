@@ -708,23 +708,29 @@ export class UI {
     const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     dr.innerHTML = `
       <div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div>
-      <div class="dr-save">
-        <label class="fld"><span>${t('projectName')}</span><input type="text" data-r="projname" maxlength="60" value="${esc(cur?.name ?? '')}"></label>
-        <div class="col">
-          <button class="btn primary wide" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
-          ${cur ? `<button class="btn wide" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
+      <section class="dr-sec">
+        <h3 class="dr-t">${t('currentRing')}</h3>
+        <div class="dr-save">
+          <label class="fld"><span>${t('projectName')}</span><input type="text" data-r="projname" maxlength="60" placeholder="${esc(t('projectNameHint'))}" value="${esc(cur?.name ?? '')}"></label>
+          <div class="col">
+            <button class="btn primary wide" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
+            ${cur ? `<button class="btn wide" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
+          </div>
         </div>
-      </div>
-      <p class="palette-title">${t('projectsList')}</p>
-      ${failed ? `<p class="proj-empty">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="proj-empty">${t('projectsEmpty')}</p>` : ''}
-      <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
-        <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
-          <span><b>${esc(p.name)}</b><small>${esc(p.modelName)} · ${fmt(p.updated)}</small></span></button>
-        <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
-      <div class="dr-foot">
-        <p>${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
-        ${cloud.auth.enabled ? `<p class="acct"><span>${esc(cloud.auth.user.email || '')}</span><button class="link" data-a="signout">${t('signOut')}</button></p>` : ''}
-      </div>`;
+      </section>
+      <section class="dr-sec">
+        <h3 class="dr-t">${t('projectsList')}<span class="dr-n">${list.length}</span></h3>
+        ${failed ? `<p class="proj-empty">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="proj-empty">${t('projectsEmpty')}</p>` : ''}
+        <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
+          <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
+            <span><b>${esc(p.name)}</b><small>${fmt(p.updated)} · ${esc(p.modelName)}</small></span></button>
+          <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
+      </section>
+      <footer class="dr-foot">
+        ${cloud.auth.enabled ? `<p class="dr-who"><small>${t('signedInAs')}</small><span>${esc(cloud.auth.user.email || '')}</span></p>
+        <button class="btn wide" data-a="signout">${t('signOut')}</button>` : ''}
+        <p class="dr-note">${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
+      </footer>`;
   }
 
   /** Formulaire de connexion / création de compte (Firebase Auth). `done` est appelé une fois connecté. */
