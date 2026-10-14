@@ -1,4 +1,4 @@
-// Niveau de qualité de rendu : les effets lourds (profondeur de champ, reflet du sol) sont réservés aux ordinateurs ;
+// Niveau de qualité de rendu : les effets lourds (profondeur de champ) sont réservés aux ordinateurs ;
 // l'iPhone garde un rendu direct pendant le mouvement et ne cumule des images (anti-crénelage, pierres stables) qu'à l'arrêt.
 // Surcharge de test : ?fx=off (rendu direct d'origine), ?fx=mobile (profil iPhone sur ordinateur), ?fx=desktop.
 const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
@@ -14,7 +14,6 @@ export const QUALITY = {
   accumFrames: MOBILE ? 10 : 28,   // images cumulées à l'arrêt (anti-crénelage + stabilité du scintillement des pierres)
   msaa: MOBILE ? 0 : 2,            // anti-crénelage matériel pendant le mouvement
   dof: !MOBILE,
-  reflection: !MOBILE && forced !== 'off', // reflet du sol : exige le pipeline (fond rendu à part)
   contactShadow: true,
   maxRtPixels: 5e6,                // plafond de pixels des tampons (mémoire GPU des écrans Retina)
 };

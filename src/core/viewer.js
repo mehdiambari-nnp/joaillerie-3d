@@ -6,7 +6,6 @@ import { getEnvironment, disposeEnvironments } from './environments.js';
 import { Fx } from './fx.js';
 import { QUALITY } from './quality.js';
 import { ContactShadow } from './contactShadow.js';
-import { Reflection } from './reflection.js';
 
 
 export class Viewer {
@@ -56,8 +55,6 @@ export class Viewer {
     this.fx = QUALITY.post ? new Fx(this) : null; // accumulation d'images, profondeur de champ (voir fx.js)
     this._shadow = this._makeShadow();
     this.scene.add(this._shadow);
-    this.reflection = QUALITY.reflection ? new Reflection(this, this._shadow) : null; // reflet discret sur le sol (ordinateur)
-    if (this.reflection) this.scene.add(this.reflection.mesh);
     this.contact = QUALITY.contactShadow ? new ContactShadow(this, this._shadow) : null; // ombre de contact calculée (voir contactShadow.js)
 
     this.controls.addEventListener('start', () => { this.controls.autoRotate = false; this._autoRotateResume = Infinity; this.anim = null; });
@@ -115,7 +112,6 @@ export class Viewer {
     clearTimeout(this._bakeT);
     this._bakeT = setTimeout(() => {
       if (!this.root || this.paused) return;
-      if (this.reflection) this.reflection.dirty = true;
       try { this.contact?.bake(); } catch (e) { console.warn('[fx] ombre de contact', e); }
       this.invalidate();
     }, delay);
@@ -188,7 +184,6 @@ export class Viewer {
       sc.background = this._bgTex;
       this._shadow.visible = true;
     }
-    if (this.reflection) this.reflection.mesh.visible = this._shadow.visible;
     this.invalidate();
   }
 
@@ -213,7 +208,6 @@ export class Viewer {
     const s = this._shadow;
     s.position.set(sphere.center.x, box.min.y - 0.05, sphere.center.z);
     s.scale.setScalar(this.radius * 3.2);
-    this.reflection?.place(s.position, s.position.y, this.radius * 5.5);
     this.views = views || [];
     this.setView([0.62, 0.45, 0.64], false);
     this.requestBake();
@@ -352,7 +346,6 @@ export class Viewer {
       this.needsRender = false;
       if (this._hq) this._setHQ(false); // pendant le mouvement : résolution normale (fluidité, batterie)
       this._lastRender = now;
-      if (this.reflection) this.reflection.dirty = true; // caméra ou scène en mouvement : reflet à recalculer
       if (fx && QUALITY.motionPost) { fx.updateDof(this.camera, this.controls.target, this.radius, false); fx.render(this.scene, this.camera, { still: false }); }
       else { fx?.reset(); this.renderer.render(this.scene, this.camera); }
     } else if (fx && !this.anim && fx.pending && now - this._lastRender > 120) {
@@ -399,7 +392,6 @@ export class Viewer {
     this._ro.disconnect();
     this.fx?.dispose();
     this.contact?.dispose();
-    this.reflection?.dispose();
     disposeEnvironments();
     this.renderer.dispose();
   }
