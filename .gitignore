@@ -6,3 +6,6 @@ public/mediapipe/wasm
 tests/e2e/.tmp
 assets/test/
 .firebase/
+
+# captures régénérées à chaque `npm run test:e2e` (locales, non versionnées)
+docs/screenshots/
