@@ -4,17 +4,25 @@ Web app (HTML5 / CSS3 / JS + three.js) : importez un `.fbx` (ou GLB/OBJ), tourne
 touchez une partie (corps, griffes, chaton, pierres…) et appliquez une matière (or, platine, diamant, émeraude…) en temps réel.
 Partage par lien, export GLB/USDZ, **AR Quick Look** (iPhone) et **essayage sur la main** (caméra + MediaPipe).
 
-Tout s'exécute dans le navigateur : le fichier 3D ne quitte jamais l'appareil.
+Le rendu et l'import s'exécutent dans le navigateur. Le fichier 3D ne quitte l'appareil que si le joaillier **partage** un lien client ou **enregistre** un projet : il est alors hébergé (Firebase) pour que le client ouvre exactement cette bague.
 
 ## Démarrer
 ```bash
 npm install            # copie aussi les wasm MediaPipe (postinstall)
-npm run dev            # HTTPS auto-signé, accessible sur le réseau local
-npm run dev -- --open  # puis ?model=gemv charge assets/test/MAQUETTE_GEMV.fbx
-npm test               # 18 tests unitaires
-npm run test:e2e       # E2E Chromium headless (captures dans docs/screenshots/)
-npm run build          # dist/ statique, à héberger en HTTPS
+npm run dev            # HTTPS auto-signé, réseau local ; Firebase réel : page de connexion joaillier
+npm run dev:offline    # sans Firebase ni connexion (API en mémoire) : tests et développement hors ligne
+npm run dev -- --open  # puis ?model=gemv charge assets/test/MAQUETTE_GEMV.fbx (mode offline)
+npm test               # tests unitaires (le fichier import.test.js exige la maquette privée assets/test/)
+npm run test:e2e       # E2E Chromium headless, mode offline (captures dans docs/screenshots/)
+npm run build          # dist/ statique (Firebase) ; npm run build:offline pour la variante sans Firebase
+npm run deploy:all     # règles Firestore/Storage + Hosting (npx firebase login --reauth si la session a expiré)
 ```
+
+## Comptes, partage et hébergement
+Firebase (projet `jewel3d-e8caa`) : Hosting, Authentication (e-mail + Google), Cloud Storage (modèles partagés), Firestore (projets, liens courts).
+L'outil exige un compte joaillier ; **un lien de partage (`#s=…`) s'ouvre sans compte** (vue client, écrin d'ouverture). Mise en route et règles de sécurité : `docs/FIREBASE.md`.
+La CI GitHub déploie sans clé (Workload Identity Federation) : aperçu par PR, production sur `main`. Nouveau domaine : l'ajouter aux *domaines autorisés* d'Authentication.
+Options d'URL utiles : `?fx=off` (ancien rendu direct), `?fx=mobile` (profil iPhone), `?intro=1` (force l'écrin), `?debug` (console, en développement uniquement).
 
 ## Tester sur iPhone (voir docs/IOS_TESTS.md)
 1. Mac/PC et iPhone sur le même Wi‑Fi, `npm run dev`, ouvrir l'URL « Network » (https://192.168.x.x:5173) dans Safari ou Chrome iOS, accepter le certificat.
