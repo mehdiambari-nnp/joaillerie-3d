@@ -1,8 +1,8 @@
 node_modules
-.firebase
 dist
 public/mediapipe/wasm
 *.log
 .DS_Store
 tests/e2e/.tmp
 assets/test/
+.firebase/
