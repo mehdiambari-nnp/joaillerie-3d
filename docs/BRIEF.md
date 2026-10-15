@@ -1,5 +1,7 @@
 # Brief de développement — Configurateur 3D de bijoux (FBX → rendu temps réel → AR)
 
+> **Document historique** : brief d'origine (octobre 2026). L'application a beaucoup évolué (Firebase, comptes joailliers, projets, ateliers, liens suivis, backoffice, effets de rendu) : l'état actuel est dans `README.md`, `docs/FIREBASE.md` et `DECISIONS.md`. Les captures citées plus bas (`docs/screenshots/`) ne sont plus versionnées.
+
 > **Destinataire : agent de développement (Claude Sonnet 5.5, Claude Code).**
 > Ce document est ta source de vérité. Lis-le en entier avant d'écrire une ligne de code. Les sections marquées **[DÉCISION]** sont arrêtées ; celles marquées **[À VALIDER]** doivent être confirmées avec l'utilisateur (Mehdi) avant implémentation si elles bloquent.
 >
