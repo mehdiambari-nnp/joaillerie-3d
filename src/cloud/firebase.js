@@ -1,14 +1,22 @@
 // Service Firebase : Auth (joaillier), Cloud Storage (modèles, adressés par empreinte, lisibles par lien), Firestore (projets par utilisateur).
 // Le SDK n'est chargé qu'à la demande (import dynamique depuis ./index.js).
 import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile } from 'firebase/auth';
-import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
-import { getStorage, ref, uploadBytesResumable, getBytes, getMetadata } from 'firebase/storage';
+import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile, connectAuthEmulator } from 'firebase/auth';
+import { getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { getStorage, connectStorageEmulator, ref, uploadBytesResumable, getBytes, getMetadata } from 'firebase/storage';
 import { modelId, gzip, gunzip } from '../share/remote.js';
+import { createWorkspaces } from './workspaces.js';
+import { displayName } from './name.js';
+
+// Développement : `?emulator` branche l'application sur les émulateurs locaux (npm run emulators) : comptes et données fictifs,
+// projet « demo-jewel3d », rien n'est écrit en production. Jamais actif dans le build publié (import.meta.env.DEV).
+const useEmulator = () => { try { return import.meta.env.DEV && new URLSearchParams(location.search).has('emulator'); } catch { return false; } };
 
 export function create(config) {
-  const app = initializeApp(config);
+  const emu = useEmulator();
+  const app = initializeApp(emu ? { ...config, projectId: 'demo-jewel3d', apiKey: 'demo-key', storageBucket: 'demo-jewel3d.appspot.com' } : config);
   const auth = getAuth(app), db = getFirestore(app), storage = getStorage(app);
+  if (emu) { connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); connectFirestoreEmulator(db, '127.0.0.1', 8080); connectStorageEmulator(storage, '127.0.0.1', 9199); }
   const state = { user: undefined, subs: new Set() }; // undefined : état pas encore connu
   onAuthStateChanged(auth, (u) => { state.user = u ? { uid: u.uid, email: u.email, name: u.displayName || '' } : null; state.subs.forEach((f) => f(state.user)); });
   const uid = () => { if (!auth.currentUser) throw Object.assign(new Error('Connexion requise'), { code: 'auth/required' }); return auth.currentUser.uid; };
@@ -60,7 +68,9 @@ export function create(config) {
     async get(id) { const s = await getDoc(doc(db, 'shares', id)); if (!s.exists()) throw new Error('partage introuvable'); return s.data().p; },
   };
 
-  const col = () => collection(db, 'users', uid(), 'projects');
+  // Ateliers partagés : les projets sont ceux de l'atelier actif (le mien, ou celui d'un joaillier qui m'a invité)
+  const workspaces = createWorkspaces(db, () => { uid(); const u = auth.currentUser; return { uid: u.uid, email: u.email || '', name: displayName({ name: u.displayName, email: u.email }) }; });
+  const col = () => { uid(); return collection(db, 'users', workspaces.active, 'projects'); };
   const projects = {
     async list() {
       const snap = await getDocs(query(col(), orderBy('updated', 'desc')));
@@ -70,7 +80,7 @@ export function create(config) {
       const { id, config, options, ...rest } = meta;
       const modelHash = buffer ? await models.upload({ buffer, name: meta.modelName, options }) : meta.modelHash;
       const d = doc(col(), id), old = await getDoc(d);
-      await setDoc(d, { ...rest, modelHash, options: JSON.stringify(options || {}), config: JSON.stringify(config || {}), created: old.exists() ? old.data().created : Date.now(), updated: Date.now() });
+      await setDoc(d, { ...rest, modelHash, options: JSON.stringify(options || {}), config: JSON.stringify(config || {}), created: old.exists() ? old.data().created : Date.now(), updated: Date.now(), by: displayName({ name: auth.currentUser.displayName, email: auth.currentUser.email }) });
       return id;
     },
     async get(id) {
@@ -83,5 +93,5 @@ export function create(config) {
     remove: (id) => deleteDoc(doc(col(), id)),
   };
 
-  return { kind: 'firebase', auth: authApi, models, projects, shares };
+  return { kind: 'firebase', auth: authApi, models, projects, shares, workspaces };
 }

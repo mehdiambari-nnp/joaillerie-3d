@@ -28,3 +28,15 @@ Le mode « offline » (`npm run dev:offline`, `--mode offline`, projets sur l'ap
 ## Raccourci : tout déployer en une commande
 Depuis le dépôt, sur ton ordinateur : `npx firebase login`, puis `npm run deploy:all` (règles Firestore et Storage + index + Hosting). Reste le CORS du bucket, à faire une fois dans Google Cloud Shell (console.cloud.google.com, icône `>_`) :
 `echo '[{"origin":["*"],"method":["GET","HEAD"],"maxAgeSeconds":3600}]' > cors.json && gcloud storage buckets update gs://jewel3d-e8caa.firebasestorage.app --cors-file=cors.json`
+
+## Ateliers partagés et invitations
+L'**atelier** d'un joaillier = ses projets (`users/{uid}/projects`). Il peut y **inviter d'autres joailliers** (menu burger → *Joailliers* → *Inviter un joaillier*) :
+- l'app crée un **lien à usage unique, valable 7 jours** (`…/#i=<jeton secret de 128 bits>`), à envoyer à la personne (bouton e-mail prérempli, copie, partage) ;
+- la personne ouvre le lien, se connecte ou crée son compte, puis accepte : elle **voit, ouvre, modifie, crée et supprime** les projets de l'atelier ; un sélecteur *Atelier* apparaît dans son tiroir ;
+- **tout ce qu'un invité enregistre appartient à l'atelier du propriétaire** (il le garde si l'invité part) ; chaque projet affiche qui l'a modifié en dernier ;
+- le propriétaire **retire** un joaillier à tout moment, ou annule une invitation en attente ; un invité peut **quitter** l'atelier. Un invité ne peut pas inviter à son tour dans l'atelier d'un autre.
+
+Données : `invites/{jeton}`, `workspaces/{owner}/members/{uid}`, `users/{uid}/memberships/{owner}` (index inverse). Les règles (`firestore.rules`) imposent l'usage unique (le jeton est marqué utilisé *dans la même écriture groupée* que l'adhésion), l'expiration et l'identité ; elles sont testées sur l'émulateur : `npm run test:rules` (Java requis, lancé aussi par la CI). **Déployer les règles avant le site** : `npx firebase deploy --only firestore:rules`.
+
+### Tester en local sans toucher à la production
+`npm run emulators` (Auth, Firestore, Storage fictifs, projet `demo-jewel3d`), puis `npm run dev` et ouvrir `http://localhost:5173/?emulator`. Pour simuler deux joailliers dans le même navigateur, utiliser deux origines : `http://localhost:5173/?emulator` et `http://127.0.0.1:5173/?emulator` (les sessions sont séparées).

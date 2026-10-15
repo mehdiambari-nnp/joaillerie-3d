@@ -101,6 +101,10 @@ export function parseShareJson(json) {
   try { return fromPayload(JSON.parse(json)); } catch { return null; }
 }
 
+/** Invitation dans un atelier : lien `#i=<jeton de 32 caractères hexadécimaux>` (le jeton est secret et à usage unique). */
+export const parseInviteHash = (hash) => /[#&]i=([a-f0-9]{32})/.exec(hash || '')?.[1] ?? null;
+export const inviteUrl = (token, base = location.origin + location.pathname) => `${base}#i=${token}`;
+
 /** Variantes issues d'un fichier ou d'un projet (donnée non fiable) : forme vérifiée, identifiant réduit à [\w-]. */
 export function cleanVariants(v) {
   if (!Array.isArray(v)) return [];

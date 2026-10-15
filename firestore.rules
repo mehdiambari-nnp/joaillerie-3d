@@ -1,21 +1,85 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ---- Fonctions communes ----
+    function signedIn() { return request.auth != null; }
+    function isOwner(owner) { return signedIn() && request.auth.uid == owner; }
+    // Atelier partagé : l'atelier d'un joaillier = ses projets (users/{owner}/projects) ; les joailliers invités y sont listés dans
+    // workspaces/{owner}/members/{uid}. Un membre lit et écrit les projets de l'atelier ; seul le propriétaire invite et retire.
+    function isMember(owner) { return signedIn() && exists(/databases/$(database)/documents/workspaces/$(owner)/members/$(request.auth.uid)); }
+    function canWork(owner) { return isOwner(owner) || isMember(owner); }
+    // Invitation consommée par ce joaillier : valide avant l'écriture (émise par ce propriétaire, non utilisée, non expirée) ET marquée
+    // utilisée par lui DANS LE MÊME LOT d'écritures (getAfter). Sans cela, un lien pourrait servir à plusieurs personnes.
+    function consumesInvite(token, owner) {
+      return get(/databases/$(database)/documents/invites/$(token)).data.owner == owner
+        && get(/databases/$(database)/documents/invites/$(token)).data.used == false
+        && get(/databases/$(database)/documents/invites/$(token)).data.expires > request.time.toMillis()
+        && getAfter(/databases/$(database)/documents/invites/$(token)).data.used == true
+        && getAfter(/databases/$(database)/documents/invites/$(token)).data.usedBy == request.auth.uid;
+    }
+
     // Liens courts : lisibles par quiconque connaît l'identifiant (pas de listing), créés une fois par un joaillier connecté.
     match /shares/{id} {
       allow get: if true;
-      allow create: if request.auth != null && id.matches('[a-f0-9]{12}')
+      allow create: if signedIn() && id.matches('[a-f0-9]{12}')
         && request.resource.data.keys().hasOnly(['p', 'created'])
         && request.resource.data.p is string && request.resource.data.p.size() < 16000;
       allow update, delete: if false;
     }
 
-    // Projets d'un joaillier : lui seul les lit et les écrit.
+    // Projets de l'atelier d'un joaillier : lui et ses membres.
     match /users/{uid}/projects/{pid} {
-      allow read, delete: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow read, delete: if canWork(uid);
+      allow create, update: if canWork(uid)
         && request.resource.data.name is string && request.resource.data.name.size() <= 120
         && request.resource.data.modelHash is string && request.resource.data.modelHash.matches('[a-f0-9]{32}');
+    }
+
+    // Ateliers que j'ai rejoints (index inverse, pour les lister) : je le lis ; je le crée en acceptant une invitation ;
+    // je le supprime en quittant, ou le propriétaire en me retirant.
+    match /users/{uid}/memberships/{owner} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && owner != uid
+        && request.resource.data.keys().hasOnly(['owner', 'ownerName', 'joined', 'invite'])
+        && request.resource.data.owner == owner
+        && request.resource.data.invite is string && request.resource.data.invite.matches('[a-f0-9]{32}')
+        && consumesInvite(request.resource.data.invite, owner);
+      allow delete: if isOwner(uid) || isOwner(owner);
+      allow update: if false;
+    }
+
+    // Membres d'un atelier.
+    match /workspaces/{owner}/members/{m} {
+      allow read: if canWork(owner);
+      allow create: if isOwner(m) && m != owner
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'joined', 'invite'])
+        && request.resource.data.uid == m
+        && request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.invite is string && request.resource.data.invite.matches('[a-f0-9]{32}')
+        && consumesInvite(request.resource.data.invite, owner);
+      allow delete: if isOwner(owner) || isOwner(m);
+      allow update: if false;
+    }
+
+    // Invitations : lien secret à usage unique, valable 7 jours. Lisible par qui détient le lien (pas de listing, sauf le propriétaire).
+    match /invites/{token} {
+      allow get: if signedIn() && token.matches('[a-f0-9]{32}');
+      allow list: if signedIn() && resource.data.owner == request.auth.uid;
+      allow create: if signedIn() && token.matches('[a-f0-9]{32}')
+        && request.resource.data.keys().hasOnly(['owner', 'ownerName', 'ownerEmail', 'email', 'created', 'expires', 'used'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.used == false
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.expires is int
+        && request.resource.data.expires > request.time.toMillis()
+        && request.resource.data.expires <= request.time.toMillis() + 8 * 24 * 3600 * 1000;
+      // acceptation : une seule fois, par un autre joaillier, avant l'expiration ; seuls les champs d'usage changent
+      allow update: if signedIn() && resource.data.used == false && resource.data.expires > request.time.toMillis()
+        && request.auth.uid != resource.data.owner
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
+        && request.resource.data.used == true && request.resource.data.usedBy == request.auth.uid;
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
     }
   }
 }
