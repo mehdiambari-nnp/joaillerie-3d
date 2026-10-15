@@ -183,7 +183,7 @@
 - **Dépôt privé** : le FBX Domuse et les photos de test restent versionnés (dépôt toujours privé).
 - **Liens courts** : identifiants de 48 bits conservés (liens de visualisation, pas des secrets).
 - **Dépendances** : `overrides` force `@grpc/grpc-js` 1.14.6 (correctifs de sécurité ; le navigateur n'utilise pas ce module). `npm audit --omit=dev` : 0 faille, et la CI échoue dès « high ».
-- **CSP** : `Content-Security-Policy` minimale appliquée (`frame-ancestors`, `object-src`, `base-uri`) ; la politique complète est en `Content-Security-Policy-Report-Only` (`firebase.json`). `node scripts/csp-check.mjs` la rejoue en mode bloquant sur `dist/` : 0 violation (page de connexion et outil). Pour l'appliquer : renommer l'en-tête en `Content-Security-Policy` après avoir vérifié la connexion Google sur un aperçu.
+- **CSP** : politique complète appliquée en mode **bloquant** (`Content-Security-Policy`, `firebase.json`). `node scripts/csp-check.mjs` la rejoue sur `dist/` : 0 violation. Si une source légitime est bloquée (console : « violates the following Content Security Policy directive »), l'ajouter à la directive concernée ; retour arrière rapide : renommer l'en-tête en `Content-Security-Policy-Report-Only`.
 - **CI** : job `test` (audit, tests unitaires, build, e2e Chromium) puis job `deploy` seulement s'il est vert. Le test d'import FBX est sauté (et non en échec) quand le fichier privé est absent.
 - **Rendu** : le pipeline d'image (`fx.js`) n'est activé que si le GPU gère les tampons flottants ; l'état de la scène et de l'ombre de contact est restauré même en cas d'erreur ; la caméra de l'essayage est éteinte si le suivi de la main ne démarre pas.
 
