@@ -8,7 +8,7 @@ import { UI } from './ui/ui.js';
 import { t } from './ui/i18n.js';
 import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
-import { parseShareHash, shortShareRef, parseShareJson } from './state/store.js';
+import { parseShareHash, shortShareRef, parseShareJson, cleanVariants } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
 import { getCloud } from './cloud/index.js';
 
@@ -58,7 +58,7 @@ async function boot() {
       if (pending && (pending.modelId === modelId)) { cfg = { ...(cfg || {}), assign: pending.assign, hidden: pending.hidden }; }
       app.setModel(model, modelId, cfg);
       if (introPending) model.root.visible = false; // masquée jusqu'à ce que l'écrin soit prêt (pas d'apparition avant l'intro)
-      if (model.project?.variants) { app.variants = model.project.variants; app.emit('variants'); }
+      if (model.project?.variants) { app.variants = cleanVariants(model.project.variants); app.emit('variants'); }
       if (pending && pending.modelId === modelId) {
         if (pending.env) app.viewer.setEnvironment(pending.env);
         if (pending.envRot != null) app.viewer.setEnvironmentRotation(pending.envRot);
@@ -92,7 +92,7 @@ async function boot() {
       const { meta } = p;
       const model = await load(p.buffer, meta.modelName, meta.options || {}, meta.config || null, meta.modelId);
       if (!model) return false;
-      if (meta.config?.variants) { app.variants = meta.config.variants; app.emit('variants'); }
+      if (meta.config?.variants) { app.variants = cleanVariants(meta.config.variants); app.emit('variants'); }
       if (meta.env) app.viewer.setEnvironment(meta.env);
       if (meta.envRot != null) app.viewer.setEnvironmentRotation(meta.envRot);
       app.exploder.assembleNow();
@@ -151,7 +151,7 @@ async function boot() {
   ui.changelog();
   if (shareFailed) ui.toast(t('shareLinkFailed'), 6000);
   else if (remoteFailed) ui.toast(t('remoteFailed'), 6000);
-  else if (pending) ui.toast(`Lien pour « ${pending.modelId} » : ouvrez ce fichier pour appliquer la configuration.`, 5000);
+  else if (pending) ui.toast(t('shareNeedsFile').replace('{name}', pending.modelId), 5000);
 
   if ('serviceWorker' in navigator && import.meta.env.PROD && location.protocol === 'https:') {
     navigator.serviceWorker.register('./sw.js').catch(() => {});

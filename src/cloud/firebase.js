@@ -49,6 +49,7 @@ export function create(config) {
       onProgress(1);
       const c = meta.customMetadata || {};
       if (c.gz === '1') buffer = await gunzip(buffer);
+      if ((await modelId(buffer)) !== id) throw new Error('Modèle altéré : empreinte différente de son identifiant'); // l'identifiant EST l'empreinte du fichier
       let options = {}; try { options = JSON.parse(c.opts || '{}'); } catch { /* options absentes */ }
       return { buffer, name: c.name || 'modele.glb', options };
     },

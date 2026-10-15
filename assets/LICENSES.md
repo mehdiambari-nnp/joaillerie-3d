@@ -1,4 +1,5 @@
 - three.js, three-mesh-bvh, meshoptimizer, lz-string, qrcode, @google/model-viewer : MIT / Apache-2.0 (voir node_modules).
 - MediaPipe Tasks Vision et `public/mediapipe/hand_landmarker.task` : Apache-2.0 (Google), modèle fourni via paquet npm/dépôt officiel.
-- `assets/test/MAQUETTE_GEMV.fbx` : fichier privé de l'utilisateur — ne pas publier ni committer sur un dépôt public.
+- `assets/test/MAQUETTE_GEMV.fbx` (ignoré par git) : maquette privée de l'utilisateur, utilisée seulement en local pour les tests.
+- `themes/domuse/MAQUETTE_GEMV.fbx` : maquette par défaut du thème Domuse, volontairement embarquée dans le site publié (`model/`). Elle est versionnée : à retirer de l'historique si le dépôt devient public sans l'accord du client.
 - `tests/fixtures/*.jpg` : photos de test de mains issues d'Internet, usage de test local uniquement ; vérifier leur licence avant toute redistribution.

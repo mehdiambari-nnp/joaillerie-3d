@@ -638,7 +638,7 @@ export class UI {
     if (/face|front/i.test(n)) return t('viewFront');
     if (/dessus|top/i.test(n)) return t('viewTop');
     if (/droite|right/i.test(n)) return t('viewRight');
-    if (/gauche|left/i.test(n)) return 'Gauche';
+    if (/gauche|left/i.test(n)) return t('viewLeft');
     if (/persp/i.test(n)) return t('view34') + ' (CAO)';
     return n;
   }
@@ -647,7 +647,7 @@ export class UI {
     const v = this.app.model?.views ?? [];
     const std = [[t('view34'), [0.62, 0.45, 0.64]], [t('viewFront'), [0, 0, 1]], [t('viewTop'), [0, 1, 0]], [t('viewSide'), [1, 0, 0]]];
     const fromFile = v.map((x) => [this.viewLabel(x.name), x.dir]);
-    $('[data-pop=views]', this.root).innerHTML = `<h4>${t('views')}</h4><div class="row">${[...std, ...fromFile].map(([n, d]) => `<button class="btn small" data-view='${JSON.stringify(d)}'>${esc(n)}</button>`).join('')}</div>`;
+    $('[data-pop=views]', this.root).innerHTML = `<h4>${t('views')}</h4><div class="row">${[...std, ...fromFile].map(([n, d]) => `<button class="btn small" data-view="${esc(JSON.stringify([...d].slice(0, 3).map(Number)))}">${esc(n)}</button>`).join('')}</div>`;
   }
 
   renderEnvPop() {
@@ -877,7 +877,7 @@ export class UI {
     const d = this.html('');
     const draw = () => {
       d.innerHTML = `<div class="row"><input type="text" data-r="vname" placeholder="${t('variantName')}" maxlength="40"><button class="btn primary" data-s="save">${t('saveVariant')}</button></div>
-        <ul style="list-style:none;padding:0">${app.variants.map((v) => `<li class="row"><strong style="flex:1">${esc(v.name)}</strong><button class="btn small" data-s="apply" data-id="${v.id}">${t('apply')}</button><button class="btn small" data-s="del" data-id="${v.id}">${t('delete')}</button></li>`).join('')}</ul>`;
+        <ul style="list-style:none;padding:0">${app.variants.map((v) => `<li class="row"><strong style="flex:1">${esc(v.name)}</strong><button class="btn small" data-s="apply" data-id="${esc(v.id)}">${t('apply')}</button><button class="btn small" data-s="del" data-id="${esc(v.id)}">${t('delete')}</button></li>`).join('')}</ul>`;
     };
     draw();
     d.addEventListener('click', (e) => {

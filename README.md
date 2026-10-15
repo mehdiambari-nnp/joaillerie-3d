@@ -2,7 +2,7 @@
 
 Web app (HTML5 / CSS3 / JS + three.js) : importez un `.fbx` (ou GLB/OBJ), tournez la bague comme sur Sketchfab,
 touchez une partie (corps, griffes, chaton, pierres…) et appliquez une matière (or, platine, diamant, émeraude…) en temps réel.
-Partage par lien, export GLB/USDZ, **AR Quick Look** (iPhone) et **essayage sur la main** (caméra + MediaPipe).
+Partage par lien, export GLB/USDZ, **AR Quick Look** (iPhone, désactivée pour l'instant dans l'interface) et **essayage sur la main** (caméra + MediaPipe).
 
 Tout s'exécute dans le navigateur : le fichier 3D ne quitte jamais l'appareil.
 
@@ -11,7 +11,7 @@ Tout s'exécute dans le navigateur : le fichier 3D ne quitte jamais l'appareil.
 npm install            # copie aussi les wasm MediaPipe (postinstall)
 npm run dev            # HTTPS auto-signé, accessible sur le réseau local
 npm run dev -- --open  # puis ?model=gemv charge assets/test/MAQUETTE_GEMV.fbx
-npm test               # 18 tests unitaires
+npm test               # tests unitaires (l'import FBX exige assets/test/MAQUETTE_GEMV.fbx, absent du dépôt)
 npm run test:e2e       # E2E Chromium headless (captures dans docs/screenshots/)
 npm run build          # dist/ statique, à héberger en HTTPS
 ```
