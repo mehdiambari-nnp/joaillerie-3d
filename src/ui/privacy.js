@@ -29,4 +29,6 @@ export function showPrivacyBar(ui) {
   window.addEventListener('rc:optout', render);
   render();
   ui.root.append(bar);
+  document.documentElement.classList.add('has-privacy');
+  window.dispatchEvent(new Event('resize'));
 }
