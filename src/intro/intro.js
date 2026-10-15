@@ -78,6 +78,7 @@ export async function playIntro(app, ui, theme) {
 
   const open = () => { if (state !== 'idle') return; emitTrack('open'); state = 'anim'; t0 = performance.now(); hint.classList.add('gone'); startCam(); };
   const skip = () => { skipped = true; if (state === 'idle') state = 'anim'; t0 = performance.now() - 99999; hint.classList.add('gone'); };
+  ui.skipIntro = skip; // permet à l'interface d'interrompre l'introduction (ex. retour en mode Joaillier)
   // toucher la boîte (clic net, pas un glissé)
   let down = null;
   const pd = (e) => { down = { x: e.clientX, y: e.clientY }; };
@@ -140,6 +141,7 @@ export async function playIntro(app, ui, theme) {
     viewer.autoRotateEnabled = autoSave;
     viewer.controls.target.copy(finalTarget); viewer.camera.position.copy(finalPos); viewer.controls.update();
     hint.remove();
+    ui.skipIntro = null;
     delete ui.el.dataset.intro;
     viewer.invalidate();
     resolveDone();

@@ -194,6 +194,13 @@ const cl = await page.evaluate(() => {
 });
 ok(!cl.zones && !cl.mats && !cl.seg && cl.tryon && !cl.ar && cl.sel === 0 && !cl.interactive, 'mode client : épuré (essayage + photo ; AR désactivé par flag)');
 await page.evaluate(() => __rc.ui.setMode('vitrine'));
+// aperçu client : le bouton Client rejoue l'écrin comme pour le client réel ; « Quitter l'aperçu » l'interrompt proprement
+await page.click('button[data-mode=client]');
+await page.waitForSelector('.intro-open', { timeout: 60000 });
+ok(await page.evaluate(() => document.querySelector('.app').dataset.intro === '1' && document.querySelector('.app').dataset.mode === 'client'), 'aperçu client : écrin affiché en mode client');
+await page.click('[data-a=exit-client]');
+await page.waitForFunction(() => !document.querySelector('.app').dataset.intro && document.querySelector('.app').dataset.mode === 'vitrine', null, { timeout: 15000 });
+ok(await page.evaluate(() => __rc.app.model.root.position.y === 0 && __rc.app.model.root.visible && !document.querySelector('.intro-hint')), 'aperçu client : retour joaillier, intro interrompue proprement');
 ok(await page.evaluate(() => !document.querySelector('[data-a=ar]:not([hidden])')), 'bouton AR masqué (flag ar désactivé)');
 await page.evaluate(() => __rc.ui.openAR()); // le code AR reste fonctionnel même flag off
 await page.waitForTimeout(1500);
