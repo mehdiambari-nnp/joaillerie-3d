@@ -16,6 +16,10 @@ jobs:
       - name: Audit des dépendances (bloque les failles critiques de production)
         run: npm audit --omit=dev --audit-level=critical
       - run: npm test --if-present -- --exclude tests/unit/import.test.js
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - name: Règles de sécurité Firestore (émulateur)
+        run: npm run test:rules
       - run: npm run build
       - uses: google-github-actions/auth@v3
         with:

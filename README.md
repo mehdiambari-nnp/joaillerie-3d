@@ -15,12 +15,14 @@ npm run dev -- --open  # puis ?model=gemv charge assets/test/MAQUETTE_GEMV.fbx (
 npm test               # tests unitaires (le fichier import.test.js exige la maquette privée assets/test/)
 npm run test:e2e       # E2E Chromium headless, mode offline (captures dans docs/screenshots/)
 npm run build          # dist/ statique (Firebase) ; npm run build:offline pour la variante sans Firebase
+npm run emulators      # émulateurs Firebase (Auth/Firestore/Storage) ; ouvrir ?emulator pour s'y brancher
+npm run test:rules     # règles de sécurité Firestore sur l'émulateur (Java requis)
 npm run deploy:all     # règles Firestore/Storage + Hosting (npx firebase login --reauth si la session a expiré)
 ```
 
 ## Comptes, partage et hébergement
 Firebase (projet `jewel3d-e8caa`) : Hosting, Authentication (e-mail + Google), Cloud Storage (modèles partagés), Firestore (projets, liens courts).
-L'outil exige un compte joaillier ; **un lien de partage (`#s=…`) s'ouvre sans compte** (vue client, écrin d'ouverture). Mise en route et règles de sécurité : `docs/FIREBASE.md`.
+L'outil exige un compte joaillier ; un joaillier peut **inviter d'autres joailliers dans son atelier** par un lien à usage unique (voir `docs/FIREBASE.md`) ; **un lien de partage (`#s=…`) s'ouvre sans compte** (vue client, écrin d'ouverture). Mise en route et règles de sécurité : `docs/FIREBASE.md`.
 La CI GitHub déploie sans clé (Workload Identity Federation) : aperçu par PR, production sur `main`. Nouveau domaine : l'ajouter aux *domaines autorisés* d'Authentication.
 Options d'URL utiles : `?fx=off` (ancien rendu direct), `?fx=mobile` (profil iPhone), `?intro=1` (force l'écrin), `?debug` (console, en développement uniquement).
 
