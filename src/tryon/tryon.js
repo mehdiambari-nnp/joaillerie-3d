@@ -1,4 +1,5 @@
 // Essayage de la bague sur la main : caméra + MediaPipe + three.js dans la page (aucun WebXR requis → iOS OK).
+import { emitTrack } from '../cloud/track.js';
 import * as THREE from 'three';
 import { t } from '../ui/i18n.js';
 import { prefs } from '../state/store.js';
@@ -307,6 +308,7 @@ export class TryOn {
 
   /** Photo : image caméra + rendu 3D composés, partagée via la feuille de partage iOS ou téléchargée. */
   async capture() {
+    emitTrack('photo');
     const r = this.viewer.renderer;
     await withoutHighlight(this.app, async () => {
       r.render(this.scene, this.camera);

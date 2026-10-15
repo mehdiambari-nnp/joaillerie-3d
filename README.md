@@ -23,7 +23,7 @@ npm run deploy:all     # règles Firestore/Storage + Hosting (npx firebase login
 
 ## Comptes, partage et hébergement
 Firebase (projet `jewel3d-e8caa`) : Hosting, Authentication (e-mail + Google), Cloud Storage (modèles partagés), Firestore (projets, liens courts).
-L'outil exige un compte joaillier ; un joaillier peut **inviter d'autres joailliers dans son atelier** par un lien à usage unique (voir `docs/FIREBASE.md`) ; **un lien de partage (`#s=…`) s'ouvre sans compte** (vue client, écrin d'ouverture). Mise en route et règles de sécurité : `docs/FIREBASE.md`.
+L'outil exige un compte joaillier ; un joaillier peut **suivre les liens clients qu'il envoie** (consultations, temps passé, essayages ; désactivation, modification) et **inviter d'autres joailliers dans son atelier** par un lien à usage unique (voir `docs/FIREBASE.md`) ; **un lien de partage (`#s=…`) s'ouvre sans compte** (vue client, écrin d'ouverture). Mise en route et règles de sécurité : `docs/FIREBASE.md`.
 La CI GitHub déploie sans clé (Workload Identity Federation) : aperçu par PR, production sur `main`. Nouveau domaine : l'ajouter aux *domaines autorisés* d'Authentication.
 Options d'URL utiles : `?fx=off` (ancien rendu direct), `?fx=mobile` (profil iPhone), `?intro=1` (force l'écrin), `?debug` (console, en développement uniquement).
 

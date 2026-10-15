@@ -1,5 +1,6 @@
 // Introduction : l'écrin de la marque est fermé au centre de la vue 3D ; au toucher, le couvercle se soulève, la bague
 // sort de son écrin, puis la boîte disparaît et le configurateur apparaît.
+import { emitTrack } from '../cloud/track.js';
 import * as THREE from 'three';
 import { buildBox } from './box.js';
 import { t } from '../ui/i18n.js';
@@ -75,7 +76,7 @@ export async function playIntro(app, ui, theme) {
   let resolveDone; const done = new Promise((r) => { resolveDone = r; });
   let state = 'idle', t0 = 0, skipped = false;
 
-  const open = () => { if (state !== 'idle') return; state = 'anim'; t0 = performance.now(); hint.classList.add('gone'); startCam(); };
+  const open = () => { if (state !== 'idle') return; emitTrack('open'); state = 'anim'; t0 = performance.now(); hint.classList.add('gone'); startCam(); };
   const skip = () => { skipped = true; if (state === 'idle') state = 'anim'; t0 = performance.now() - 99999; hint.classList.add('gone'); };
   ui.skipIntro = skip; // permet à l'interface d'interrompre l'introduction (ex. retour en mode Joaillier)
   // toucher la boîte (clic net, pas un glissé)

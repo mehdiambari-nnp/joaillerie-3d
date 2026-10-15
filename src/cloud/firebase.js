@@ -6,6 +6,7 @@ import { getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDoc
 import { getStorage, connectStorageEmulator, ref, uploadBytesResumable, getBytes, getMetadata } from 'firebase/storage';
 import { modelId, gzip, gunzip } from '../share/remote.js';
 import { createWorkspaces } from './workspaces.js';
+import { createLinks } from './links.js';
 import { displayName } from './name.js';
 
 // Développement : `?emulator` branche l'application sur les émulateurs locaux (npm run emulators) : comptes et données fictifs,
@@ -70,6 +71,7 @@ export function create(config) {
 
   // Ateliers partagés : les projets sont ceux de l'atelier actif (le mien, ou celui d'un joaillier qui m'a invité)
   const workspaces = createWorkspaces(db, () => { uid(); const u = auth.currentUser; return { uid: u.uid, email: u.email || '', name: displayName({ name: u.displayName, email: u.email }) }; });
+  const links = createLinks(db, auth, () => { uid(); return { uid: auth.currentUser.uid }; });
   const col = () => { uid(); return collection(db, 'users', workspaces.active, 'projects'); };
   const projects = {
     async list() {
@@ -93,5 +95,5 @@ export function create(config) {
     remove: (id) => deleteDoc(doc(col(), id)),
   };
 
-  return { kind: 'firebase', auth: authApi, models, projects, shares, workspaces };
+  return { kind: 'firebase', auth: authApi, models, projects, shares, workspaces, links };
 }

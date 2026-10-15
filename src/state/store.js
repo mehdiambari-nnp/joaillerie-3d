@@ -105,6 +105,9 @@ export function parseShareJson(json) {
 export const parseInviteHash = (hash) => /[#&]i=([a-f0-9]{32})/.exec(hash || '')?.[1] ?? null;
 export const inviteUrl = (token, base = location.origin + location.pathname) => `${base}#i=${token}`;
 
+/** Lien client SUIVI : `#l=<20 caractères hexadécimaux>` (identifiant secret, désactivable par le joaillier). */
+export const trackedLinkRef = (hash) => /[#&]l=([a-f0-9]{20})(?:&|$)/.exec(hash || '')?.[1] ?? null;
+
 /** Variantes issues d'un fichier ou d'un projet (donnée non fiable) : forme vérifiée, identifiant réduit à [\w-]. */
 export function cleanVariants(v) {
   if (!Array.isArray(v)) return [];

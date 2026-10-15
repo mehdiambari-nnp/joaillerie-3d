@@ -2,6 +2,8 @@
 import { t } from './i18n.js';
 import * as THREE from 'three';
 import { displayName } from '../cloud/name.js';
+import { emitTrack } from '../cloud/track.js';
+import { openLinks } from './liens.js';
 import { workspaceBlocks, openInviteDialog, joinFlow } from './atelier.js';
 import { shouldPlayIntro, playIntro } from '../intro/intro.js';
 import { FEATURES } from '../config/features.js';
@@ -565,6 +567,7 @@ export class UI {
       case 'proj-save-new': this.saveCurrentProject(true); break;
       case 'proj-open': this.svc.openProject?.(el.closest('[data-id]').dataset.id).then((ok) => { if (ok) this.closeProjects(); }); break;
       case 'proj-del': this.removeProject(el.closest('[data-id]').dataset.id); break;
+      case 'links': this.openLinks(); break;
       case 'ws-invite': this.svc.cloud().then((c) => openInviteDialog(this, c, () => this.renderProjects())); break;
       case 'ws-remove': this.removeMember(el.closest('[data-uid]').dataset.uid); break;
       case 'ws-revoke': this.revokeInvite(el.closest('[data-token]').dataset.token); break;
@@ -574,7 +577,7 @@ export class UI {
       case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
       case 'ar': this.openAR(); break;
-      case 'tryon': this.tryon.open(); break;
+      case 'tryon': emitTrack('tryon'); this.tryon.open(); break;
     }
   }
 
@@ -765,6 +768,7 @@ export class UI {
             <span><b>${esc(p.name)}</b><small>${fmt(p.updated)} · ${esc(p.modelName)}${p.by && p.by !== myName ? ` · ${esc(p.by)}` : ''}</small></span></button>
           <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
       </section>
+      ${cloud.links ? `<section class="dr-sec"><h3 class="dr-t">${t('linksTitle')}</h3><p class="dr-note">${t('linksDrawerNote')}</p><button class="btn wide" data-a="links">${t('linksOpen')}</button></section>` : ''}
       ${ws.bottom}
       <footer class="dr-foot">
         ${cloud.auth.enabled ? `<p class="dr-who"><small>${t('signedInAs')}</small><span title="${esc(cloud.auth.user.email || '')}">${esc(displayName(cloud.auth.user))}</span></p>
@@ -891,15 +895,24 @@ export class UI {
       try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.width = Math.round(p * 100) + '%'; }); }
       catch (e) { console.warn('Hébergement du modèle impossible', e); hostFailed = true; }
     } else remote = await this.hostModel().catch(() => null);
-    const urls = { client: await this.shortShareUrl(true, remote), jeweler: await this.shortShareUrl(false, remote) };
+    const tracked = !!cloud.links && !!cloud.auth.user; // Firebase : lien client SUIVI (un par envoi) ; sinon lien classique
+    const urls = { client: tracked ? null : await this.shortShareUrl(true, remote), jeweler: await this.shortShareUrl(false, remote) };
     const field = (k, label) => `<p class="palette-title">${label}</p>
       <input type="url" readonly value="${esc(urls[k])}" data-r="shareurl-${k}" aria-label="${esc(label)}">
       <div class="row"><button class="btn ${k === 'client' ? 'primary' : ''}" data-s="copy" data-k="${k}">${t('copyLink')}</button>
         ${navigator.share ? `<button class="btn" data-s="native" data-k="${k}">${t('share')}…</button>` : ''}</div>`;
+    const clientBlock = tracked ? `<p class="palette-title">${t('clientLink')}</p>
+      <div data-r="linkform"><p class="muted tiny">${t('trackedNote')}</p>
+        <label class="fld"><span>${t('linkLabel')}</span><input type="text" data-r="linklabel" maxlength="120" placeholder="${esc(t('linkLabelHint'))}"></label>
+        <button class="btn primary" data-s="mklink">${t('linkCreate')}</button></div>
+      <div data-r="linkmade" hidden>
+        <input type="url" readonly value="" data-r="shareurl-client" aria-label="${esc(t('clientLink'))}">
+        <div class="row"><button class="btn primary" data-s="copy" data-k="client">${t('copyLink')}</button>${navigator.share ? `<button class="btn" data-s="native" data-k="client">${t('share')}…</button>` : ''}<button class="btn" data-s="mylinks">${t('linksFollow')}</button></div>
+        <img class="qr" alt="QR" width="180" height="180"></div>`
+      : `${field('client', t('clientLink'))}\n      <img class="qr" alt="QR" width="180" height="180">`;
     const d = this.html(`
       <p class="muted tiny">${t('clientNote')}</p>
-      ${field('client', t('clientLink'))}
-      <img class="qr" alt="QR" width="180" height="180">
+      ${clientBlock}
       ${field('jeweler', t('jewelerLink'))}
       <p class="muted tiny">${hostFailed ? t('shareNoHost') : remote ? t('shareHosted') : t('shareNote')}</p>
       <div class="row"><button class="btn" data-s="project">${t('exportProject')}</button></div>`);
@@ -909,10 +922,36 @@ export class UI {
       if (s === 'copy') { try { await navigator.clipboard.writeText(url); this.toast(t('linkCopied')); } catch { $(`[data-r=shareurl-${b.dataset.k}]`, d).select(); } }
       if (s === 'native') { try { await navigator.share({ url, title: t('app') }); } catch { /* annulé */ } }
       if (s === 'project') this.exportProject();
+      if (s === 'mylinks') { this.dlg.close(); this.openLinks(); }
+      if (s === 'mklink') {
+        b.disabled = true;
+        try {
+          const made = await this.createTrackedLink($('[data-r=linklabel]', d).value, remote);
+          urls.client = made.url;
+          $('[data-r=linkform]', d).hidden = true; $('[data-r=linkmade]', d).hidden = false; $('[data-r=shareurl-client]', d).value = made.url;
+          qrDataUrl(made.url).then((q) => { $('img.qr', d).src = q; }).catch(() => {});
+        } catch (ex) { console.warn(ex); this.toast(t('errorGeneric')); b.disabled = false; }
+      }
     });
     this.openDialog(t('share'), d);
-    qrDataUrl(urls.client).then((u) => { $('img.qr', d).src = u; }).catch(() => {});
+    if (urls.client) qrDataUrl(urls.client).then((u) => { $('img.qr', d).src = u; }).catch(() => {});
   }
+
+  /** Configuration d'un lien client (JSON), modèle hébergé si besoin : sert à créer un lien suivi et à le mettre à jour. */
+  async clientPayloadJson(remote) {
+    const a = this.app;
+    if (remote === undefined) remote = await this.hostModel().catch(() => null);
+    return JSON.stringify(sharePayload({ client: true, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI) }));
+  }
+  /** Crée un lien client suivi : nom donné par le joaillier, vignette 3/4, configuration actuelle. */
+  async createTrackedLink(label, remote) {
+    const a = this.app, c = await this.svc.cloud();
+    let thumb = null;
+    try { await withoutHighlight(a, async () => { thumb = await thumbnail(await a.viewer.capture({ scale: 1, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
+    return c.links.create({ json: await this.clientPayloadJson(remote), label, modelName: (a.model.meta.fileName || '').replace(/\.[^.]+$/, ''), modelId: a.modelId, thumb });
+  }
+  /** Backoffice « Liens clients » (suivi des consultations). */
+  async openLinks() { const c = await this.svc.cloud(); if (c.links) openLinks(this, c, { onChange: () => this.renderProjects?.() }); }
 
   async exportProject() {
     try {
@@ -923,7 +962,7 @@ export class UI {
   }
 
   async takePhoto() {
-    const app = this.app;
+    const app = this.app; emitTrack('photo');
     await withoutHighlight(app, async () => {
       const blob = await app.viewer.capture({ scale: 2, background: BG[this.bg] });
       const how = await shareOrDownload(blob, 'bague.png', t('app'));

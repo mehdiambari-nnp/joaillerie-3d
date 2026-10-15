@@ -8,7 +8,7 @@ import { UI } from './ui/ui.js';
 import { t } from './ui/i18n.js';
 import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
-import { parseShareHash, shortShareRef, parseShareJson, cleanVariants, needsLogin, parseInviteHash } from './state/store.js';
+import { parseShareHash, shortShareRef, parseShareJson, cleanVariants, needsLogin, parseInviteHash, trackedLinkRef } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
 import { getCloud } from './cloud/index.js';
 
@@ -21,7 +21,7 @@ function hasWebGL2() {
 
 async function boot() {
   if (!hasWebGL2()) { root.innerHTML = `<p style="padding:24px;font:16px system-ui">${t('webgl')}</p>`; return; }
-  const hasLink = /[#&][cs]=/.test(location.hash);
+  const hasLink = /[#&][csl]=/.test(location.hash);
   let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV, hasLink); // vrai tant que l'intro n'a pas pris la main
   let pending = parseShareHash(location.hash); // lien long (#c=) : configuration lue sur place
   let shareFailed = false;
@@ -29,6 +29,20 @@ async function boot() {
   if (shortRef) {
     try { pending = parseShareJson(await (await getCloud()).shares.get(shortRef)); if (!pending) throw new Error('lien illisible'); }
     catch (e) { console.warn('Lien de partage introuvable', e); shareFailed = true; introPending = false; } // lien introuvable : modèle par défaut, sans l'écrin
+  }
+  // Lien client SUIVI (#l=) : configuration lue sur le serveur ; désactivé, expiré ou supprimé : page d'information, rien d'autre.
+  const trackedRef = trackedLinkRef(location.hash);
+  let tracking = null;
+  if (trackedRef) {
+    try {
+      const links = (await getCloud()).links;
+      if (!links) throw new Error('liens suivis indisponibles (mode hors ligne)');
+      const l = await links.open(trackedRef);
+      if (!l || !l.enabled || l.expired) { (await import('./ui/linkoff.js')).showLinkOff(root, !l ? 'missing' : l.expired ? 'expired' : 'disabled'); return; }
+      pending = parseShareJson(l.p);
+      if (!pending) throw new Error('lien illisible');
+      tracking = { id: trackedRef, owner: l.owner };
+    } catch (e) { console.warn('Lien suivi introuvable', e); shareFailed = true; introPending = false; }
   }
   // Porte d'entrée : seul un lien CLIENT valide s'ouvre sans compte. Tout le reste (adresse nue, lien joaillier, lien illisible ou modifié)
   // exige la connexion d'un joaillier (Firebase). Les liens joaillier gardent leur configuration une fois connecté.
@@ -49,6 +63,8 @@ async function boot() {
   ui.initTheme(); app.viewer._applyBackground();
   if (pending?.client) ui.lockClient(); // lien client : interface épurée et verrouillée
   window.__rc = { app, ui, THREE }; // pratique pour le débogage et les tests E2E
+  if (tracking) import('./ui/privacy.js').then((m) => m.showPrivacyBar(ui)); // information du client, visible dès l'ouverture (écrin compris)
+  if (tracking) getCloud().then((c) => c.links.track(tracking.id, tracking.owner)); // mesure de la consultation dès l'ouverture (silencieuse, anonyme) : l'ouverture de l'écrin est comptée
 
   /** Importe un buffer et l'installe dans le configurateur. */
   async function load(buffer, name, opts = {}, config = null, modelId = name) {
@@ -78,7 +94,7 @@ async function boot() {
   }
 
   // Coller un lien de partage dans l'onglet déjà ouvert ne recharge pas la page : on la recharge pour repartir d'un état neuf (assemblé).
-  window.addEventListener('hashchange', () => { if (/[#&][csi]=/.test(location.hash)) location.reload(); });
+  window.addEventListener('hashchange', () => { if (/[#&][csil]=/.test(location.hash)) location.reload(); });
 
   svc.openFile = async (file) => {
     const buffer = await file.arrayBuffer();
