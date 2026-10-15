@@ -77,11 +77,15 @@ export async function deleteProject(id) {
   finally { db.close(); }
 }
 
-/** Vignette JPEG réduite (data URL) à partir d'une image PNG. */
-export async function thumbnail(blob, width = 220) {
+/** Vignette JPEG réduite (data URL) à partir d'une image PNG. 560 px de large : net sur les cartes (≈ 300 px CSS) des écrans Retina, ~30–50 Ko. */
+export async function thumbnail(blob, width = 560) {
   const bmp = await createImageBitmap(blob);
-  const c = document.createElement('canvas'); c.width = width; c.height = Math.round((width * bmp.height) / bmp.width);
-  const g = c.getContext('2d'); g.fillStyle = '#e9e0d0'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+  const w = Math.min(width, bmp.width), h = Math.round((w * bmp.height) / bmp.width);
+  // réduction en deux temps (moitié, puis taille finale) : un seul grand saut donne une image crénelée
+  let src = bmp, sw = bmp.width, sh = bmp.height;
+  const step = (tw, th) => { const k = document.createElement('canvas'); k.width = tw; k.height = th; const g = k.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.fillStyle = '#e9e0d0'; g.fillRect(0, 0, tw, th); g.drawImage(src, 0, 0, sw, sh, 0, 0, tw, th); src = k; sw = tw; sh = th; return k; };
+  while (sw / 2 > w) step(Math.round(sw / 2), Math.round(sh / 2));
+  const c = step(w, h);
   bmp.close?.();
-  return c.toDataURL('image/jpeg', 0.8);
+  return c.toDataURL('image/jpeg', 0.86);
 }

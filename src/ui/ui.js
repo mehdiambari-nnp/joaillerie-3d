@@ -782,7 +782,7 @@ export class UI {
     name = String(name || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
     try {
       let thumb = null; // vignette toujours en 3/4, quel que soit l'angle de la caméra du joaillier
-      try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
+      try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 2, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
       const id = asNew || !s.projectId ? newId() : s.projectId;
       await (await s.cloud()).projects.save({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
       s.projectId = id; s.projectName = name;
@@ -896,7 +896,7 @@ export class UI {
   async createTrackedLink(label, remote) {
     const a = this.app, c = await this.svc.cloud();
     let thumb = null;
-    try { await withoutHighlight(a, async () => { thumb = await thumbnail(await a.viewer.capture({ scale: 1, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
+    try { await withoutHighlight(a, async () => { thumb = await thumbnail(await a.viewer.capture({ scale: 2, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
     return c.links.create({ json: await this.clientPayloadJson(remote), label, modelName: (a.model.meta.fileName || '').replace(/\.[^.]+$/, ''), modelId: a.modelId, thumb });
   }
   /** Backoffice « Liens clients » (suivi des consultations). */
