@@ -5,3 +5,4 @@ public/mediapipe/wasm
 .DS_Store
 tests/e2e/.tmp
 assets/test/
+.firebase/
