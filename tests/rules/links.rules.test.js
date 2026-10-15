@@ -2,7 +2,7 @@
 import { readFileSync } from 'node:fs';
 import { beforeAll, afterAll, beforeEach, describe, it } from 'vitest';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, collectionGroup, query, where } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, collectionGroup, query, where, Timestamp } from 'firebase/firestore';
 
 const OWNER = 'owner1', OTHER = 'other1', VISITOR = 'visitor1', VISITOR2 = 'visitor2';
 const LINK = 'a'.repeat(20), VIEW = 'b'.repeat(20), VIEW2 = 'c'.repeat(20);
@@ -18,7 +18,7 @@ const guest = () => env.unauthenticatedContext().firestore();
 const seed = (fn) => env.withSecurityRulesDisabled(async (ctx) => fn(ctx.firestore()));
 
 const link = (x = {}) => ({ p: '{"v":1}', owner: OWNER, enabled: true, expires: null, created: Date.now(), ...x });
-const view = (x = {}) => ({ owner: OWNER, uid: VISITOR, at: Date.now(), last: Date.now(), seconds: 0, opened: false, tryon: 0, photo: 0, taps: 0, device: 'mobile', os: 'iOS', browser: 'Safari', lang: 'fr', ...x });
+const view = (x = {}) => ({ owner: OWNER, uid: VISITOR, at: Date.now(), last: Date.now(), seconds: 0, opened: false, tryon: 0, photo: 0, taps: 0, device: 'mobile', os: 'iOS', browser: 'Safari', lang: 'fr', expireAt: Timestamp.fromMillis(Date.now() + 395 * 86400000), ...x });
 const seedLink = (x) => seed((db) => setDoc(doc(db, 'links', LINK), link(x)));
 const seedView = (x, id = VIEW) => seed((db) => setDoc(doc(db, 'links', LINK, 'views', id), view(x)));
 
@@ -84,6 +84,14 @@ describe('consultations : création (client anonyme)', () => {
     await assertFails(setDoc(at(), view({ at: Date.now() + 3600000, last: Date.now() + 3600000 })));
     await assertFails(setDoc(at(), view({ device: 'fridge' })));
     await assertFails(setDoc(at(), view({ browser: 'x'.repeat(21) })));
+  });
+  it('la conservation est bornée : expireAt obligatoire, dans le futur, 400 jours au plus', async () => {
+    const db = anon(VISITOR), at = () => doc(db, 'links', LINK, 'views', VIEW);
+    const { expireAt, ...sans } = view();
+    await assertFails(setDoc(at(), sans));
+    await assertFails(setDoc(at(), view({ expireAt: Timestamp.fromMillis(Date.now() - 1000) })));
+    await assertFails(setDoc(at(), view({ expireAt: Timestamp.fromMillis(Date.now() + 500 * 86400000) })));
+    await assertFails(setDoc(at(), view({ expireAt: Date.now() + 86400000 })));
   });
 });
 

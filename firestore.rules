@@ -112,12 +112,14 @@ service cloud.firestore {
 
       match /views/{vid} {
         allow create: if anyUser() && vid.matches('[a-f0-9]{20}') && linkOpen(id)
-          && request.resource.data.keys().hasOnly(['owner', 'uid', 'at', 'last', 'seconds', 'opened', 'tryon', 'photo', 'taps', 'device', 'os', 'browser', 'lang'])
+          && request.resource.data.keys().hasOnly(['owner', 'uid', 'at', 'last', 'seconds', 'opened', 'tryon', 'photo', 'taps', 'device', 'os', 'browser', 'lang', 'expireAt'])
           && request.resource.data.owner == linkOf(id).owner && request.resource.data.uid == request.auth.uid
           && request.resource.data.at is int && request.resource.data.at > request.time.toMillis() - 300000 && request.resource.data.at < request.time.toMillis() + 300000
           && request.resource.data.last == request.resource.data.at
           && request.resource.data.seconds == 0 && request.resource.data.tryon == 0 && request.resource.data.photo == 0 && request.resource.data.taps == 0
           && request.resource.data.opened == false
+          // conservation limitée : suppression automatique (politique TTL Firestore sur expireAt), 13 mois au plus (400 j de marge)
+          && request.resource.data.expireAt is timestamp && request.resource.data.expireAt > request.time && request.resource.data.expireAt <= request.time + duration.value(400, 'd')
           && request.resource.data.device in ['mobile', 'tablet', 'desktop']
           && request.resource.data.os is string && request.resource.data.os.size() <= 20
           && request.resource.data.browser is string && request.resource.data.browser.size() <= 20

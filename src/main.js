@@ -63,6 +63,7 @@ async function boot() {
   ui.initTheme(); app.viewer._applyBackground();
   if (pending?.client) ui.lockClient(); // lien client : interface épurée et verrouillée
   window.__rc = { app, ui, THREE }; // pratique pour le débogage et les tests E2E
+  if (tracking) import('./ui/privacy.js').then((m) => m.showPrivacyBar(ui)); // information du client, visible dès l'ouverture (écrin compris)
   if (tracking) getCloud().then((c) => c.links.track(tracking.id, tracking.owner)); // mesure de la consultation dès l'ouverture (silencieuse, anonyme) : l'ouverture de l'écrin est comptée
 
   /** Importe un buffer et l'installe dans le configurateur. */

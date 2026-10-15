@@ -3,11 +3,13 @@
 //   users/{uid}/links/{id}    privé : nom donné au lien, note, vignette (visible du seul joaillier)
 //   links/{id}/views/{vid}    une ligne par consultation, écrite par le client (compte ANONYME) : durée, actions, appareil grossier
 // Aucune donnée personnelle : ni adresse IP, ni localisation, ni identité du client. Règles : firestore.rules (testées sur l'émulateur).
-import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, collectionGroup, query, where, limit, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, collectionGroup, query, where, limit, writeBatch, Timestamp } from 'firebase/firestore';
 import { signInAnonymously } from 'firebase/auth';
 import { deviceInfo } from './linkStats.js';
+import { trackingRefused } from './optout.js';
 
 const hex = (bytes) => Array.from(crypto.getRandomValues(new Uint8Array(bytes)), (b) => b.toString(16).padStart(2, '0')).join('');
+export const RETENTION_DAYS = 395; // 13 mois : suppression automatique des consultations (TTL Firestore sur `expireAt`)
 export const linkUrl = (id, base = location.origin + location.pathname) => `${base}#l=${id}`;
 
 /** @param {import('firebase/firestore').Firestore} db @param {import('firebase/auth').Auth} auth @param {() => {uid:string}} me */
@@ -82,11 +84,11 @@ export function createLinks(db, auth, me) {
      */
     async track(id, owner) {
       try {
-        if (auth.currentUser && !auth.currentUser.isAnonymous) return { stop() {} };
+        if (trackingRefused() || (auth.currentUser && !auth.currentUser.isAnonymous)) return { stop() {} };
         if (!auth.currentUser) await signInAnonymously(auth);
         const vid = hex(10), ref = doc(db, 'links', id, 'views', vid), now = Date.now();
         const st = { opened: false, tryon: 0, photo: 0, taps: 0 };
-        await setDoc(ref, { owner, uid: auth.currentUser.uid, at: now, last: now, seconds: 0, ...st, ...deviceInfo(navigator.userAgent, navigator.language) });
+        await setDoc(ref, { owner, uid: auth.currentUser.uid, at: now, last: now, seconds: 0, ...st, ...deviceInfo(navigator.userAgent, navigator.language), expireAt: Timestamp.fromMillis(now + RETENTION_DAYS * 86400000) });
         let visibleMs = 0, lastTick = performance.now(), sent = '', stopped = false;
         const tick = () => { const n = performance.now(); if (document.visibilityState === 'visible') visibleMs += n - lastTick; lastTick = n; };
         const flush = async () => {
@@ -104,7 +106,14 @@ export function createLinks(db, auth, me) {
         window.addEventListener('rc:track', onEvent); window.addEventListener('pointerdown', onTap, { passive: true });
         document.addEventListener('visibilitychange', onVis); window.addEventListener('pagehide', flush);
         const timer = setInterval(flush, 10000);
-        return { stop() { stopped = true; clearInterval(timer); window.removeEventListener('rc:track', onEvent); window.removeEventListener('pointerdown', onTap); document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', flush); } };
+        const stop = () => {
+          stopped = true; clearInterval(timer);
+          window.removeEventListener('rc:track', onEvent); window.removeEventListener('pointerdown', onTap);
+          document.removeEventListener('visibilitychange', onVis); window.removeEventListener('pagehide', flush); window.removeEventListener('rc:optout', onOptOut);
+        };
+        const onOptOut = (e) => { if (e.detail) stop(); }; // le visiteur refuse la mesure : on s'arrête aussitôt
+        window.addEventListener('rc:optout', onOptOut);
+        return { stop };
       } catch (e) { console.warn('Suivi indisponible', e); return { stop() {} }; }
     },
   };
