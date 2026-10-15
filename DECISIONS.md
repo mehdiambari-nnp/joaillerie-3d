@@ -177,6 +177,16 @@
 - **Non fait** : *occlusion ambiante entre les pièces* (SSAO/GTAO) : incompatible avec le rendu des pierres et le contour de sélection par stencil à un coût acceptable sur mobile ; l'ombre de contact couvre l'ancrage au sol.
 - **À valider sur un vrai iPhone** : coût du cumul d'images avec le shader de pierres, mémoire des tampons HDR (plafonnés à 5 M de pixels sur ordinateur).
 
+## Protection des accès, CSP, CI (audit d'octobre 2026)
+- **Porte d'entrée** : seul un lien **client valide** (`k:1`, lien long ou court) s'ouvre sans compte. Adresse nue, lien joaillier, lien illisible ou lien client modifié exigent la connexion (`needsLogin`, `src/state/store.js`). Les liens joaillier gardent leur configuration après connexion. Limite : c'est une protection d'interface ; côté serveur, les règles Firestore/Storage laissent lire par identifiant (indispensable aux liens client) et réservent l'écriture aux comptes connectés.
+- **Inscription** : laissée ouverte pour l'instant (le produit passera en SaaS). À reprendre avec la facturation : liste d'invitation ou vérification d'e-mail, App Check, alerte de budget.
+- **Dépôt privé** : le FBX Domuse et les photos de test restent versionnés (dépôt toujours privé).
+- **Liens courts** : identifiants de 48 bits conservés (liens de visualisation, pas des secrets).
+- **Dépendances** : `overrides` force `@grpc/grpc-js` 1.14.6 (correctifs de sécurité ; le navigateur n'utilise pas ce module). `npm audit --omit=dev` : 0 faille, et la CI échoue dès « high ».
+- **CSP** : `Content-Security-Policy` minimale appliquée (`frame-ancestors`, `object-src`, `base-uri`) ; la politique complète est en `Content-Security-Policy-Report-Only` (`firebase.json`). `node scripts/csp-check.mjs` la rejoue en mode bloquant sur `dist/` : 0 violation (page de connexion et outil). Pour l'appliquer : renommer l'en-tête en `Content-Security-Policy` après avoir vérifié la connexion Google sur un aperçu.
+- **CI** : job `test` (audit, tests unitaires, build, e2e Chromium) puis job `deploy` seulement s'il est vert. Le test d'import FBX est sauté (et non en échec) quand le fichier privé est absent.
+- **Rendu** : le pipeline d'image (`fx.js`) n'est activé que si le GPU gère les tampons flottants ; l'état de la scène et de l'ombre de contact est restauré même en cas d'erreur ; la caméra de l'essayage est éteinte si le suivi de la main ne démarre pas.
+
 ## Ateliers partagés et invitations
 - **Modèle** : atelier partagé. L'atelier = l'espace du propriétaire (`users/{uid}/projects`, aucune migration) ; les invités y sont listés dans `workspaces/{owner}/members`. Un membre lit, écrit et supprime les projets ; seul le propriétaire invite et retire. Chaque joaillier a son propre atelier et peut en rejoindre d'autres (sélecteur).
 - **Invitation par lien** (pas d'e-mail automatique : aucune Cloud Function ni service d'envoi à maintenir) : jeton aléatoire de 128 bits, à usage unique, 7 jours, dans le fragment d'URL (`#i=`, jamais envoyé au serveur). L'e-mail saisi n'est qu'un repère pour le propriétaire (et le destinataire du bouton « e-mail ») : **qui détient le lien peut le consommer**, d'où l'usage unique et l'avertissement « à n'envoyer qu'à la personne invitée ».

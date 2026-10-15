@@ -46,12 +46,16 @@ export class ContactShadow {
     for (const o of scene.children) if (o !== root && o.visible) { o.visible = false; hidden.push(o); }
     root.traverse((o) => { if (o.userData.highlight && o.visible) { o.visible = false; hidden.push(o); } });
     const prev = { target: r.getRenderTarget(), bg: scene.background, over: scene.overrideMaterial, auto: r.autoClear, tm: r.toneMapping, ca: r.getClearAlpha() };
-    scene.background = null; scene.overrideMaterial = this.depthMat; r.autoClear = false; r.toneMapping = THREE.NoToneMapping;
-    r.setClearColor(0x000000, 0);
-    r.setRenderTarget(this.rt); r.clear(); r.render(scene, this.cam);
-    this._blur(3.2); this._blur(1.3);
-    r.setRenderTarget(prev.target); scene.background = prev.bg; scene.overrideMaterial = prev.over; r.autoClear = prev.auto; r.toneMapping = prev.tm;
-    for (const o of hidden) o.visible = true;
+    try {
+      scene.background = null; scene.overrideMaterial = this.depthMat; r.autoClear = false; r.toneMapping = THREE.NoToneMapping;
+      r.setClearColor(0x000000, 0);
+      r.setRenderTarget(this.rt); r.clear(); r.render(scene, this.cam);
+      this._blur(3.2); this._blur(1.3);
+    } finally { // en cas d'erreur, la bague ne doit pas rester rendue avec le matériau d'ombre ni les objets masqués
+      r.setRenderTarget(prev.target); scene.background = prev.bg; scene.overrideMaterial = prev.over; r.autoClear = prev.auto; r.toneMapping = prev.tm;
+      r.setClearColor(0x000000, prev.ca);
+      for (const o of hidden) o.visible = true;
+    }
     if (!this.ready) {
       this.ready = true;
       this.mesh.material.map = this.rt.texture; this.mesh.material.needsUpdate = true;
