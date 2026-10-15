@@ -757,3 +757,8 @@ html.has-privacy .app { height: calc(100dvh - var(--privacy-h)); }
 .switch:disabled { opacity: .45; cursor: not-allowed; }
 .perm-list li { align-items: center; } .perm-list small { white-space: normal; }
 .btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+
+/* dialogue « Nouveau projet » : zone de dépôt */
+.np-drop { display: grid; justify-items: center; gap: 8px; padding: 28px 18px; margin-top: 8px; text-align: center; border: 1px dashed color-mix(in srgb, var(--ink) 40%, transparent); border-radius: var(--radius); cursor: pointer; transition: background .2s, border-color .2s; }
+.np-drop:hover, .np-drop.over, .np-drop:focus-visible { background: var(--surface-2); border-color: var(--ink); }
+.np-drop b { font: 500 17px/1.2 var(--serif); } .np-drop small { color: var(--muted); font-size: 12px; }

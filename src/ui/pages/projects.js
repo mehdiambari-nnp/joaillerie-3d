@@ -56,7 +56,7 @@ export async function mount(ctx) {
       <div class="bo-toolbar">
         <label class="bo-search">${ICONS.search}<input type="search" data-r="q" value="${esc(S.q)}" placeholder="${esc(t('pSearch'))}" aria-label="${esc(t('pSearch'))}"></label>
         <select data-r="sort" aria-label="${esc(t('pSort'))}"><option value="recent"${S.sort === 'recent' ? ' selected' : ''}>${t('pSortRecent')}</option><option value="name"${S.sort === 'name' ? ' selected' : ''}>${t('pSortName')}</option></select>
-        ${ui.app.model && R.save ? `<button class="btn primary" data-a="save">${ICONS.plus}${t('pSaveCurrent')}</button>` : ''}
+        ${R.save ? `<button class="btn primary" data-a="new">${ICONS.plus}${t('pNew')}</button>` : ''}${ui.app.model && R.save ? `<button class="btn" data-a="save">${t('pSaveCurrent')}</button>` : ''}
       </div>
       <div class="bo-tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" data-a="filter" data-k="${k}" aria-selected="${S.filter === k}">${esc(l)} <i>${n}</i></button>`).join('')}</div>
       ${S.error ? `<p class="proj-empty">${esc(t('projectsUnavailable'))}</p>` : shown.length ? `<ul class="pgrid">${shown.map(card).join('')}</ul>` : `<p class="proj-empty">${esc(empty)}</p>`}
@@ -73,6 +73,7 @@ export async function mount(ctx) {
     const a = b.dataset.a, id = idOf(b), p = S.list.find((x) => x.id === id);
     if (a === 'filter') { S.filter = b.dataset.k; S.menu = null; render(); }
     else if (a === 'save') ui.openSaveDialog(() => load());
+    else if (a === 'new') ui.openNewProject(() => ctx.go('projects'))
     else if (a === 'menu') { S.menu = S.menu === id ? null : id; render(); }
     else if (a === 'open') { const ok = await ui.svc.openProject?.(id); if (ok) ctx.close(); }
     else if (a === 'rename') { S.edit = id; S.menu = null; render(); }

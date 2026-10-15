@@ -55,7 +55,7 @@ export async function mount(ctx) {
     const lead = (h) => `<li data-id="${esc(h.link.id)}"><button data-a="lead">${thumbOf(h.link)}<span class="txt"><b>${esc(h.link.label || h.link.modelName || t('linkUnnamed'))}</b><small>${esc(leadText(h))}</small></span>${ICONS.chevron}</button></li>`;
     el.innerHTML = `<div class="bo-body bo-dash">
       <section class="bo-hero"><div><p class="bo-hello">${esc(fill(t('dHello'), { name: first }))}</p><p class="muted">${esc((s => s.charAt(0).toUpperCase() + s.slice(1))(new Date().toLocaleDateString(loc(), { weekday: 'long', day: 'numeric', month: 'long' })))}</p></div>
-        <div class="bo-quick">${ui.app.model && R.save ? `<button class="btn primary" data-a="save">${ICONS.plus}${esc(t('pSaveCurrent'))}</button>` : ''}<button class="btn" data-a="import">${ICONS.upload}${esc(t('dImport'))}</button>${ui.app.model ? `<button class="btn" data-a="share">${ICONS.links}${esc(t('dShare'))}</button>` : ''}</div></section>
+        <div class="bo-quick">${R.save ? `<button class="btn primary" data-a="new">${ICONS.plus}${esc(t('pNew'))}</button>` : ''}${ui.app.model && R.save ? `<button class="btn" data-a="save">${esc(t('pSaveCurrent'))}</button>` : ''}${ui.app.model && R.createLinks ? `<button class="btn" data-a="share">${ICONS.links}${esc(t('dShare'))}</button>` : ''}</div></section>
       <div class="bo-tiles five">
         <button class="tile" data-a="go-projects"><b>${act.length}</b><span>${esc(t('pgProjects'))}${own && priv.length ? ' · ' + esc(fill(t('dPrivateN'), { n: priv.length })) : ''}</span></button>
         ${vl ? `<button class="tile" data-a="go-links"><b>${activeLinks.length}</b><span>${esc(t('tileActive'))}</span></button>
@@ -77,7 +77,7 @@ export async function mount(ctx) {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a, id = b.closest('[data-id]')?.dataset.id;
     if (a === 'save') ui.openSaveDialog(() => load());
-    else if (a === 'import') { ctx.close(); ui.root.querySelector('#file')?.click(); }
+    else if (a === 'new') ui.openNewProject(() => ctx.go('projects'));
     else if (a === 'share') { ctx.close(); ui.openShare(); }
     else if (a === 'go-projects') ctx.go('projects');
     else if (a === 'go-links') ctx.go('links');

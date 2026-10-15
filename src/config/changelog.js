@@ -2,6 +2,15 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.8.1', date: '2026-10-16',
+    fr: [
+      'Nouveau bouton « Nouveau projet » : donnez un nom, choisissez ou déposez un fichier 3D, le projet est créé et enregistré',
+    ],
+    en: [
+      'New “New project” button: give it a name, choose or drop a 3D file, the project is created and saved',
+    ],
+  },
+  {
     version: '0.8.0', date: '2026-10-16',
     fr: [
       'Droits des joailliers invités : cliquez sur un joaillier pour lui donner accès aux projets un par un, ou à tous',
