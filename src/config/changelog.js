@@ -15,6 +15,17 @@ export const CHANGELOG = [
     ],
   },
   {
+    version: '0.7.1', date: '2026-10-16',
+    fr: [
+      'Vignettes des projets et des liens beaucoup plus nettes (enregistrez de nouveau un projet pour renouveler sa vignette)',
+      'Pages du backoffice avec leur propre adresse ; suppressions annulables',
+    ],
+    en: [
+      'Much sharper project and link thumbnails (save a project again to refresh its thumbnail)',
+      'Back-office pages have their own address; deletions can be undone',
+    ],
+  },
+  {
     version: '0.7.0', date: '2026-10-16',
     fr: [
       'Menu repensé : plus de textes d’explication, chaque entrée ouvre sa propre page',
