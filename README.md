@@ -2,7 +2,7 @@
 
 Web app (HTML5 / CSS3 / JS + three.js) : importez un `.fbx` (ou GLB/OBJ), tournez la bague comme sur Sketchfab,
 touchez une partie (corps, griffes, chaton, pierres…) et appliquez une matière (or, platine, diamant, émeraude…) en temps réel.
-Partage par lien, export GLB/USDZ, **AR Quick Look** (iPhone) et **essayage sur la main** (caméra + MediaPipe).
+Partage par lien, export GLB/USDZ, **AR Quick Look** (iPhone, désactivée pour l'instant dans l'interface) et **essayage sur la main** (caméra + MediaPipe).
 
 Le rendu et l'import s'exécutent dans le navigateur. Le fichier 3D ne quitte l'appareil que si le joaillier **partage** un lien client ou **enregistre** un projet : il est alors hébergé (Firebase) pour que le client ouvre exactement cette bague.
 

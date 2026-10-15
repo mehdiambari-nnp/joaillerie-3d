@@ -46,5 +46,6 @@ export async function downloadModel(id, { onProgress = () => {}, fetchImpl = fet
   }
   let buffer = await new Blob(chunks).arrayBuffer();
   if (meta.gz) buffer = await gunzip(buffer);
+  if ((await modelId(buffer)) !== id) throw new Error('Modèle altéré : empreinte différente de son identifiant');
   return { buffer, name: meta.name, options: meta.opts || {} };
 }

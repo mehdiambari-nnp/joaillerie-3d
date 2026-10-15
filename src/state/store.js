@@ -101,6 +101,14 @@ export function parseShareJson(json) {
   try { return fromPayload(JSON.parse(json)); } catch { return null; }
 }
 
+/** Variantes issues d'un fichier ou d'un projet (donnée non fiable) : forme vérifiée, identifiant réduit à [\w-]. */
+export function cleanVariants(v) {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x) => x && typeof x.id === 'string' && typeof x.name === 'string' && x.snap && typeof x.snap === 'object')
+    .map((x) => ({ id: x.id.replace(/[^\w-]/g, '').slice(0, 40), name: x.name.slice(0, 40), snap: x.snap }))
+    .filter((x) => x.id);
+}
+
 /** Préférences par viewer (jamais bloquant si le stockage est indisponible : mode privé iOS, etc.). */
 export const prefs = {
   get(k, d = null) { try { const v = localStorage.getItem('rc:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },

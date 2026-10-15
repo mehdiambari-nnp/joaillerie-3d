@@ -68,3 +68,13 @@ describe('liens courts', () => {
     expect((await fetchImpl(`/api/shares/${'a'.repeat(12)}`, { method: 'PUT', body: JSON.stringify({ p: 'x'.repeat(20000) }) })).status).toBe(413);
   });
 });
+
+describe('intégrité des modèles hébergés', () => {
+  it('refuse un fichier dont l’empreinte ne correspond pas à son identifiant', async () => {
+    const { store, fetchImpl } = rig(); const buffer = new Uint8Array(500).fill(9).buffer;
+    const id = await uploadModel({ buffer, name: 'a.glb' }, { fetchImpl });
+    await store.set(`${id}/0`, new Uint8Array(500).fill(1).buffer); // contenu substitué
+    await store.set(`${id}/meta`, JSON.stringify({ name: 'a.glb', opts: {}, gz: false, parts: 1, size: 500 }));
+    await expect(downloadModel(id, { fetchImpl })).rejects.toThrow(/altéré/);
+  });
+});
