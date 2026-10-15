@@ -2,6 +2,7 @@
 // Les clients n'en voient jamais : un lien de partage (#s= / #c=) s'ouvre directement, sans compte.
 import theme, { brandHTML } from '../config/theme.js';
 import { t } from './i18n.js';
+import { parseInviteHash } from '../state/store.js';
 
 const AUTH_ERR = { 'auth/invalid-credential': 'authBad', 'auth/wrong-password': 'authBad', 'auth/user-not-found': 'authBad', 'auth/invalid-email': 'authEmail', 'auth/email-already-in-use': 'authExists',
   'auth/weak-password': 'authWeak', 'auth/popup-closed-by-user': 'authCancelled', 'auth/cancelled-popup-request': 'authCancelled', 'auth/network-request-failed': 'authNetwork', 'auth/too-many-requests': 'authMany' };
@@ -33,6 +34,7 @@ function build(root, cloud) {
       <p class="login-eyebrow">${esc(theme.brand.tagline || '')}</p>
       <h1 id="login-h">${t('loginTitle')}</h1>
       <p class="login-lead">${t('loginLead')}</p>
+      ${parseInviteHash(location.hash) ? `<p class="login-invite" role="status">${t('loginInvited')}</p>` : ''}
       <div class="login-tabs" role="tablist" data-mode="in">
         <span class="login-ink" aria-hidden="true"></span>
         <button type="button" role="tab" data-m="in" aria-selected="true">${t('signIn')}</button>

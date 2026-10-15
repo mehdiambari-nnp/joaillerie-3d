@@ -16,9 +16,12 @@
     "deploy:hosting": "npm run build && firebase deploy --only hosting",
     "deploy:all": "npm run build && firebase deploy",
     "dev:offline": "vite --host --mode offline",
-    "build:offline": "vite build --mode offline"
+    "build:offline": "vite build --mode offline",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-jewel3d \"vitest run --config vitest.rules.config.js\"",
+    "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-jewel3d"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
     "@vitejs/plugin-basic-ssl": "2.3.0",
     "eruda": "3.4.3",
     "firebase-tools": "15.33.0",

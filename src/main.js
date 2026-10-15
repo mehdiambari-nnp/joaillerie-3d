@@ -8,7 +8,7 @@ import { UI } from './ui/ui.js';
 import { t } from './ui/i18n.js';
 import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
-import { parseShareHash, shortShareRef, parseShareJson, cleanVariants, needsLogin } from './state/store.js';
+import { parseShareHash, shortShareRef, parseShareJson, cleanVariants, needsLogin, parseInviteHash } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
 import { getCloud } from './cloud/index.js';
 
@@ -78,7 +78,7 @@ async function boot() {
   }
 
   // Coller un lien de partage dans l'onglet déjà ouvert ne recharge pas la page : on la recharge pour repartir d'un état neuf (assemblé).
-  window.addEventListener('hashchange', () => { if (/[#&][cs]=/.test(location.hash)) location.reload(); });
+  window.addEventListener('hashchange', () => { if (/[#&][csi]=/.test(location.hash)) location.reload(); });
 
   svc.openFile = async (file) => {
     const buffer = await file.arrayBuffer();
@@ -152,6 +152,8 @@ async function boot() {
   if (app.model) app.model.root.visible = true; // filet de sécurité (intro ignorée ou en erreur)
   ui.onboard();
   ui.changelog();
+  const invite = parseInviteHash(location.hash);
+  if (invite) ui.joinWorkshop(invite); // lien d'invitation dans un atelier : après connexion, propose de le rejoindre
   if (shareFailed) ui.toast(t('shareLinkFailed'), 6000);
   else if (remoteFailed) ui.toast(t('remoteFailed'), 6000);
   else if (pending) ui.toast(t('shareNeedsFile').replace('{name}', pending.modelId), 5000);

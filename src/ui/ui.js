@@ -1,6 +1,7 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
 import { displayName } from '../cloud/name.js';
+import { workspaceBlocks, openInviteDialog, joinFlow } from './atelier.js';
 import { FEATURES } from '../config/features.js';
 import { CHANGELOG, CURRENT_VERSION, unseenEntries } from '../config/changelog.js';
 import { LANG } from './i18n.js';
@@ -131,6 +132,7 @@ export class UI {
   bind() {
     const app = this.app;
     this.root.addEventListener('click', (e) => this.onClick(e));
+    this.root.addEventListener('change', (e) => { if (e.target.matches?.('[data-r=ws]')) this.switchWorkshop(e.target.value); }); // sélecteur d'atelier
     this.root.addEventListener('pointerdown', (e) => this.onGaugeDown(e));
     this.root.addEventListener('input', (e) => this.onInput(e));
     this.root.addEventListener('change', (e) => this.onChange(e));
@@ -561,6 +563,11 @@ export class UI {
       case 'proj-save-new': this.saveCurrentProject(true); break;
       case 'proj-open': this.svc.openProject?.(el.closest('[data-id]').dataset.id).then((ok) => { if (ok) this.closeProjects(); }); break;
       case 'proj-del': this.removeProject(el.closest('[data-id]').dataset.id); break;
+      case 'ws-invite': this.svc.cloud().then((c) => openInviteDialog(this, c, () => this.renderProjects())); break;
+      case 'ws-remove': this.removeMember(el.closest('[data-uid]').dataset.uid); break;
+      case 'ws-revoke': this.revokeInvite(el.closest('[data-token]').dataset.token); break;
+      case 'ws-copy': this.copyInvite(el.closest('[data-token]').dataset.token); break;
+      case 'ws-leave': this.leaveWorkshop(); break;
       case 'photo': this.takePhoto(); break;
       case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
@@ -706,9 +713,11 @@ export class UI {
     let list = [], failed = false;
     try { list = await cloud.projects.list(); } catch (e) { failed = true; console.warn(e); }
     const cur = list.find((p) => p.id === this.svc.projectId);
+    const ws = await workspaceBlocks(cloud), myName = cloud.auth.user ? displayName(cloud.auth.user) : '';
     const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
     dr.innerHTML = `
       <div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div>
+      ${ws.top}
       <section class="dr-sec">
         <h3 class="dr-t">${t('currentRing')}</h3>
         <div class="dr-save">
@@ -724,9 +733,10 @@ export class UI {
         ${failed ? `<p class="proj-empty">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="proj-empty">${t('projectsEmpty')}</p>` : ''}
         <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
           <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
-            <span><b>${esc(p.name)}</b><small>${fmt(p.updated)} · ${esc(p.modelName)}</small></span></button>
+            <span><b>${esc(p.name)}</b><small>${fmt(p.updated)} · ${esc(p.modelName)}${p.by && p.by !== myName ? ` · ${esc(p.by)}` : ''}</small></span></button>
           <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
       </section>
+      ${ws.bottom}
       <footer class="dr-foot">
         ${cloud.auth.enabled ? `<p class="dr-who"><small>${t('signedInAs')}</small><span title="${esc(cloud.auth.user.email || '')}">${esc(displayName(cloud.auth.user))}</span></p>
         <button class="btn wide" data-a="signout">${t('signOut')}</button>` : ''}
@@ -776,6 +786,37 @@ export class UI {
   async removeProject(id) {
     if (!confirm(t('projectDeleteAsk'))) return;
     try { await (await this.svc.cloud()).projects.remove(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
+  }
+
+  // ---- Ateliers partagés (voir atelier.js) ----
+  async switchWorkshop(owner) {
+    const c = await this.svc.cloud(); c.workspaces?.setActive(owner);
+    this.svc.projectId = null; await this.renderProjects();
+  }
+  async removeMember(uid) {
+    const c = await this.svc.cloud(), name = $(`[data-uid="${CSS.escape(uid)}"] b`, this.root)?.textContent || '';
+    if (!confirm(t('removeMemberAsk').replace('{name}', name))) return;
+    try { await c.workspaces.removeMember(uid); } catch (e) { console.warn(e); this.toast(t('errorGeneric')); }
+    await this.renderProjects();
+  }
+  async revokeInvite(token) {
+    try { await (await this.svc.cloud()).workspaces.invites.revoke(token); } catch (e) { console.warn(e); }
+    await this.renderProjects();
+  }
+  async copyInvite(token) {
+    const { inviteUrl } = await import('../state/store.js');
+    try { await navigator.clipboard.writeText(inviteUrl(token)); this.toast(t('linkCopied')); } catch { this.toast(inviteUrl(token), 8000); }
+  }
+  async leaveWorkshop() {
+    const c = await this.svc.cloud(), w = c.workspaces, name = (await w.list()).find((o) => o.owner === w.active)?.name || '';
+    if (!confirm(t('leaveWsAsk').replace('{name}', name))) return;
+    try { await w.leave(w.active); } catch (e) { console.warn(e); this.toast(t('errorGeneric')); }
+    this.svc.projectId = null; await this.renderProjects();
+  }
+  /** Lien d'invitation (#i=) ouvert : propose de rejoindre l'atelier ; le tiroir s'ouvre sur l'atelier rejoint. */
+  async joinWorkshop(token) {
+    const c = await this.svc.cloud();
+    await joinFlow(this, c, token, () => { this.svc.projectId = null; this.openProjects(); });
   }
 
   /** Lien court (#s=<12 caractères>) : la configuration est déposée sur le serveur. Repli : lien long si le dépôt échoue. */
