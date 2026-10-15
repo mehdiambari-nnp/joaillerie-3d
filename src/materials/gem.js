@@ -61,6 +61,7 @@ export function installGemShader(material, data) {
     uGemDisp: { value: 0 },       // Δn entre rouge et bleu (physique : diamant ≈ 0,044)
     uGemScale: { value: data.scale },
     uGemGain: { value: 1.0 },
+    uGemZone: { value: 0 },        // zonation de croissance / inclusions : variation locale de l'absorption (pierres de couleur)
     uGemBase: { value: data.radius }, // trajet minimal : la lumière traverse déjà ~ un rayon avant la 1re facette de sortie
   };
   material.userData.gemU = U;
@@ -78,13 +79,17 @@ export function installGemShader(material, data) {
         `if (uGemOn > 0.5) totalDiffuse = gemRadiance();
          vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;`);
   };
-  material.customProgramCacheKey = () => 'gemrt1';
+  material.customProgramCacheKey = () => 'gemrt2';
   return U;
 }
 
 const GEM_GLSL = /* glsl */`
 uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
-uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase;
+uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone;
+float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
+float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(gzH(i), gzH(i + vec3(1, 0, 0)), f.x), mix(gzH(i + vec3(0, 1, 0)), gzH(i + vec3(1, 1, 0)), f.x), f.y),
+             mix(mix(gzH(i + vec3(0, 0, 1)), gzH(i + vec3(1, 0, 1)), f.x), mix(gzH(i + vec3(0, 1, 1)), gzH(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
 varying vec3 vGemPos; varying vec3 vGemCam; varying mat3 vGemM;
 
 vec3 gemEnv(vec3 dirObj) {
@@ -99,7 +104,7 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
   if (dot(r, r) < 1e-4) r = reflect(I, nObj);
   vec3 p = vGemPos - uGemCenter;
   float F0 = pow((ior - 1.0) / (ior + 1.0), 2.0);
-  vec3 acc = vec3(0.0); float weight = 1.0; float path = uGemBase;
+  vec3 acc = vec3(0.0); float weight = 1.0; vec3 od = sigma * uGemBase * uGemScale; // épaisseur optique cumulée
   for (int b = 0; b < ${GEM_MAX_BOUNCES}; b++) {
     float t = 0.5 * length(p) + 0.1;
     for (int k = 0; k < ${GEM_NEWTON}; k++) {
@@ -110,17 +115,19 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
     t = max(t, 0.0);
     vec3 q = p + r * t; vec3 hd = q / max(length(q), 1e-5);
     vec3 n = textureCube(uGemCube, hd).xyz;
-    path += t;
+    // zonation : bandes de croissance + petits nuages d'inclusions, en espace objet (varie d'une facette à l'autre)
+    float zf = 1.0 + uGemZone * ((gzN((p + r * t * 0.5) / uGemBase * 2.3) - 0.5) * 1.6 + (gzN((p + r * t * 0.5) / uGemBase * 7.0) - 0.5) * 0.6);
+    od += sigma * zf * t * uGemScale;
     vec3 nin = -n;
     float cosi = clamp(dot(r, n), 0.0, 1.0);
     vec3 rr = refract(r, nin, ior);
     float Fr = (dot(rr, rr) < 1e-4) ? 1.0 : F0 + (1.0 - F0) * pow(1.0 - cosi, 5.0);
-    if (Fr < 1.0) acc += weight * (1.0 - Fr) * gemEnv(rr) * exp(-sigma * path * uGemScale);
+    if (Fr < 1.0) acc += weight * (1.0 - Fr) * gemEnv(rr) * exp(-od);
     weight *= Fr;
     r = reflect(r, nin); p = q;
     if (weight < 0.015) break;
   }
-  acc += weight * gemEnv(r) * exp(-sigma * path * uGemScale) * 0.5; // reliquat
+  acc += weight * gemEnv(r) * exp(-od) * 0.5; // reliquat
   return acc;
 }
 
@@ -147,6 +154,7 @@ export function updateGemUniforms(material, g) {
   const s = (c) => -Math.log(Math.max(0.002, Math.min(1, c))) / d;
   U.uGemSigma.value.set(s(att.r), s(att.g), s(att.b));
   U.uGemGain.value = g.sparkle ? 1.5 : 1.35;
+  U.uGemZone.value = g.sparkle ? 0 : 0.3; // pierres de couleur : zonation / inclusions discrètes
 }
 
 export function disposeGemData(data) { data?.rt?.dispose(); }

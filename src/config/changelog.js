@@ -2,6 +2,21 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.5.0', date: '2026-10-15',
+    fr: [
+      'Rendu plus net et plus stable : images cumulées à l’arrêt (arêtes fines lissées, éclats des pierres sans scintillement)',
+      'Ombre de contact réaliste sous la bague',
+      'Flou de profondeur en gros plan, avec mise au point progressive (ordinateur)',
+      'Pierres de couleur : zonation et inclusions discrètes',
+    ],
+    en: [
+      'Sharper, steadier rendering: frames accumulate when still (fine edges smoothed, no more gem flicker)',
+      'Realistic contact shadow under the ring',
+      'Depth of field in close-ups, with progressive focus (desktop)',
+      'Coloured stones: subtle zoning and inclusions',
+    ],
+  },
+  {
     version: '0.4.0', date: '2026-10-12',
     fr: [
       'Le bouton de finition devient un curseur : glissez dessus pour régler l’effet',

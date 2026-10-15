@@ -43,6 +43,7 @@ export class Configurator extends Emitter {
     this.modelId = null;
     this.exploder = new Exploder(this);
     this.on('zones', () => this.exploder.compute());
+    this.on('config', () => this.viewer.requestBake()); // ombre de contact et reflets recalculés après chaque changement
   }
 
   // ---------- Modèle ----------

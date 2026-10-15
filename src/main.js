@@ -146,6 +146,7 @@ async function boot() {
   ui.loadThumbnails();
   if (app.model && introPending) await playIntro(app, ui, theme).catch((e) => console.warn('Intro ignorée', e));
   introPending = false;
+  app.viewer.requestBake(); // l'intro masque la bague : ombre de contact et reflets calculés une fois l'écrin retiré
   if (app.model) app.model.root.visible = true; // filet de sécurité (intro ignorée ou en erreur)
   ui.onboard();
   ui.changelog();
