@@ -169,6 +169,8 @@ async function boot() {
   ui.onboard();
   ui.changelog();
   const invite = parseInviteHash(location.hash);
+  const bo = /^#bo=(dashboard|projects|links|team)$/.exec(location.hash);
+  if (bo && !invite) ui.openBackoffice(bo[1]); // adresse d'une page du backoffice (rechargement, favori)
   if (invite) ui.joinWorkshop(invite); // lien d'invitation dans un atelier : après connexion, propose de le rejoindre
   if (shareFailed) ui.toast(t('shareLinkFailed'), 6000);
   else if (remoteFailed) ui.toast(t('remoteFailed'), 6000);

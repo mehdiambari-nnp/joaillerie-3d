@@ -62,7 +62,7 @@ export async function mount(ctx) {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a, row = b.closest('[data-uid],[data-token],[data-id]');
     if (a === 'invite') openInviteDialog(ui, cloud, () => load());
-    else if (a === 'remove') { const m = S.members.find((x) => x.uid === row.dataset.uid); if (confirm(fill(t('removeMemberAsk'), { name: m?.name || m?.email || '' }))) act(() => w.removeMember(row.dataset.uid), t('tRemoved')); }
+    else if (a === 'remove') { const m = S.members.find((x) => x.uid === row.dataset.uid); const uid = row.dataset.uid; if (m) { S.members = S.members.filter((x) => x.uid !== uid); render(); ui.undoToast(t('tRemoved'), async () => { try { await w.removeMember(uid); } catch (err) { console.warn(err); ui.toast(t('errorGeneric')); } load(); }, load); } }
     else if (a === 'revoke') act(() => w.invites.revoke(row.dataset.token));
     else if (a === 'copyinvite') { const { inviteUrl } = await import('../../state/store.js'); try { await navigator.clipboard.writeText(inviteUrl(row.dataset.token)); ui.toast(t('linkCopied')); } catch { ui.toast(inviteUrl(row.dataset.token), 8000); } }
     else if (a === 'toggle') { const p = S.projects.find((x) => x.id === row.dataset.id); act(() => cloud.projects.update(p.id, { private: !p.private })); }

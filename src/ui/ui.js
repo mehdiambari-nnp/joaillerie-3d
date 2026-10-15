@@ -175,6 +175,23 @@ export class UI {
     setTimeout(() => el.remove(), ms);
   }
 
+  // Suppression « annulable » : l'élément est déjà masqué par l'appelant ; l'action réelle (commit) ne part qu'au bout de `ms`,
+  // à la fermeture de la page, ou jamais si l'utilisateur annule.
+  undoToast(msg, commit, onUndo, ms = 6000) {
+    const el = document.createElement('div');
+    el.className = 'toast toast-undo'; el.setAttribute('role', 'status');
+    const txt = document.createElement('span'); txt.textContent = msg;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = t('undo');
+    el.append(txt, b);
+    let done = false, tm = null;
+    const finish = (ok) => { if (done) return; done = true; clearTimeout(tm); removeEventListener('pagehide', flush); el.remove(); if (ok) commit(); else onUndo?.(); };
+    const flush = () => finish(true);
+    tm = setTimeout(flush, ms);
+    b.addEventListener('click', () => finish(false));
+    addEventListener('pagehide', flush);
+    document.body.append(el);
+  }
+
   // ---------- Rendu ----------
   renderAll() {
     this.el.dataset.mode = this.mode;

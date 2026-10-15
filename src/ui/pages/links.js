@@ -117,7 +117,7 @@ export async function mount(ctx) {
     else if (a === 'copy') { try { await navigator.clipboard.writeText(linkUrl(id)); ui.toast(t('linkCopied')); } catch { el.querySelector('[data-r=url]')?.select(); } }
     else if (a === 'qr') { const img = el.querySelector('img.qr'); if (img.hidden) { img.hidden = false; qrDataUrl(linkUrl(id)).then((u) => { img.src = u; }).catch(() => {}); } else img.hidden = true; }
     else if (a === 'toggle' && l) act(() => cloud.links.update(id, { enabled: linkStatus(l) !== 'active' ? true : false }), linkStatus(l) === 'active' ? t('linkDisabledOk') : t('linkEnabledOk'));
-    else if (a === 'delete' && l) { if (confirm(fill(t('linkDeleteAsk'), { name: name(l) }))) { S.open = null; act(() => cloud.links.remove(id), t('linkDeletedOk')); } }
+    else if (a === 'delete' && l) { S.open = null; S.links = S.links.filter((x) => x.id !== id); render(); ui.undoToast(t('linkDeletedOk'), async () => { try { await cloud.links.remove(id); } catch (err) { console.warn(err); ui.toast(t('errorGeneric')); } load(); }, load); }
     else if (a === 'refresh' && l) { if (confirm(t('linkRefreshAsk'))) act(async () => { await cloud.links.update(id, { json: await ui.clientPayloadJson() }); }, t('linkRefreshedOk')); }
   };
   const onSubmit = (e) => {

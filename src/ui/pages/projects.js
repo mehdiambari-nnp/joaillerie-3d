@@ -78,7 +78,7 @@ export async function mount(ctx) {
     else if (a === 'duplicate' && p) { S.menu = null; act(() => cloud.projects.duplicate(id, fill(t('pCopyName'), { name: p.name })), t('pDuplicated')); }
     else if (a === 'visibility' && p) { S.menu = null; act(() => cloud.projects.update(id, { private: !p.private }), p.private ? t('pNowVisible') : t('pNowPrivate')); }
     else if (a === 'archive' && p) { S.menu = null; act(() => cloud.projects.update(id, { archived: !p.archived }), p.archived ? t('pUnarchived') : t('pArchivedOk')); }
-    else if (a === 'delete' && p) { S.menu = null; if (confirm(fill(t('pDeleteAsk'), { name: p.name }))) act(async () => { await cloud.projects.remove(id); if (ui.svc.projectId === id) ui.svc.projectId = null; }, t('pDeleted')); else render(); }
+    else if (a === 'delete' && p) { S.menu = null; S.list = S.list.filter((x) => x.id !== id); render(); ui.undoToast(t('pDeleted'), async () => { try { await cloud.projects.remove(id); if (ui.svc.projectId === id) ui.svc.projectId = null; } catch (err) { console.warn(err); ui.toast(t('errorGeneric')); } load(); }, load); }
   };
   const onInput = (e) => {
     if (e.target.matches('[data-r=q]')) { S.q = e.target.value; const pos = e.target.selectionStart; render(); const i = el.querySelector('[data-r=q]'); i.focus(); i.setSelectionRange(pos, pos); }
