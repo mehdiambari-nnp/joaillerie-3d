@@ -746,3 +746,14 @@ html.has-privacy .app { height: calc(100dvh - var(--privacy-h)); }
 
 /* zone tactile de l'interrupteur : 48×44 sans changer son dessin */
 .switch::after { content: ''; position: absolute; inset: -8px -4px; }
+
+/* fiche d'un joaillier : accès aux projets, fonctionnalités */
+.mem-list li.clickable { cursor: pointer; } .mem-list li.clickable:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.mem-head { display: flex; align-items: center; gap: 14px; margin: 6px 0 22px; } .mem-head .avatar { width: 56px; height: 56px; font-size: 18px; }
+.mem-head .txt { display: grid; gap: 3px; min-width: 0; } .mem-head b { font: 400 24px/1.15 var(--serif); overflow-wrap: anywhere; } .mem-head small { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.seg-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 0 0 8px; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface-2); }
+.seg-pair button { min-height: 40px; padding: 0 10px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 13px; letter-spacing: .02em; transition: background .2s, color .2s; }
+.seg-pair button[aria-pressed='true'] { background: var(--ink); color: var(--bg); }
+.switch:disabled { opacity: .45; cursor: not-allowed; }
+.perm-list li { align-items: center; } .perm-list small { white-space: normal; }
+.btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }

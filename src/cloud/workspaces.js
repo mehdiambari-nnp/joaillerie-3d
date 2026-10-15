@@ -4,8 +4,9 @@
 //   workspaces/{owner}/members/{uid}   membres de l'atelier
 //   users/{uid}/memberships/{owner}    ateliers que j'ai rejoints (index inverse, pour les lister)
 // Les règles de sécurité (firestore.rules, testées sur l'émulateur) garantissent l'usage unique, l'expiration et les droits.
-import { doc, getDoc, getDocs, setDoc, deleteDoc, collection, query, where, writeBatch } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, query, where, writeBatch } from 'firebase/firestore';
 import { inviteUrl } from '../state/store.js';
+import { resolveRights, permsPatch, OWNER_RIGHTS } from './rights.js';
 
 export const INVITE_TTL = 7 * 24 * 3600 * 1000;
 const KEY = 'rc:workspace';
@@ -13,6 +14,7 @@ const token = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) =
 
 /** @param {import('firebase/firestore').Firestore} db @param {() => {uid:string, email:string, name:string}} me utilisateur courant (exige d'être connecté) */
 export function createWorkspaces(db, me) {
+  let mineCache = null;
   let active = null; // propriétaire de l'atelier ouvert ; null = le mien
   try { active = localStorage.getItem(KEY) || null; } catch { /* stockage indisponible */ }
   const persist = () => { try { active ? localStorage.setItem(KEY, active) : localStorage.removeItem(KEY); } catch { /* idem */ } };
@@ -21,7 +23,25 @@ export function createWorkspaces(db, me) {
     /** Identifiant (uid du propriétaire) de l'atelier actif. */
     get active() { const u = me().uid; return !active || active === u ? u : active; },
     get isOwn() { return this.active === me().uid; },
-    setActive(owner) { active = owner && owner !== me().uid ? owner : null; persist(); },
+    setActive(owner) { active = owner && owner !== me().uid ? owner : null; persist(); mineCache = null; },
+
+    /** Mes droits dans l'atelier actif (tout, si c'est le mien). Mis en cache jusqu'au changement d'atelier. */
+    async rights() {
+      if (api.isOwn) return OWNER_RIGHTS;
+      if (mineCache && mineCache.owner === api.active) return mineCache.r;
+      const s = await getDoc(doc(db, 'workspaces', api.active, 'members', me().uid));
+      const r = resolveRights(s.exists() ? s.data() : null);
+      mineCache = { owner: api.active, r }; return r;
+    },
+    refreshRights() { mineCache = null; },
+
+    /** Propriétaire : fixe les droits d'un joaillier ({ projects, perms }). */
+    setRights(uid, { projects, perms }) {
+      const patch = {};
+      if (projects) patch.projects = projects === 'selected' ? 'selected' : 'all';
+      if (perms) patch.perms = permsPatch(perms);
+      return updateDoc(doc(db, 'workspaces', me().uid, 'members', uid), patch);
+    },
 
     /** Ateliers disponibles : le mien, puis ceux que j'ai rejoints. */
     async list() {
@@ -55,7 +75,7 @@ export function createWorkspaces(db, me) {
       b.delete(doc(db, 'workspaces', owner, 'members', uid));
       b.delete(doc(db, 'users', uid, 'memberships', owner));
       await b.commit();
-      if (active === owner) api.setActive(null);
+      if (active === owner) api.setActive(null); else mineCache = null;
     },
 
     invites: {

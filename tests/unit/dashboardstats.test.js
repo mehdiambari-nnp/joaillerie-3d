@@ -58,7 +58,7 @@ describe('activityFeed', () => {
 describe('memberStats / initials', () => {
   it('compte les projets et la dernière modification de chaque membre', () => {
     const r = memberStats([{ uid: 'bob' }, { uid: 'carl' }], [{ byUid: 'bob', updated: 5 }, { byUid: 'bob', updated: 9 }, { byUid: 'alice', updated: 50 }]);
-    expect(r).toEqual([{ uid: 'bob', projects: 2, last: 9 }, { uid: 'carl', projects: 0, last: null }]);
+    expect(r).toEqual([{ uid: 'bob', made: 2, last: 9 }, { uid: 'carl', made: 0, last: null }]);
   });
   it('initiales', () => { expect(initials('Alice Owner')).toBe('AO'); expect(initials('mehdi.ambari@x.fr')).toBe('MA'); expect(initials('')).toBe('·'); expect(initials('Bob')).toBe('B'); });
 });

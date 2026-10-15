@@ -7,6 +7,7 @@ import { esc, fill, fmtDate, ago, chip, ICONS } from './util.js';
 export async function mount(ctx) {
   const { ui, cloud, el } = ctx;
   const w = cloud.workspaces, team = !!w;                         // Firebase : atelier, visibilité
+  const R = ctx.rights;
   const own = !w || w.isOwn;                                      // seul le propriétaire gère la visibilité
   const me = cloud.auth.user, myName = me ? displayName(me) : '';
   const S = { list: [], q: '', filter: 'active', sort: 'recent', menu: null, edit: null, loading: true, error: false, wsName: '' };
@@ -31,11 +32,11 @@ export async function mount(ctx) {
     const open = ui.svc.projectId === p.id, mine = !p.by || p.by === myName;
     const chips = [p.private ? chip('priv', t('pPrivate')) : '', p.archived ? chip('arch', t('pArchived')) : '', open ? chip('on', t('pOpen')) : ''].join('');
     const menu = `<ul class="pmenu" role="menu" ${S.menu === p.id ? '' : 'hidden'}>
-        <li><button data-a="rename">${ICONS.pencil}${t('pRename')}</button></li>
-        <li><button data-a="duplicate">${ICONS.copy}${t('pDuplicate')}</button></li>
+        ${R.save ? `<li><button data-a="rename">${ICONS.pencil}${t('pRename')}</button></li>
+        <li><button data-a="duplicate">${ICONS.copy}${t('pDuplicate')}</button></li>` : ''}
         ${team && own ? `<li><button data-a="visibility">${p.private ? ICONS.eye + t('pMakeVisible') : ICONS.eyeOff + t('pMakePrivate')}</button></li>` : ''}
-        <li><button data-a="archive">${ICONS.archive}${p.archived ? t('pUnarchive') : t('pArchive')}</button></li>
-        <li><button data-a="delete" class="danger">${ICONS.trash}${t('delete')}</button></li></ul>`;
+        ${R.save ? `<li><button data-a="archive">${ICONS.archive}${p.archived ? t('pUnarchive') : t('pArchive')}</button></li>` : ''}
+        ${R.delete ? `<li><button data-a="delete" class="danger">${ICONS.trash}${t('delete')}</button></li>` : ''}</ul>`;
     return `<li class="pcard${p.archived ? ' is-archived' : ''}" data-id="${esc(p.id)}">
       <button class="pthumb" data-a="open" aria-label="${esc(fill(t('pOpenNamed'), { name: p.name }))}">${p.thumb ? `<img src="${p.thumb}" alt="" loading="lazy">` : '<span class="ph"></span>'}<span class="pchips">${chips}</span></button>
       <div class="pmeta">
@@ -55,7 +56,7 @@ export async function mount(ctx) {
       <div class="bo-toolbar">
         <label class="bo-search">${ICONS.search}<input type="search" data-r="q" value="${esc(S.q)}" placeholder="${esc(t('pSearch'))}" aria-label="${esc(t('pSearch'))}"></label>
         <select data-r="sort" aria-label="${esc(t('pSort'))}"><option value="recent"${S.sort === 'recent' ? ' selected' : ''}>${t('pSortRecent')}</option><option value="name"${S.sort === 'name' ? ' selected' : ''}>${t('pSortName')}</option></select>
-        ${ui.app.model ? `<button class="btn primary" data-a="save">${ICONS.plus}${t('pSaveCurrent')}</button>` : ''}
+        ${ui.app.model && R.save ? `<button class="btn primary" data-a="save">${ICONS.plus}${t('pSaveCurrent')}</button>` : ''}
       </div>
       <div class="bo-tabs" role="tablist">${tabs.map(([k, l, n]) => `<button type="button" role="tab" data-a="filter" data-k="${k}" aria-selected="${S.filter === k}">${esc(l)} <i>${n}</i></button>`).join('')}</div>
       ${S.error ? `<p class="proj-empty">${esc(t('projectsUnavailable'))}</p>` : shown.length ? `<ul class="pgrid">${shown.map(card).join('')}</ul>` : `<p class="proj-empty">${esc(empty)}</p>`}

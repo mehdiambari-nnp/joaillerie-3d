@@ -2,6 +2,19 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.8.0', date: '2026-10-16',
+    fr: [
+      'Droits des joailliers invités : cliquez sur un joaillier pour lui donner accès aux projets un par un, ou à tous',
+      'Vous choisissez ses fonctionnalités : créer et modifier, supprimer, créer des liens clients, voir les liens et leurs statistiques',
+      'Les liens clients créés par un invité appartiennent à votre atelier',
+    ],
+    en: [
+      'Guest jeweler rights: click a jeweler to give access to projects one by one, or to all of them',
+      'You choose their features: create and edit, delete, create client links, see links and their statistics',
+      'Client links created by a guest belong to your workshop',
+    ],
+  },
+  {
     version: '0.7.0', date: '2026-10-16',
     fr: [
       'Menu repensé : plus de textes d’explication, chaque entrée ouvre sa propre page',

@@ -3,6 +3,7 @@
 // Hors Firebase (mode local) : un seul onglet, Projets.
 import { t } from './i18n.js';
 import { ICONS, esc } from './pages/util.js';
+import { OWNER_RIGHTS } from '../cloud/rights.js';
 
 const PAGES = {
   dashboard: () => import('./pages/dashboard.js'),
@@ -15,7 +16,10 @@ const TITLES = { dashboard: 'pgDashboard', projects: 'pgProjects', links: 'pgLin
 export async function openBackoffice(ui, tab = 'dashboard', params = {}) {
   if (ui.backoffice) { ui.backoffice.go(tab, params); return ui.backoffice; }
   const cloud = await ui.svc.cloud();
-  const tabs = cloud.links ? ['dashboard', 'projects', 'links', 'team'] : ['projects'];
+  const rights = await Promise.resolve(cloud.workspaces?.rights?.() ?? OWNER_RIGHTS).catch(() => OWNER_RIGHTS);
+  ui.rights = rights;
+  // « Liens clients » n'apparaît que si le propriétaire a donné au moins un droit sur les liens (créer ou voir)
+  const tabs = cloud.links ? ['dashboard', 'projects', ...(rights.createLinks || rights.viewLinks ? ['links'] : []), 'team'] : ['projects'];
   if (!tabs.includes(tab)) tab = tabs[0];
   const prevFocus = document.activeElement;
   const el = document.createElement('div');
@@ -43,7 +47,7 @@ export async function openBackoffice(ui, tab = 'dashboard', params = {}) {
         const mod = await PAGES[id]();
         if (my !== token) return;
         pageEl.innerHTML = '';
-        const ctx = { ui, cloud, el: pageEl, params: p, go: api.go, close: api.close, reload: () => api.go(id, p), setBack: (fn) => { back = fn; }, refreshMenu: () => ui.renderMenu?.() };
+        const ctx = { ui, cloud, rights, el: pageEl, params: p, go: api.go, close: api.close, reload: () => api.go(id, p), setBack: (fn) => { back = fn; }, refreshMenu: () => ui.renderMenu?.() };
         page = await mod.mount(ctx) || null;
       } catch (e) { console.warn('Page indisponible', e); if (my === token) pageEl.innerHTML = `<div class="bo-body"><p class="proj-empty">${esc(t('linksError'))}</p></div>`; }
     },

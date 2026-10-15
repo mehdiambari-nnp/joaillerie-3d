@@ -13,29 +13,35 @@ export const RETENTION_DAYS = 395; // 13 mois : suppression automatique des cons
 export const linkUrl = (id, base = location.origin + location.pathname) => `${base}#l=${id}`;
 
 /** @param {import('firebase/firestore').Firestore} db @param {import('firebase/auth').Auth} auth @param {() => {uid:string}} me */
-export function createLinks(db, auth, me) {
-  const priv = (id) => doc(db, 'users', me().uid, 'links', id);
+export function createLinks(db, auth, me, workspaces) {
+  // les liens appartiennent à l'ATELIER actif (le mien, ou celui où je suis invité avec le droit de créer des liens) ; `by` = leur auteur
+  const ws = () => (workspaces ? workspaces.active : me().uid);
+  const priv = (id) => doc(db, 'users', ws(), 'links', id);
   const pub = (id) => doc(db, 'links', id);
 
   const api = {
     /** Crée un lien client suivi : partie publique + fiche privée, en une écriture groupée. */
     async create({ json, label = '', note = '', expires = null, modelName = '', modelId = '', thumb = null }) {
       const id = hex(10), now = Date.now(), b = writeBatch(db);
-      b.set(pub(id), { p: json, owner: me().uid, enabled: true, expires, created: now });
-      b.set(priv(id), { label: String(label).trim().slice(0, 120), note: String(note).slice(0, 1000), modelName: String(modelName).slice(0, 200), modelId: String(modelId).slice(0, 200), thumb, enabled: true, expires, created: now });
+      const u = me();
+      b.set(pub(id), { p: json, owner: ws(), enabled: true, expires, created: now, by: u.uid });
+      b.set(priv(id), { by: u.uid, byName: u.name || '', label: String(label).trim().slice(0, 120), note: String(note).slice(0, 1000), modelName: String(modelName).slice(0, 200), modelId: String(modelId).slice(0, 200), thumb, enabled: true, expires, created: now });
       await b.commit();
       return { id, url: linkUrl(id) };
     },
 
-    /** Fiches de mes liens (privées), les plus récents d'abord. */
+    /** Fiches des liens de l'atelier (privées), les plus récents d'abord : toutes (propriétaire, ou droit « voir les liens »), sinon les miennes. */
     async list() {
-      const snap = await getDocs(collection(db, 'users', me().uid, 'links'));
+      const r = workspaces ? await workspaces.rights() : { viewLinks: true };
+      const col = collection(db, 'users', ws(), 'links');
+      const snap = await getDocs(r.viewLinks ? col : query(col, where('by', '==', me().uid)));
       return snap.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => (b.created || 0) - (a.created || 0));
     },
 
     /** Toutes mes consultations, regroupées par lien : { [id]: vues[] } (une seule requête de groupe). */
     async views() {
-      const snap = await getDocs(query(collectionGroup(db, 'views'), where('owner', '==', me().uid), limit(5000)));
+      if (workspaces && !(await workspaces.rights()).viewLinks) return {}; // statistiques : réservées au propriétaire et aux membres autorisés
+      const snap = await getDocs(query(collectionGroup(db, 'views'), where('owner', '==', ws()), limit(5000)));
       const by = {};
       for (const d of snap.docs) (by[d.ref.parent.parent.id] ||= []).push({ id: d.id, ...d.data() });
       for (const k of Object.keys(by)) by[k].sort((a, b) => b.at - a.at);
@@ -63,7 +69,7 @@ export function createLinks(db, auth, me) {
     /** Supprime le lien, sa fiche et toutes ses consultations (par lots de 400). Le client ne peut plus l'ouvrir. */
     async remove(id) {
       for (;;) {
-        const snap = await getDocs(query(collection(db, 'links', id, 'views'), where('owner', '==', me().uid), limit(400)));
+        const snap = await getDocs(query(collection(db, 'links', id, 'views'), where('owner', '==', ws()), limit(400)));
         if (snap.empty) break;
         const b = writeBatch(db); snap.docs.forEach((d) => b.delete(d.ref)); await b.commit();
       }
