@@ -30,6 +30,31 @@ export async function saveProject(meta, buffer) {
   return meta.id;
 }
 
+/** Modifie le nom ou l'archivage d'un projet (sans le fichier ni la date de modification). */
+export async function updateProject(id, patch) {
+  const db = await open();
+  try {
+    const tx = db.transaction('projects', 'readwrite'), st = tx.objectStore('projects'), cur = await req(st.get(id));
+    if (cur) st.put({ ...cur, ...Object.fromEntries(Object.entries(patch).filter(([k]) => ['name', 'archived'].includes(k))) });
+    await done(tx);
+  } finally { db.close(); }
+}
+
+/** Copie un projet (fichier compris). */
+export async function duplicateProject(id, name) {
+  const db = await open();
+  try {
+    const tx = db.transaction(['projects', 'buffers'], 'readwrite');
+    const [meta, buf] = await Promise.all([req(tx.objectStore('projects').get(id)), req(tx.objectStore('buffers').get(id))]);
+    if (!meta) throw new Error('projet introuvable');
+    const nid = newId(), now = Date.now();
+    tx.objectStore('projects').put({ ...meta, id: nid, name: name || meta.name, created: now, updated: now, archived: false });
+    if (buf) tx.objectStore('buffers').put(buf.slice ? buf.slice(0) : buf, nid);
+    await done(tx);
+    return nid;
+  } finally { db.close(); }
+}
+
 /** Projets, du plus récent au plus ancien (sans les fichiers). */
 export async function listProjects() {
   const db = await open();

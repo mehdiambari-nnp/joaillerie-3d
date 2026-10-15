@@ -2,6 +2,19 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.7.0', date: '2026-10-16',
+    fr: [
+      'Menu repensé : plus de textes d’explication, chaque entrée ouvre sa propre page',
+      'Nouveau tableau de bord : indicateurs de la semaine, contacts à relancer, activité récente, projets récents',
+      'Page Projets : recherche, archivage, duplication, renommage ; page Joailliers : invitations et projets visibles ou privés pour chaque invité',
+    ],
+    en: [
+      'Redesigned menu: no more explanatory text, each entry opens its own page',
+      'New dashboard: weekly figures, leads to follow up, recent activity, recent projects',
+      'Projects page: search, archive, duplicate, rename; Jewelers page: invitations and visible or private projects for each guest',
+    ],
+  },
+  {
     version: '0.6.0', date: '2026-10-16',
     fr: [
       'Liens clients suivis : un lien par envoi, avec un nom pour vous repérer',

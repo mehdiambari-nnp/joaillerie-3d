@@ -3,8 +3,9 @@ import { t } from './i18n.js';
 import * as THREE from 'three';
 import { displayName } from '../cloud/name.js';
 import { emitTrack } from '../cloud/track.js';
-import { openLinks } from './liens.js';
-import { workspaceBlocks, openInviteDialog, joinFlow } from './atelier.js';
+import { joinFlow } from './atelier.js';
+import { renderMenu, openSaveDialog } from './menu.js';
+import { openBackoffice } from './backoffice.js';
 import { shouldPlayIntro, playIntro } from '../intro/intro.js';
 import { FEATURES } from '../config/features.js';
 import { CHANGELOG, CURRENT_VERSION, unseenEntries } from '../config/changelog.js';
@@ -172,6 +173,23 @@ export class UI {
     el.className = 'toast'; el.textContent = msg; el.setAttribute('role', 'status');
     document.body.append(el);
     setTimeout(() => el.remove(), ms);
+  }
+
+  // Suppression « annulable » : l'élément est déjà masqué par l'appelant ; l'action réelle (commit) ne part qu'au bout de `ms`,
+  // à la fermeture de la page, ou jamais si l'utilisateur annule.
+  undoToast(msg, commit, onUndo, ms = 6000) {
+    const el = document.createElement('div');
+    el.className = 'toast toast-undo'; el.setAttribute('role', 'status');
+    const txt = document.createElement('span'); txt.textContent = msg;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = t('undo');
+    el.append(txt, b);
+    let done = false, tm = null;
+    const finish = (ok) => { if (done) return; done = true; clearTimeout(tm); removeEventListener('pagehide', flush); el.remove(); if (ok) commit(); else onUndo?.(); };
+    const flush = () => finish(true);
+    tm = setTimeout(flush, ms);
+    b.addEventListener('click', () => finish(false));
+    addEventListener('pagehide', flush);
+    document.body.append(el);
   }
 
   // ---------- Rendu ----------
@@ -563,16 +581,8 @@ export class UI {
       case 'projects': this.openProjects(); break;
       case 'signout': (await this.svc.cloud()).auth.signOut() /* le rechargement vers la page de connexion est déclenché par main.js */; break;
       case 'projects-close': this.closeProjects(); break;
-      case 'proj-save': this.saveCurrentProject(false); break;
-      case 'proj-save-new': this.saveCurrentProject(true); break;
-      case 'proj-open': this.svc.openProject?.(el.closest('[data-id]').dataset.id).then((ok) => { if (ok) this.closeProjects(); }); break;
-      case 'proj-del': this.removeProject(el.closest('[data-id]').dataset.id); break;
-      case 'links': this.openLinks(); break;
-      case 'ws-invite': this.svc.cloud().then((c) => openInviteDialog(this, c, () => this.renderProjects())); break;
-      case 'ws-remove': this.removeMember(el.closest('[data-uid]').dataset.uid); break;
-      case 'ws-revoke': this.revokeInvite(el.closest('[data-token]').dataset.token); break;
-      case 'ws-copy': this.copyInvite(el.closest('[data-token]').dataset.token); break;
-      case 'ws-leave': this.leaveWorkshop(); break;
+      case 'menu-save': this.closeProjects(); this.openSaveDialog(); break;
+      case 'menu-nav': this.closeProjects(); this.openBackoffice(el.dataset.tab); break;
       case 'photo': this.takePhoto(); break;
       case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
@@ -725,57 +735,20 @@ export class UI {
   }
 
   // ---------- Projets (menu burger) ----------
-  async openProjects() {
+  async openProjects() { // action « projects » du burger : ouvre le menu
     const dr = $('[data-r=drawer]', this.root), sc = $('.scrim', this.root);
     dr.hidden = sc.hidden = false;
     requestAnimationFrame(() => this.el.dataset.drawer = '1');
-    await this.renderProjects();
+    await this.renderMenu();
   }
   closeProjects() {
     this.el.dataset.drawer = '0';
     setTimeout(() => { if (this.el.dataset.drawer !== '1') { $('[data-r=drawer]', this.root).hidden = true; $('.scrim', this.root).hidden = true; } }, 250);
   }
-  async renderProjects() {
-    const dr = $('[data-r=drawer]', this.root);
-    const cloud = await this.svc.cloud();
-    if (cloud.auth.enabled && !cloud.auth.user) { // compte requis : projets et modèles partagés sont liés au joaillier
-      dr.replaceChildren(this.html(`<div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div><p class="auth-intro">${t('signInWhy')}</p>`), this.authForm(() => this.renderProjects()));
-      return;
-    }
-    let list = [], failed = false;
-    try { list = await cloud.projects.list(); } catch (e) { failed = true; console.warn(e); }
-    const cur = list.find((p) => p.id === this.svc.projectId);
-    const ws = await workspaceBlocks(cloud), myName = cloud.auth.user ? displayName(cloud.auth.user) : '';
-    const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    dr.innerHTML = `
-      <div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div>
-      ${ws.top}
-      <section class="dr-sec">
-        <h3 class="dr-t">${t('currentRing')}</h3>
-        <div class="dr-save">
-          <label class="fld"><span>${t('projectName')}</span><input type="text" data-r="projname" maxlength="60" placeholder="${esc(t('projectNameHint'))}" value="${esc(cur?.name ?? '')}"></label>
-          <div class="col">
-            <button class="btn primary wide" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
-            ${cur ? `<button class="btn wide" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
-          </div>
-        </div>
-      </section>
-      <section class="dr-sec">
-        <h3 class="dr-t">${t('projectsList')}<span class="dr-n">${list.length}</span></h3>
-        ${failed ? `<p class="proj-empty">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="proj-empty">${t('projectsEmpty')}</p>` : ''}
-        <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
-          <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
-            <span><b>${esc(p.name)}</b><small>${fmt(p.updated)} · ${esc(p.modelName)}${p.by && p.by !== myName ? ` · ${esc(p.by)}` : ''}</small></span></button>
-          <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
-      </section>
-      ${cloud.links ? `<section class="dr-sec"><h3 class="dr-t">${t('linksTitle')}</h3><p class="dr-note">${t('linksDrawerNote')}</p><button class="btn wide" data-a="links">${t('linksOpen')}</button></section>` : ''}
-      ${ws.bottom}
-      <footer class="dr-foot">
-        ${cloud.auth.enabled ? `<p class="dr-who"><small>${t('signedInAs')}</small><span title="${esc(cloud.auth.user.email || '')}">${esc(displayName(cloud.auth.user))}</span></p>
-        <button class="btn wide" data-a="signout">${t('signOut')}</button>` : ''}
-        <p class="dr-note">${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
-      </footer>`;
-  }
+  renderMenu() { return renderMenu(this); }                       // contenu du menu : voir menu.js
+  openSaveDialog(onDone) { openSaveDialog(this, onDone); }
+  openBackoffice(tab, params) { return openBackoffice(this, tab, params); } // pages : voir backoffice.js et pages/
+
 
   /** Formulaire de connexion / création de compte (Firebase Auth). `done` est appelé une fois connecté. */
   authForm(done) {
@@ -802,54 +775,30 @@ export class UI {
     });
     return d;
   }
-  async saveCurrentProject(asNew) {
+  /** Enregistre la bague (nouveau projet ou mise à jour du projet ouvert). Le nom vient de la boîte « Enregistrer » (menu.js). */
+  async saveCurrentProject(asNew, name) {
     const app = this.app, s = this.svc;
     if (!app.model || !s.last) return;
-    const name = ($('[data-r=projname]', this.root).value || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
+    name = String(name || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
     try {
       let thumb = null; // vignette toujours en 3/4, quel que soit l'angle de la caméra du joaillier
       try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
       const id = asNew || !s.projectId ? newId() : s.projectId;
       await (await s.cloud()).projects.save({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
-      s.projectId = id;
+      s.projectId = id; s.projectName = name;
       this.toast(t('projectSaved'));
-      await this.renderProjects();
     } catch (e) { console.warn(e); this.toast(t('projectsUnavailable')); }
   }
-  async removeProject(id) {
-    if (!confirm(t('projectDeleteAsk'))) return;
-    try { await (await this.svc.cloud()).projects.remove(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
-  }
 
-  // ---- Ateliers partagés (voir atelier.js) ----
+  /** Atelier : changement d'atelier depuis le menu. */
   async switchWorkshop(owner) {
     const c = await this.svc.cloud(); c.workspaces?.setActive(owner);
-    this.svc.projectId = null; await this.renderProjects();
+    this.svc.projectId = null; await this.renderMenu(); this.backoffice?.reload();
   }
-  async removeMember(uid) {
-    const c = await this.svc.cloud(), name = $(`[data-uid="${CSS.escape(uid)}"] b`, this.root)?.textContent || '';
-    if (!confirm(t('removeMemberAsk').replace('{name}', name))) return;
-    try { await c.workspaces.removeMember(uid); } catch (e) { console.warn(e); this.toast(t('errorGeneric')); }
-    await this.renderProjects();
-  }
-  async revokeInvite(token) {
-    try { await (await this.svc.cloud()).workspaces.invites.revoke(token); } catch (e) { console.warn(e); }
-    await this.renderProjects();
-  }
-  async copyInvite(token) {
-    const { inviteUrl } = await import('../state/store.js');
-    try { await navigator.clipboard.writeText(inviteUrl(token)); this.toast(t('linkCopied')); } catch { this.toast(inviteUrl(token), 8000); }
-  }
-  async leaveWorkshop() {
-    const c = await this.svc.cloud(), w = c.workspaces, name = (await w.list()).find((o) => o.owner === w.active)?.name || '';
-    if (!confirm(t('leaveWsAsk').replace('{name}', name))) return;
-    try { await w.leave(w.active); } catch (e) { console.warn(e); this.toast(t('errorGeneric')); }
-    this.svc.projectId = null; await this.renderProjects();
-  }
-  /** Lien d'invitation (#i=) ouvert : propose de rejoindre l'atelier ; le tiroir s'ouvre sur l'atelier rejoint. */
+  /** Lien d'invitation (#i=) ouvert : propose de rejoindre l'atelier ; on arrive sur la page Projets de l'atelier rejoint. */
   async joinWorkshop(token) {
     const c = await this.svc.cloud();
-    await joinFlow(this, c, token, () => { this.svc.projectId = null; this.openProjects(); });
+    await joinFlow(this, c, token, () => { this.svc.projectId = null; this.openBackoffice('projects'); });
   }
 
   /** Lien court (#s=<12 caractères>) : la configuration est déposée sur le serveur. Repli : lien long si le dépôt échoue. */
@@ -951,7 +900,7 @@ export class UI {
     return c.links.create({ json: await this.clientPayloadJson(remote), label, modelName: (a.model.meta.fileName || '').replace(/\.[^.]+$/, ''), modelId: a.modelId, thumb });
   }
   /** Backoffice « Liens clients » (suivi des consultations). */
-  async openLinks() { const c = await this.svc.cloud(); if (c.links) openLinks(this, c, { onChange: () => this.renderProjects?.() }); }
+  openLinks() { return this.openBackoffice('links'); }
 
   async exportProject() {
     try {

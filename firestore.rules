@@ -30,12 +30,23 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Projets de l'atelier d'un joaillier : lui et ses membres.
+    // Projets de l'atelier d'un joaillier : lui et ses membres. Le propriétaire peut rendre un projet PRIVÉ (invisible des membres) ;
+    // un membre ne voit que les projets non privés, et ne peut pas changer la visibilité. (Les anciens projets sans champ `private`
+    // sont traités comme visibles ; le propriétaire les complète à l'ouverture du tableau de bord, car une liste filtrée par
+    // `private == false` ne retrouve que les documents qui portent le champ.)
+    function visible(res) { return res == null || res.data.get('private', false) != true; } // res == null : document inexistant (lecture avant création)
     match /users/{uid}/projects/{pid} {
-      allow read, delete: if canWork(uid);
-      allow create, update: if canWork(uid)
-        && request.resource.data.name is string && request.resource.data.name.size() <= 120
-        && request.resource.data.modelHash is string && request.resource.data.modelHash.matches('[a-f0-9]{32}');
+      allow get, delete: if isOwner(uid) || (isMember(uid) && visible(resource));
+      allow list: if isOwner(uid) || (isMember(uid) && resource.data.private == false);
+      allow create: if canWork(uid) && projectOk()
+        && (isOwner(uid) || request.resource.data.private == false);
+      allow update: if (isOwner(uid) || (isMember(uid) && visible(resource))) && projectOk()
+        && (isOwner(uid) || request.resource.data.private == resource.data.get('private', false));
+    }
+    function projectOk() {
+      return request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.modelHash is string && request.resource.data.modelHash.matches('[a-f0-9]{32}')
+        && request.resource.data.private is bool && request.resource.data.archived is bool;
     }
 
     // Ateliers que j'ai rejoints (index inverse, pour les lister) : je le lis ; je le crée en acceptant une invitation ;

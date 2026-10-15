@@ -163,7 +163,7 @@ describe('fiche privée du lien', () => {
 describe('un compte anonyme ne peut rien d\'autre', () => {
   it('ni projets, ni liens courts, ni invitations, ni adhésions', async () => {
     const db = anon(VISITOR);
-    await assertFails(setDoc(doc(db, 'users', VISITOR, 'projects', 'p1'), { name: 'x', modelHash: 'c'.repeat(32) }));
+    await assertFails(setDoc(doc(db, 'users', VISITOR, 'projects', 'p1'), { name: 'x', modelHash: 'c'.repeat(32), private: false, archived: false }));
     await assertFails(setDoc(doc(db, 'shares', 'a'.repeat(12)), { p: '{}', created: 1 }));
     await assertFails(setDoc(doc(db, 'invites', 'a'.repeat(32)), { owner: VISITOR, ownerName: 'x', ownerEmail: '', email: '', created: Date.now(), expires: Date.now() + 1000, used: false }));
   });

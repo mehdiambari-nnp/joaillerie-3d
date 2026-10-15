@@ -2,7 +2,7 @@
 // Le SDK n'est chargé qu'à la demande (import dynamique depuis ./index.js).
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, ref, uploadBytesResumable, getBytes, getMetadata } from 'firebase/storage';
 import { modelId, gzip, gunzip } from '../share/remote.js';
 import { createWorkspaces } from './workspaces.js';
@@ -12,6 +12,8 @@ import { displayName } from './name.js';
 // Développement : `?emulator` branche l'application sur les émulateurs locaux (npm run emulators) : comptes et données fictifs,
 // projet « demo-jewel3d », rien n'est écrit en production. Jamais actif dans le build publié (import.meta.env.DEV).
 const useEmulator = () => { try { return import.meta.env.DEV && new URLSearchParams(location.search).has('emulator'); } catch { return false; } };
+
+const hex12 = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 export function create(config) {
   const emu = useEmulator();
@@ -74,16 +76,45 @@ export function create(config) {
   const links = createLinks(db, auth, () => { uid(); return { uid: auth.currentUser.uid }; });
   const col = () => { uid(); return collection(db, 'users', workspaces.active, 'projects'); };
   const projects = {
+    /** Projets de l'atelier actif, du plus récent au plus ancien. Un membre ne reçoit que les projets non privés. */
     async list() {
-      const snap = await getDocs(query(col(), orderBy('updated', 'desc')));
-      return snap.docs.map((d) => { const { config, options, ...rest } = d.data(); return { id: d.id, ...rest }; }); // la configuration n'est lue qu'à l'ouverture
+      const own = workspaces.isOwn;
+      const snap = await getDocs(own ? col() : query(col(), where('private', '==', false)));
+      const out = snap.docs.map((d) => { const { config, options, ...rest } = d.data(); return { id: d.id, ...rest }; }); // la configuration n'est lue qu'à l'ouverture
+      // anciens projets sans `private` / `archived` : le propriétaire les complète (une liste filtrée ne retrouve que les documents qui portent le champ)
+      if (own) {
+        const old = snap.docs.filter((d) => typeof d.data().private !== 'boolean' || typeof d.data().archived !== 'boolean');
+        if (old.length) {
+          const b = writeBatch(db);
+          for (const d of old) { const x = d.data(); b.update(d.ref, { private: x.private === true, archived: x.archived === true }); }
+          b.commit().catch((e) => console.warn('Complément des anciens projets impossible', e));
+          for (const p of out) { p.private = p.private === true; p.archived = p.archived === true; }
+        }
+      }
+      return out.sort((a, b) => (b.updated || 0) - (a.updated || 0));
     },
     async save(meta, buffer) {
       const { id, config, options, ...rest } = meta;
       const modelHash = buffer ? await models.upload({ buffer, name: meta.modelName, options }) : meta.modelHash;
-      const d = doc(col(), id), old = await getDoc(d);
-      await setDoc(d, { ...rest, modelHash, options: JSON.stringify(options || {}), config: JSON.stringify(config || {}), created: old.exists() ? old.data().created : Date.now(), updated: Date.now(), by: displayName({ name: auth.currentUser.displayName, email: auth.currentUser.email }) });
+      const d = doc(col(), id), old = await getDoc(d), o = old.exists() ? old.data() : null;
+      const me = auth.currentUser;
+      await setDoc(d, {
+        ...rest, modelHash, options: JSON.stringify(options || {}), config: JSON.stringify(config || {}),
+        created: o ? o.created : Date.now(), updated: Date.now(),
+        by: displayName({ name: me.displayName, email: me.email }), byUid: me.uid,
+        private: o ? o.private === true : false, archived: o ? o.archived === true : false, // visibilité et archivage conservés à la mise à jour
+      });
       return id;
+    },
+    /** Modifie nom, visibilité (`private`, propriétaire seulement) ou archivage, sans toucher au fichier ni à la date de modification. */
+    update: (id, patch) => updateDoc(doc(col(), id), Object.fromEntries(Object.entries(patch).filter(([k]) => ['name', 'private', 'archived'].includes(k)))),
+    /** Copie un projet (même fichier : aucun nouveau téléversement). Le propriétaire peut le rendre privé ; la copie d'un membre est visible. */
+    async duplicate(id, name) {
+      const s = await getDoc(doc(col(), id));
+      if (!s.exists()) throw Object.assign(new Error('projet introuvable'), { code: 'project/missing' });
+      const me = auth.currentUser, nid = hex12(), now = Date.now();
+      await setDoc(doc(col(), nid), { ...s.data(), name: String(name || s.data().name).slice(0, 120), created: now, updated: now, by: displayName({ name: me.displayName, email: me.email }), byUid: me.uid, private: workspaces.isOwn ? s.data().private === true : false, archived: false });
+      return nid;
     },
     async get(id) {
       const s = await getDoc(doc(col(), id));
