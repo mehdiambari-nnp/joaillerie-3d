@@ -12,11 +12,17 @@ export async function startServer(port = 5199) {
   return { server, url: `http://127.0.0.1:${port}/` };
 }
 
+// Le rendu WebGL logiciel (SwiftShader) est bien plus lent sur un runner CI à 2 cœurs : délais d'actions (captures, attentes) relevés.
+const ACTION_TIMEOUT = process.env.CI ? 180000 : 30000;
+
 export async function launch(extraArgs = []) {
-  return chromium.launch({
+  const browser = await chromium.launch({
     executablePath: CHROMIUM,
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl', ...extraArgs],
   });
+  const newContext = browser.newContext.bind(browser);
+  browser.newContext = async (options) => { const ctx = await newContext(options); ctx.setDefaultTimeout(ACTION_TIMEOUT); return ctx; };
+  return browser;
 }
 
 export function collect(page) {
