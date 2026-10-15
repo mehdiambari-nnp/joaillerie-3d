@@ -10,6 +10,7 @@
     "preview": "vite preview --host",
     "test": "vitest run",
     "test:e2e": "node tests/e2e/run.mjs",
+    "verify": "vitest run && vite build && node scripts/csp-check.mjs && node tests/e2e/run.mjs",
     "fetch-models": "node scripts/fetch-models.mjs",
     "postinstall": "node scripts/copy-wasm.mjs",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
@@ -18,7 +19,8 @@
     "dev:offline": "vite --host --mode offline",
     "build:offline": "vite build --mode offline",
     "test:rules": "firebase emulators:exec --only firestore --project demo-jewel3d \"vitest run --config vitest.rules.config.js\"",
-    "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-jewel3d"
+    "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-jewel3d",
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "6.0.0",

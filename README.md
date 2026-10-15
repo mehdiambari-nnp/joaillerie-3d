@@ -13,6 +13,7 @@ npm run dev            # HTTPS auto-signé, réseau local ; Firebase réel : pag
 npm run dev:offline    # sans Firebase ni connexion (API en mémoire) : tests et développement hors ligne
 npm run dev -- --open  # puis ?model=gemv charge assets/test/MAQUETTE_GEMV.fbx (mode offline)
 npm test               # tests unitaires (le fichier import.test.js exige la maquette privée assets/test/)
+npm run verify         # tests unitaires + build + CSP + E2E (≈ 3 min) : lancé automatiquement avant chaque push (hook git)
 npm run test:e2e       # E2E Chromium headless, mode offline (captures dans docs/screenshots/)
 npm run build          # dist/ statique (Firebase) ; npm run build:offline pour la variante sans Firebase
 npm run emulators      # émulateurs Firebase (Auth/Firestore/Storage) ; ouvrir ?emulator pour s'y brancher

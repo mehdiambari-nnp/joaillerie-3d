@@ -194,3 +194,9 @@
 - **Propriété** : tout ce qu'un invité enregistre appartient à l'atelier du propriétaire ; le dialogue d'invitation et celui d'acceptation le disent.
 - **Inscription libre conservée** (choix) : n'importe qui peut toujours créer un compte et son propre atelier (risque de coût/abus de Cloud Storage décrit dans la revue d'audit ; à traiter séparément : liste d'invitation globale, vérification d'e-mail ou App Check, alerte de budget).
 - **Émulateurs** : `?emulator` (développement uniquement) branche l'app sur Auth/Firestore/Storage locaux (`demo-jewel3d`).
+
+## Tests de bout en bout en local, plus dans la CI
+- Mesure : sur le runner GitHub (2 cœurs, rendu WebGL logiciel) l'e2e prenait ≈ 9,5 min sur un job de ≈ 11 min ; le reste (installation, tests unitaires, règles Firestore, build) ≈ 1 min. Le rendu 3D logiciel est le coût : couper le pipeline d'image (`?fx=off`) ne gagnait que ≈ 15 % en local, au prix de la couverture de l'iPhone, donc abandonné.
+- Décision : l'e2e sort de la CI. `npm run verify` (tests unitaires, build, `csp-check`, e2e ≈ 3 min en local) est lancé **avant chaque push** par `.githooks/pre-push`, activé automatiquement par `npm install` (script `prepare` → `core.hooksPath`). Le hook saute les vérifications si aucun fichier de l'application n'a changé ; `SKIP_VERIFY=1 git push` l'ignore ponctuellement.
+- La CI garde : audit des dépendances, tests unitaires, règles Firestore (émulateur), build, puis déploiement.
+- Prérequis local : Chromium pour Playwright (`npx playwright install chromium`) et `ffmpeg` pour le test d'essayage.
