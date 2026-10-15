@@ -844,13 +844,15 @@ export class UI {
       try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.width = Math.round(p * 100) + '%'; }); }
       catch (e) { console.warn('Hébergement du modèle impossible', e); hostFailed = true; }
     } else remote = await this.hostModel().catch(() => null);
+    const rights = await Promise.resolve(cloud.workspaces?.rights?.()).catch(() => null);
+    const noClient = !!rights && !rights.createLinks; // le propriétaire de l'atelier n'a pas donné le droit de créer des liens clients
     const tracked = !!cloud.links && !!cloud.auth.user; // Firebase : lien client SUIVI (un par envoi) ; sinon lien classique
     const urls = { client: tracked ? null : await this.shortShareUrl(true, remote), jeweler: await this.shortShareUrl(false, remote) };
     const field = (k, label) => `<p class="palette-title">${label}</p>
       <input type="url" readonly value="${esc(urls[k])}" data-r="shareurl-${k}" aria-label="${esc(label)}">
       <div class="row"><button class="btn ${k === 'client' ? 'primary' : ''}" data-s="copy" data-k="${k}">${t('copyLink')}</button>
         ${navigator.share ? `<button class="btn" data-s="native" data-k="${k}">${t('share')}…</button>` : ''}</div>`;
-    const clientBlock = tracked ? `<p class="palette-title">${t('clientLink')}</p>
+    const clientBlock = noClient ? `<p class="palette-title">${t('clientLink')}</p><p class="muted tiny">${t('noRightLinks')}</p>` : tracked ? `<p class="palette-title">${t('clientLink')}</p>
       <div data-r="linkform"><p class="muted tiny">${t('trackedNote')}</p>
         <label class="fld"><span>${t('linkLabel')}</span><input type="text" data-r="linklabel" maxlength="120" placeholder="${esc(t('linkLabelHint'))}"></label>
         <button class="btn primary" data-s="mklink">${t('linkCreate')}</button></div>

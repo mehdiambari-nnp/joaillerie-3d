@@ -2,7 +2,7 @@
 // Le SDK n'est chargé qu'à la demande (import dynamique depuis ./index.js).
 import { initializeApp } from 'firebase/app';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, writeBatch } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, writeBatch, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, ref, uploadBytesResumable, getBytes, getMetadata } from 'firebase/storage';
 import { modelId, gzip, gunzip } from '../share/remote.js';
 import { createWorkspaces } from './workspaces.js';
@@ -73,13 +73,23 @@ export function create(config) {
 
   // Ateliers partagés : les projets sont ceux de l'atelier actif (le mien, ou celui d'un joaillier qui m'a invité)
   const workspaces = createWorkspaces(db, () => { uid(); const u = auth.currentUser; return { uid: u.uid, email: u.email || '', name: displayName({ name: u.displayName, email: u.email }) }; });
-  const links = createLinks(db, auth, () => { uid(); return { uid: auth.currentUser.uid }; });
+  const links = createLinks(db, auth, () => { uid(); return { uid: auth.currentUser.uid, name: displayName({ name: auth.currentUser.displayName, email: auth.currentUser.email }) }; }, workspaces);
   const col = () => { uid(); return collection(db, 'users', workspaces.active, 'projects'); };
   const projects = {
-    /** Projets de l'atelier actif, du plus récent au plus ancien. Un membre ne reçoit que les projets non privés. */
+    /** Projets de l'atelier actif, du plus récent au plus ancien. Un membre ne reçoit que ceux qui lui sont accessibles :
+     *  les projets non privés (s'il voit « tous ») et ceux que le propriétaire lui a accordés un par un (`sharedWith`). */
     async list() {
       const own = workspaces.isOwn;
-      const snap = await getDocs(own ? col() : query(col(), where('private', '==', false)));
+      let docs;
+      if (own) docs = (await getDocs(col())).docs;
+      else {
+        const r = await workspaces.rights(), me = auth.currentUser.uid, seen = new Map();
+        const queries = [getDocs(query(col(), where('sharedWith', 'array-contains', me)))];
+        if (r.projects === 'all') queries.push(getDocs(query(col(), where('private', '==', false))));
+        for (const s of await Promise.all(queries)) for (const d of s.docs) seen.set(d.id, d);
+        docs = [...seen.values()];
+      }
+      const snap = { docs };
       const out = snap.docs.map((d) => { const { config, options, ...rest } = d.data(); return { id: d.id, ...rest }; }); // la configuration n'est lue qu'à l'ouverture
       // anciens projets sans `private` / `archived` : le propriétaire les complète (une liste filtrée ne retrouve que les documents qui portent le champ)
       if (own) {
@@ -103,17 +113,20 @@ export function create(config) {
         created: o ? o.created : Date.now(), updated: Date.now(),
         by: displayName({ name: me.displayName, email: me.email }), byUid: me.uid,
         private: o ? o.private === true : false, archived: o ? o.archived === true : false, // visibilité et archivage conservés à la mise à jour
+        sharedWith: o ? o.sharedWith || [] : workspaces.isOwn ? [] : [me.uid], // accès un par un : conservés ; un membre voit ce qu'il crée
       });
       return id;
     },
     /** Modifie nom, visibilité (`private`, propriétaire seulement) ou archivage, sans toucher au fichier ni à la date de modification. */
     update: (id, patch) => updateDoc(doc(col(), id), Object.fromEntries(Object.entries(patch).filter(([k]) => ['name', 'private', 'archived'].includes(k)))),
+    /** Propriétaire : accorde (ou retire) à un joaillier l'accès à ce projet, un par un. */
+    access: (id, uid, on) => updateDoc(doc(col(), id), { sharedWith: on ? arrayUnion(uid) : arrayRemove(uid) }),
     /** Copie un projet (même fichier : aucun nouveau téléversement). Le propriétaire peut le rendre privé ; la copie d'un membre est visible. */
     async duplicate(id, name) {
       const s = await getDoc(doc(col(), id));
       if (!s.exists()) throw Object.assign(new Error('projet introuvable'), { code: 'project/missing' });
       const me = auth.currentUser, nid = hex12(), now = Date.now();
-      await setDoc(doc(col(), nid), { ...s.data(), name: String(name || s.data().name).slice(0, 120), created: now, updated: now, by: displayName({ name: me.displayName, email: me.email }), byUid: me.uid, private: workspaces.isOwn ? s.data().private === true : false, archived: false });
+      await setDoc(doc(col(), nid), { ...s.data(), name: String(name || s.data().name).slice(0, 120), created: now, updated: now, by: displayName({ name: me.displayName, email: me.email }), byUid: me.uid, private: workspaces.isOwn ? s.data().private === true : false, archived: false, sharedWith: workspaces.isOwn ? s.data().sharedWith || [] : [me.uid] });
       return nid;
     },
     async get(id) {

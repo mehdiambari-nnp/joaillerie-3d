@@ -57,7 +57,7 @@ export function activityFeed({ links = [], viewsByLink = {}, projects = [], memb
 export function memberStats(members = [], projects = []) {
   return members.map((m) => {
     const mine = projects.filter((p) => p.byUid === m.uid);
-    return { ...m, projects: mine.length, last: mine.reduce((a, p) => Math.max(a, p.updated || 0), 0) || null };
+    return { ...m, made: mine.length, last: mine.reduce((a, p) => Math.max(a, p.updated || 0), 0) || null };
   });
 }
 

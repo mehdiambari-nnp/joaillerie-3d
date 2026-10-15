@@ -8,13 +8,14 @@ import { esc, fill, loc, ago, chip, ICONS } from './util.js';
 
 export async function mount(ctx) {
   const { ui, cloud, el } = ctx;
+  const R = ctx.rights, vl = R.viewLinks; // sans le droit « voir les liens » : ni statistiques, ni contacts à relancer
   const w = cloud.workspaces, me = cloud.auth.user, name = displayName(me), first = name.split(' ')[0];
   let data = null, loading = true, error = false;
 
   async function load() {
     try {
       const own = w.isOwn;
-      const [projects, links, views, members] = await Promise.all([cloud.projects.list(), cloud.links.list(), cloud.links.views(), w.members().catch(() => [])]);
+      const [projects, links, views, members] = await Promise.all([cloud.projects.list(), vl ? cloud.links.list() : [], vl ? cloud.links.views() : {}, w.members().catch(() => [])]);
       data = { projects, links, views, members, own };
     } catch (e) { console.warn('Tableau de bord indisponible', e); error = true; }
     loading = false; render(); ctx.refreshMenu();
@@ -54,21 +55,21 @@ export async function mount(ctx) {
     const lead = (h) => `<li data-id="${esc(h.link.id)}"><button data-a="lead">${thumbOf(h.link)}<span class="txt"><b>${esc(h.link.label || h.link.modelName || t('linkUnnamed'))}</b><small>${esc(leadText(h))}</small></span>${ICONS.chevron}</button></li>`;
     el.innerHTML = `<div class="bo-body bo-dash">
       <section class="bo-hero"><div><p class="bo-hello">${esc(fill(t('dHello'), { name: first }))}</p><p class="muted">${esc((s => s.charAt(0).toUpperCase() + s.slice(1))(new Date().toLocaleDateString(loc(), { weekday: 'long', day: 'numeric', month: 'long' })))}</p></div>
-        <div class="bo-quick">${ui.app.model ? `<button class="btn primary" data-a="save">${ICONS.plus}${esc(t('pSaveCurrent'))}</button>` : ''}<button class="btn" data-a="import">${ICONS.upload}${esc(t('dImport'))}</button>${ui.app.model ? `<button class="btn" data-a="share">${ICONS.links}${esc(t('dShare'))}</button>` : ''}</div></section>
+        <div class="bo-quick">${ui.app.model && R.save ? `<button class="btn primary" data-a="save">${ICONS.plus}${esc(t('pSaveCurrent'))}</button>` : ''}<button class="btn" data-a="import">${ICONS.upload}${esc(t('dImport'))}</button>${ui.app.model ? `<button class="btn" data-a="share">${ICONS.links}${esc(t('dShare'))}</button>` : ''}</div></section>
       <div class="bo-tiles five">
         <button class="tile" data-a="go-projects"><b>${act.length}</b><span>${esc(t('pgProjects'))}${own && priv.length ? ' · ' + esc(fill(t('dPrivateN'), { n: priv.length })) : ''}</span></button>
-        <button class="tile" data-a="go-links"><b>${activeLinks.length}</b><span>${esc(t('tileActive'))}</span></button>
+        ${vl ? `<button class="tile" data-a="go-links"><b>${activeLinks.length}</b><span>${esc(t('tileActive'))}</span></button>
         <div class="tile"><b>${cw.views}</b><span>${esc(t('dViews7'))}</span>${delta(cw.viewsDelta)}</div>
         <div class="tile"><b>${cw.tryon}</b><span>${esc(t('dTryon7'))}</span></div>
-        <div class="tile"><b>${cw.views ? fmtDuration(cw.avgSeconds) : '—'}</b><span>${esc(t('tileAvgTime'))}</span></div></div>
-      <section class="bo-sec"><h3 class="dr-t">${esc(t('dFollowUp'))}</h3>
-        ${leads.length ? `<ul class="lead-list">${leads.map(lead).join('')}</ul>` : `<p class="proj-empty">${esc(t('dNothingToFollow'))}</p>`}</section>
+        <div class="tile"><b>${cw.views ? fmtDuration(cw.avgSeconds) : '—'}</b><span>${esc(t('tileAvgTime'))}</span></div>` : `<div class="tile"><b>${members.length + 1}</b><span>${esc(t('pgTeam'))}</span></div>`}</div>
+      ${vl ? `<section class="bo-sec"><h3 class="dr-t">${esc(t('dFollowUp'))}</h3>
+        ${leads.length ? `<ul class="lead-list">${leads.map(lead).join('')}</ul>` : `<p class="proj-empty">${esc(t('dNothingToFollow'))}</p>`}</section>` : ''}
       <div class="bo-cols">
         <section class="bo-sec"><h3 class="dr-t">${esc(t('dActivity'))}</h3>
           ${feed.length ? `<ul class="feed">${feed.map((e) => { const l = eventLine(e); return `<li><span class="ficon">${l.icon}</span><span class="ftxt">${l.html}</span><time>${esc(ago(e.at, now))}</time></li>`; }).join('')}</ul>` : `<p class="proj-empty">${esc(t('dNoActivity'))}</p>`}</section>
         <section class="bo-sec"><h3 class="dr-t">${esc(t('dRecentProjects'))}</h3>
           ${act.length ? `<ul class="recent">${act.slice(0, 4).map((p) => `<li data-id="${esc(p.id)}"><button data-a="open">${p.thumb ? `<img src="${p.thumb}" alt="" loading="lazy">` : '<span class="ph"></span>'}<b>${esc(p.name)}</b><small>${esc(ago(p.updated, now))}</small></button></li>`).join('')}</ul><button class="btn wide" data-a="go-projects">${esc(t('dAllProjects'))}</button>` : `<p class="proj-empty">${esc(t('pEmpty'))}</p>`}
-          ${activeLinks.length || Object.keys(views).length ? `<h3 class="dr-t" style="margin-top:26px">${esc(t('chart14'))}</h3><div class="bo-chart" role="img" aria-label="${esc(t('chart14'))} : ${days.reduce((a, d) => a + d.n, 0)}">${days.map((d) => `<i style="height:${Math.round((d.n / max) * 100)}%" title="${d.n}"></i>`).join('')}</div>` : ''}</section>
+          ${vl && (activeLinks.length || Object.keys(views).length) ? `<h3 class="dr-t" style="margin-top:26px">${esc(t('chart14'))}</h3><div class="bo-chart" role="img" aria-label="${esc(t('chart14'))} : ${days.reduce((a, d) => a + d.n, 0)}">${days.map((d) => `<i style="height:${Math.round((d.n / max) * 100)}%" title="${d.n}"></i>`).join('')}</div>` : ''}</section>
       </div></div>`;
   }
 

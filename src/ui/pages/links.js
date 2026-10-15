@@ -45,7 +45,7 @@ export async function mount(ctx) {
         <span class="chips">${statusChip(l)}${interestChip(sm)}</span></button></li>`;
     };
     return `<div class="bo-body">
-        <div class="bo-tiles">${tiles.map(([n, l]) => `<div class="tile"><b>${n}</b><span>${esc(l)}</span></div>`).join('')}</div>
+        ${ctx.rights.viewLinks ? `<div class="bo-tiles">${tiles.map(([n, l]) => `<div class="tile"><b>${n}</b><span>${esc(l)}</span></div>`).join('')}</div>` : `<p class="bo-banner">${esc(t('linksOwnOnly'))}</p>`}
         <div class="bo-tabs" role="tablist">${[['all', t('tabAll'), all.length], ['active', t('tabActive'), act.length], ['off', t('tabOff'), off.length]].map(([k, l, n]) => `<button type="button" role="tab" data-a="filter" data-k="${k}" aria-selected="${S.filter === k}">${esc(l)} <i>${n}</i></button>`).join('')}</div>
         ${S.error ? `<p class="proj-empty">${t('linksError')}</p>` : shown.length ? `<ul class="bo-list">${shown.map(card).join('')}</ul>` : `<p class="proj-empty">${all.length ? t('linksNoneHere') : t('linksEmpty')}</p>`}
         <p class="bo-note">${t('linksPrivacy')}</p>

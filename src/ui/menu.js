@@ -4,6 +4,7 @@ import { t } from './i18n.js';
 import { displayName } from '../cloud/name.js';
 import { linkStatus } from '../cloud/linkStats.js';
 import { ICONS, esc, fill } from './pages/util.js';
+import { OWNER_RIGHTS } from '../cloud/rights.js';
 
 let counts = null; // dernier comptage connu (affiché tout de suite à la réouverture)
 
@@ -18,11 +19,12 @@ export async function renderMenu(ui) {
       if (list.length > 1) wsBlock = `<div class="menu-ws"><select data-r="ws" aria-label="${esc(t('workshop'))}">${list.map((o) => `<option value="${esc(o.owner)}"${o.owner === w.active ? ' selected' : ''}>${o.self ? esc(t('myWorkshop')) : esc(fill(t('workshopOf'), { name: o.name || '…' }))}</option>`).join('')}</select></div>`;
     } catch (e) { console.warn('Ateliers indisponibles', e); }
   }
-  const items = fb ? [['dashboard', 'pgDashboard'], ['projects', 'pgProjects'], ['links', 'pgLinks'], ['team', 'pgTeam']] : [['projects', 'pgProjects']];
+  const rights = ui.rights = await (w?.rights?.() ?? Promise.resolve(OWNER_RIGHTS)).catch(() => OWNER_RIGHTS);
+  const items = fb ? [['dashboard', 'pgDashboard'], ['projects', 'pgProjects'], ...(rights.createLinks || rights.viewLinks ? [['links', 'pgLinks']] : []), ['team', 'pgTeam']] : [['projects', 'pgProjects']];
   const badge = (k) => (counts && counts[k] != null ? `<i data-r="n-${k}">${counts[k]}</i>` : `<i data-r="n-${k}" hidden></i>`);
   dr.innerHTML = `<div class="dr-h"><h2>${esc(t('menu'))}</h2><button class="icon-btn" data-a="projects-close" aria-label="${esc(t('close'))}">✕</button></div>
     ${wsBlock}
-    ${ui.app.model ? `<button class="btn primary wide menu-save" data-a="menu-save">${ICONS.plus}${esc(t('pSaveCurrent'))}</button>` : ''}
+    ${ui.app.model && rights.save ? `<button class="btn primary wide menu-save" data-a="menu-save">${ICONS.plus}${esc(t('pSaveCurrent'))}</button>` : ''}
     <nav class="menu-nav" aria-label="${esc(t('menu'))}">${items.map(([k, key]) => `<button type="button" data-a="menu-nav" data-tab="${k}">${ICONS[k]}<span>${esc(t(key))}</span>${badge(k)}</button>`).join('')}</nav>
     ${user ? `<footer class="dr-foot"><p class="dr-who"><span>${esc(displayName(user))}</span><small title="${esc(user.email || '')}">${esc(user.email || '')}</small></p>
       <button class="btn wide" data-a="signout">${ICONS.logout}${esc(t('signOut'))}</button></footer>` : ''}`;
@@ -31,7 +33,7 @@ export async function renderMenu(ui) {
 }
 
 async function refreshCounts(ui, cloud) {
-  const [projects, links, members] = await Promise.all([cloud.projects.list().catch(() => null), cloud.links.list().catch(() => null), cloud.workspaces.members().catch(() => null)]);
+  const [projects, links, members] = await Promise.all([cloud.projects.list().catch(() => null), (ui.rights?.createLinks || ui.rights?.viewLinks) ? cloud.links.list().catch(() => null) : null, cloud.workspaces.members().catch(() => null)]);
   counts = {
     dashboard: null,
     projects: projects ? projects.filter((p) => !p.archived).length : null,
