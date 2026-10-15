@@ -22,7 +22,7 @@ export async function openBackoffice(ui, tab = 'dashboard', params = {}) {
   el.className = 'bo'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true');
   el.innerHTML = `<header class="bo-h"><h2 data-r="title"></h2><button class="icon-btn" data-a="close" aria-label="${esc(t('close'))}">✕</button></header>
     <div class="bo-page" data-r="page"></div>
-    ${tabs.length > 1 ? `<nav class="bo-nav" role="tablist">${tabs.map((k) => `<button type="button" role="tab" data-tab="${k}" aria-selected="false">${ICONS[k === 'links' ? 'links' : k]}<span>${esc(t(TITLES[k]))}</span></button>`).join('')}</nav>` : ''}`;
+    ${tabs.length > 1 ? `<nav class="bo-nav" aria-label="${esc(t('menu'))}">${tabs.map((k) => `<button type="button" data-tab="${k}">${ICONS[k === 'links' ? 'links' : k]}<span>${esc(t(TITLES[k]))}</span></button>`).join('')}</nav>` : ''}`;
   ui.root.append(el);
   document.documentElement.classList.add('has-bo');
 
@@ -35,7 +35,7 @@ export async function openBackoffice(ui, tab = 'dashboard', params = {}) {
       const my = ++token;
       page?.destroy?.(); page = null; back = null; cur = id;
       el.querySelector('[data-r=title]').textContent = t(TITLES[id]);
-      el.querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === id)));
+      el.querySelectorAll('[data-tab]').forEach((b) => b.dataset.tab === id ? b.setAttribute('aria-current', 'page') : b.removeAttribute('aria-current'));
       pageEl.innerHTML = `<div class="bo-body"><p class="muted">${esc(t('loading'))}</p></div>`;
       try {
         const mod = await PAGES[id]();

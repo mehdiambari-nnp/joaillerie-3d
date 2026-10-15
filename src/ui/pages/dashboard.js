@@ -53,7 +53,7 @@ export async function mount(ctx) {
     const days = perDay(Object.values(views).flat(), 14, now), max = Math.max(1, ...days.map((d) => d.n));
     const lead = (h) => `<li data-id="${esc(h.link.id)}"><button data-a="lead">${thumbOf(h.link)}<span class="txt"><b>${esc(h.link.label || h.link.modelName || t('linkUnnamed'))}</b><small>${esc(leadText(h))}</small></span>${ICONS.chevron}</button></li>`;
     el.innerHTML = `<div class="bo-body bo-dash">
-      <section class="bo-hero"><div><h1>${esc(fill(t('dHello'), { name: first }))}</h1><p class="muted">${esc((s => s.charAt(0).toUpperCase() + s.slice(1))(new Date().toLocaleDateString(loc(), { weekday: 'long', day: 'numeric', month: 'long' })))}</p></div>
+      <section class="bo-hero"><div><p class="bo-hello">${esc(fill(t('dHello'), { name: first }))}</p><p class="muted">${esc((s => s.charAt(0).toUpperCase() + s.slice(1))(new Date().toLocaleDateString(loc(), { weekday: 'long', day: 'numeric', month: 'long' })))}</p></div>
         <div class="bo-quick">${ui.app.model ? `<button class="btn primary" data-a="save">${ICONS.plus}${esc(t('pSaveCurrent'))}</button>` : ''}<button class="btn" data-a="import">${ICONS.upload}${esc(t('dImport'))}</button>${ui.app.model ? `<button class="btn" data-a="share">${ICONS.links}${esc(t('dShare'))}</button>` : ''}</div></section>
       <div class="bo-tiles five">
         <button class="tile" data-a="go-projects"><b>${act.length}</b><span>${esc(t('pgProjects'))}${own && priv.length ? ' · ' + esc(fill(t('dPrivateN'), { n: priv.length })) : ''}</span></button>
@@ -68,7 +68,7 @@ export async function mount(ctx) {
           ${feed.length ? `<ul class="feed">${feed.map((e) => { const l = eventLine(e); return `<li><span class="ficon">${l.icon}</span><span class="ftxt">${l.html}</span><time>${esc(ago(e.at, now))}</time></li>`; }).join('')}</ul>` : `<p class="proj-empty">${esc(t('dNoActivity'))}</p>`}</section>
         <section class="bo-sec"><h3 class="dr-t">${esc(t('dRecentProjects'))}</h3>
           ${act.length ? `<ul class="recent">${act.slice(0, 4).map((p) => `<li data-id="${esc(p.id)}"><button data-a="open">${p.thumb ? `<img src="${p.thumb}" alt="" loading="lazy">` : '<span class="ph"></span>'}<b>${esc(p.name)}</b><small>${esc(ago(p.updated, now))}</small></button></li>`).join('')}</ul><button class="btn wide" data-a="go-projects">${esc(t('dAllProjects'))}</button>` : `<p class="proj-empty">${esc(t('pEmpty'))}</p>`}
-          ${activeLinks.length || Object.keys(views).length ? `<h3 class="dr-t" style="margin-top:26px">${esc(t('chart14'))}</h3><div class="bo-chart">${days.map((d) => `<i style="height:${Math.round((d.n / max) * 100)}%" title="${d.n}"></i>`).join('')}</div>` : ''}</section>
+          ${activeLinks.length || Object.keys(views).length ? `<h3 class="dr-t" style="margin-top:26px">${esc(t('chart14'))}</h3><div class="bo-chart" role="img" aria-label="${esc(t('chart14'))} : ${days.reduce((a, d) => a + d.n, 0)}">${days.map((d) => `<i style="height:${Math.round((d.n / max) * 100)}%" title="${d.n}"></i>`).join('')}</div>` : ''}</section>
       </div></div>`;
   }
 
