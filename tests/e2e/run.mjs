@@ -31,6 +31,7 @@ step('Introduction : écrin fermé → ouverture → bague libre');
   await p0.waitForFunction(() => !document.querySelector('.app').dataset.intro, null, { timeout: 30000 });
   ok(await p0.evaluate(() => __rc.app.model.root.position.y === 0 && __rc.app.model.root.rotation.y === 0 && !document.querySelector('.intro-hint')), 'bague remise en place, indice retiré');
   ok(await p0.evaluate(() => __rc.app.viewer.controls.enabled), 'contrôles de la vue 3D de nouveau actifs');
+  ok(await p0.evaluate(() => !__rc.app.viewer.fx || __rc.app.viewer.fx.n >= 1), 'pipeline d’image : au moins une image rendue (ou rendu direct si le GPU ne le gère pas)');
   ok(l0.errors.length === 0, 'aucune erreur console (intro) ' + JSON.stringify(l0.errors));
   await b0.close();
 }
