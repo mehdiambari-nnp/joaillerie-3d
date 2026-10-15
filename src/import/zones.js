@@ -11,12 +11,16 @@ const METAL_KW = /(metal|gold|\bor\b|silver|argent|platin|band|ring|anneau|prong
 
 /**
  * Classe une pièce : 'gem' (pierre) ou 'metal'.
- * Priorité : mots-clés dans les noms, puis géométrie (petite, sans UV, peu de triangles → pierre).
+ * Priorité : mots-clés dans les noms ; puis géométrie : un solide CONVEXE de taille non négligeable est une pierre (même avec des UV et
+ * un maillage dense, ce que les CAO exportent souvent pour la pierre centrale) ; puis petite, sans UV, peu de triangles → pierre.
+ * `ctx.modelMax` : plus grande dimension du fichier (ignore les grains minuscules, convexes eux aussi, qui sont du métal).
  */
-export function classifyKind(piece) {
+export function classifyKind(piece, ctx = {}) {
   const names = norm(piece.materialName) + ' ' + norm(piece.name);
   if (GEM_KW.test(names)) return 'gem';
   if (METAL_KW.test(names)) return 'metal';
+  const modelMax = ctx.modelMax ?? (piece.size ? Math.max(...piece.size) * 3 : 0);
+  if (piece.convex && piece.size && Math.min(...piece.size) >= 0.02 * modelMax) return 'gem';
   if (piece.tris < 1000 && !piece.hasUV) return 'gem';
   return 'metal';
 }
@@ -32,14 +36,17 @@ export function detectZones(pieces) {
   const roles = {}; // pieceId -> role
   const gems = [];
   const metals = [];
-  for (const p of pieces) (classifyKind(p) === 'gem' ? gems : metals).push(p);
+  for (const p of pieces) ((p.kind ?? classifyKind(p, { modelMax })) === 'gem' ? gems : metals).push(p); // `kind` déjà décidé à l'import (géométrie) prime
 
-  // Pierres : centrale = la plus proche du barycentre des pierres (si >= 3)
+  // Pierres : centrale = la pierre nettement la plus grosse (volume ≥ 1,8 × la suivante : un pavé de petites pierres fausse le barycentre) ;
+  // sinon la plus proche du barycentre des pierres (si >= 3)
   const gemRole = {};
   if (gems.length >= 3) {
+    const vol = (g) => g.size[0] * g.size[1] * g.size[2];
+    const bySize = [...gems].sort((a, b) => vol(b) - vol(a));
     const c = gems.reduce((a, g) => a.map((v, i) => v + g.center[i] / gems.length), [0, 0, 0]);
     const d = (g) => Math.hypot(g.center[0] - c[0], g.center[1] - c[1], g.center[2] - c[2]);
-    const centre = [...gems].sort((a, b) => d(a) - d(b))[0];
+    const centre = vol(bySize[0]) >= 1.8 * vol(bySize[1]) ? bySize[0] : [...gems].sort((a, b) => d(a) - d(b))[0];
     for (const g of gems) gemRole[g.id] = g === centre ? 'gem-center' : 'gem-side';
   } else {
     for (const g of gems) gemRole[g.id] = 'gem';
@@ -50,7 +57,7 @@ export function detectZones(pieces) {
   for (const m of metals) {
     const md = maxDimOf(m);
     if (md > 0.5 * modelMax) roles[m.id] = 'body';
-    else if (m.tris < 3000 && md < 0.25 * modelMax) roles[m.id] = 'claw';
+    else if ((m.tris < 3000 && md < 0.25 * modelMax) || md < 0.16 * modelMax) roles[m.id] = 'claw'; // petite pièce : griffe, même très maillée
     else {
       let best = null, bd = Infinity;
       for (const g of gems) {

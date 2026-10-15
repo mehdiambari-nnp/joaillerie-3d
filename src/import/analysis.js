@@ -23,6 +23,37 @@ export function positionHash(geometry, samples = 64) {
 }
 
 /** Descripteur léger d'une géométrie (dans le repère courant). */
+/**
+ * Solide CONVEXE ? (une pierre taillée l'est toujours ; un anneau, un chaton, une griffe ne le sont presque jamais).
+ * Échantillon de faces : pour chacune, part des sommets situés d'un côté et de l'autre de son plan ; un solide convexe a tous ses sommets
+ * d'un seul côté, quelle que soit l'orientation des normales. Retourne la « non-convexité » moyenne (0 = convexe).
+ */
+export function nonConvexity(geometry, { faces = 80, verts = 240 } = {}) {
+  const pos = geometry.attributes.position, idx = geometry.index;
+  const n = (idx ? idx.count : pos.count) / 3;
+  if (n < 4) return 1;
+  geometry.computeBoundingBox();
+  const size = geometry.boundingBox.getSize(new THREE.Vector3()), tol = Math.max(size.x, size.y, size.z) * 1e-3;
+  const vi = (t, k) => (idx ? idx.getX(t * 3 + k) : t * 3 + k);
+  const sample = []; const vs = Math.max(1, Math.floor(pos.count / verts));
+  for (let i = 0; i < pos.count; i += vs) sample.push(new THREE.Vector3().fromBufferAttribute(pos, i));
+  const a = new THREE.Vector3(), b = new THREE.Vector3(), c = new THREE.Vector3(), nr = new THREE.Vector3(), d = new THREE.Vector3();
+  let bad = 0, tot = 0;
+  const step = Math.max(1, Math.floor(n / faces));
+  for (let f = 0; f < n; f += step) {
+    a.fromBufferAttribute(pos, vi(f, 0)); b.fromBufferAttribute(pos, vi(f, 1)); c.fromBufferAttribute(pos, vi(f, 2));
+    nr.crossVectors(b.sub(a), c.sub(a));
+    if (nr.lengthSq() < 1e-18) continue;
+    nr.normalize();
+    let up = 0, down = 0;
+    for (const v of sample) { const s = nr.dot(d.subVectors(v, a)); if (s > tol) up++; else if (s < -tol) down++; }
+    bad += Math.min(up, down) / sample.length; tot++;
+  }
+  return tot ? bad / tot : 1;
+}
+/** Solide convexe : seuil 1 % (les métaux d'une vraie bague sont à ≥ 1,8 % ; les pierres à ≈ 0). */
+export const isConvexSolid = (geometry) => nonConvexity(geometry) < 0.01;
+
 export function describeGeometry(geometry) {
   geometry.computeBoundingBox();
   const b = geometry.boundingBox;
@@ -36,6 +67,7 @@ export function describeGeometry(geometry) {
     size,
     center,
     hash: positionHash(geometry),
+    convex: isConvexSolid(geometry),
   };
 }
 

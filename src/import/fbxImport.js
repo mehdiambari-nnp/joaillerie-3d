@@ -115,7 +115,8 @@ export async function importModel(buffer, fileName = 'modele.fbx', options = {})
   report.notes.push(`Unité ${unit ? 'choisie' : 'détectée'} : ${unitInfo.unit}.`);
 
   // 3. Classification (repère du fichier, invariante d'échelle)
-  for (const p of pieces) { p.kind = p.userData?.kind || classifyKind({ ...p, name: p.name }); }
+  const fileMax = Math.max(...fileSize.toArray());
+  for (const p of pieces) { p.kind = p.userData?.kind || classifyKind({ ...p, name: p.name }, { modelMax: fileMax }); }
   const gems = pieces.filter((p) => p.kind === 'gem');
   const fileCenter = fileBox.getCenter(new THREE.Vector3());
 
