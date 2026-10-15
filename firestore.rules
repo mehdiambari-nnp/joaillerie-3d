@@ -2,7 +2,10 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ---- Fonctions communes ----
-    function signedIn() { return request.auth != null; }
+    // Compte réel (e-mail, Google) : exclut les comptes ANONYMES, que reçoit le client d'un lien suivi pour qu'on puisse mesurer sa
+    // consultation. Un anonyme ne peut rien créer d'autre que sa propre ligne de consultation (voir links/{id}/views).
+    function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    function anyUser() { return request.auth != null; }
     function isOwner(owner) { return signedIn() && request.auth.uid == owner; }
     // Atelier partagé : l'atelier d'un joaillier = ses projets (users/{owner}/projects) ; les joailliers invités y sont listés dans
     // workspaces/{owner}/members/{uid}. Un membre lit et écrit les projets de l'atelier ; seul le propriétaire invite et retire.
@@ -80,6 +83,65 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
         && request.resource.data.used == true && request.resource.data.usedBy == request.auth.uid;
       allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+    }
+
+    // ---- Liens clients suivis ----
+    // links/{id} : partie PUBLIQUE d'un lien (le client l'ouvre par son identifiant secret de 80 bits) : configuration, propriétaire,
+    // actif / désactivé, expiration. Pas de listing. Seul le propriétaire modifie, désactive ou supprime.
+    // users/{uid}/links/{id} : fiche PRIVÉE du joaillier (nom donné au lien, note, projet) ; links/{id}/views/{vid} : une ligne par
+    // consultation, écrite par le client (compte anonyme) et lisible par le seul propriétaire.
+    function linkOf(id) { return get(/databases/$(database)/documents/links/$(id)).data; }
+    function linkOpen(id) { return linkOf(id).enabled == true && (linkOf(id).expires == null || linkOf(id).expires > request.time.toMillis()); }
+
+    match /links/{id} {
+      allow get: if id.matches('[a-f0-9]{20}');
+      allow create: if signedIn() && id.matches('[a-f0-9]{20}')
+        && request.resource.data.keys().hasOnly(['p', 'owner', 'enabled', 'expires', 'created'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.enabled == true
+        && request.resource.data.p is string && request.resource.data.p.size() < 16000
+        && request.resource.data.created is int
+        && (request.resource.data.expires == null || request.resource.data.expires is int);
+      allow update: if isOwner(resource.data.owner)
+        && request.resource.data.keys().hasOnly(['p', 'owner', 'enabled', 'expires', 'created'])
+        && request.resource.data.owner == resource.data.owner && request.resource.data.created == resource.data.created
+        && request.resource.data.enabled is bool
+        && request.resource.data.p is string && request.resource.data.p.size() < 16000
+        && (request.resource.data.expires == null || request.resource.data.expires is int);
+      allow delete: if isOwner(resource.data.owner);
+
+      match /views/{vid} {
+        allow create: if anyUser() && vid.matches('[a-f0-9]{20}') && linkOpen(id)
+          && request.resource.data.keys().hasOnly(['owner', 'uid', 'at', 'last', 'seconds', 'opened', 'tryon', 'photo', 'taps', 'device', 'os', 'browser', 'lang'])
+          && request.resource.data.owner == linkOf(id).owner && request.resource.data.uid == request.auth.uid
+          && request.resource.data.at is int && request.resource.data.at > request.time.toMillis() - 300000 && request.resource.data.at < request.time.toMillis() + 300000
+          && request.resource.data.last == request.resource.data.at
+          && request.resource.data.seconds == 0 && request.resource.data.tryon == 0 && request.resource.data.photo == 0 && request.resource.data.taps == 0
+          && request.resource.data.opened == false
+          && request.resource.data.device in ['mobile', 'tablet', 'desktop']
+          && request.resource.data.os is string && request.resource.data.os.size() <= 20
+          && request.resource.data.browser is string && request.resource.data.browser.size() <= 20
+          && request.resource.data.lang is string && request.resource.data.lang.size() <= 10;
+        // mise à jour par le même visiteur : seuls les compteurs, qui ne reculent pas ; le temps ne peut dépasser le temps réel écoulé
+        allow update: if anyUser() && resource.data.uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['last', 'seconds', 'opened', 'tryon', 'photo', 'taps'])
+          && request.resource.data.seconds is int && request.resource.data.seconds >= resource.data.seconds
+          && request.resource.data.seconds <= (request.time.toMillis() - resource.data.at) / 1000 + 5
+          && request.resource.data.tryon is int && request.resource.data.tryon >= resource.data.tryon && request.resource.data.tryon <= 200
+          && request.resource.data.photo is int && request.resource.data.photo >= resource.data.photo && request.resource.data.photo <= 200
+          && request.resource.data.taps is int && request.resource.data.taps >= resource.data.taps && request.resource.data.taps <= 5000
+          && request.resource.data.opened is bool && request.resource.data.last is int;
+        allow read, delete: if isOwner(resource.data.owner);
+      }
+    }
+    // requêtes sur toutes les consultations d'un joaillier (tableau de bord)
+    match /{path=**}/views/{vid} { allow read: if isOwner(resource.data.owner); }
+
+    match /users/{uid}/links/{id} {
+      allow read, delete: if isOwner(uid);
+      allow create, update: if isOwner(uid) && id.matches('[a-f0-9]{20}')
+        && request.resource.data.label is string && request.resource.data.label.size() <= 120
+        && request.resource.data.note is string && request.resource.data.note.size() <= 1000;
     }
   }
 }

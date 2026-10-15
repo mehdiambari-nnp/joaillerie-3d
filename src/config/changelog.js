@@ -2,6 +2,19 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.6.0', date: '2026-10-16',
+    fr: [
+      'Liens clients suivis : un lien par envoi, avec un nom pour vous repérer',
+      'Nouveau backoffice « Liens clients » : consultations, temps passé, essayages, photos, appareil, historique',
+      'Désactivez, réactivez, modifiez ou supprimez un lien à tout moment ; mettez-le à jour avec la bague actuelle',
+    ],
+    en: [
+      'Tracked client links: one link per recipient, with a name to find it again',
+      'New “Client links” back office: views, time spent, try-ons, photos, device, history',
+      'Disable, re-enable, edit or delete a link at any time; update it with the current ring',
+    ],
+  },
+  {
     version: '0.5.0', date: '2026-10-15',
     fr: [
       'Rendu plus net et plus stable : images cumulées à l’arrêt (arêtes fines lissées, éclats des pierres sans scintillement)',
