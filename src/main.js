@@ -99,7 +99,8 @@ async function boot() {
   svc.openFile = async (file) => {
     const buffer = await file.arrayBuffer();
     if (!sniffFormat(buffer, file.name)) { ui.fatal(t('errorFormat')); return; }
-    if (await load(buffer, file.name, {}, null, file.name)) svc.projectId = null; // nouveau fichier : ce n'est plus un projet enregistré
+    if (await load(buffer, file.name, {}, null, file.name)) { svc.projectId = null; return true; } // nouveau fichier : ce n'est plus un projet enregistré
+    return false;
   };
 
   /** Ouvre un projet enregistré (fichier + configuration + lumière). */

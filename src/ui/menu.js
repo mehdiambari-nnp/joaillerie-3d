@@ -24,7 +24,8 @@ export async function renderMenu(ui) {
   const badge = (k) => (counts && counts[k] != null ? `<i data-r="n-${k}">${counts[k]}</i>` : `<i data-r="n-${k}" hidden></i>`);
   dr.innerHTML = `<div class="dr-h"><h2>${esc(t('menu'))}</h2><button class="icon-btn" data-a="projects-close" aria-label="${esc(t('close'))}">✕</button></div>
     ${wsBlock}
-    ${ui.app.model && rights.save ? `<button class="btn primary wide menu-save" data-a="menu-save">${ICONS.plus}${esc(t('pSaveCurrent'))}</button>` : ''}
+    ${rights.save ? `<button class="btn primary wide menu-save" data-a="menu-new">${ICONS.plus}${esc(t('pNew'))}</button>` : ''}
+    ${ui.app.model && rights.save ? `<button class="btn wide menu-save" data-a="menu-save">${esc(t('pSaveCurrent'))}</button>` : ''}
     <nav class="menu-nav" aria-label="${esc(t('menu'))}">${items.map(([k, key]) => `<button type="button" data-a="menu-nav" data-tab="${k}">${ICONS[k]}<span>${esc(t(key))}</span>${badge(k)}</button>`).join('')}</nav>
     ${user ? `<footer class="dr-foot"><p class="dr-who"><span>${esc(displayName(user))}</span><small title="${esc(user.email || '')}">${esc(user.email || '')}</small></p>
       <button class="btn wide" data-a="signout">${ICONS.logout}${esc(t('signOut'))}</button></footer>` : ''}`;
@@ -40,6 +41,30 @@ async function refreshCounts(ui, cloud) {
     links: links ? links.filter((l) => linkStatus(l) === 'active').length : null,
     team: members ? members.length + 1 : null,
   };
+}
+
+/** Dialogue « Nouveau projet » : un nom (facultatif) et un fichier 3D (FBX, GLB, OBJ) ; le projet est créé et enregistré aussitôt. */
+export function openNewProjectDialog(ui, onDone) {
+  const d = ui.html(`<form class="auth" novalidate>
+      <label class="fld"><span>${esc(t('projectName'))}</span><input type="text" name="name" maxlength="60" placeholder="${esc(t('npNameHint'))}" autocomplete="off"></label>
+      <label class="np-drop" data-r="drop" tabindex="0">${ICONS.upload}<b>${esc(t('npDrop'))}</b><small>${esc(t('npFormats'))}</small>
+        <input type="file" data-r="file" hidden></label></form>`);
+  const f = d.querySelector('form'), drop = d.querySelector('[data-r=drop]'), input = d.querySelector('[data-r=file]');
+  const go = async (file) => {
+    if (!file) return;
+    const name = f.name.value.trim();
+    ui.dlg.close();
+    if (!(await ui.svc.openFile(file))) return; // format illisible : l'erreur est déjà affichée
+    await ui.saveCurrentProject(true, name || file.name.replace(/\.[^.]+$/, ''));
+    onDone?.();
+  };
+  input.addEventListener('change', () => go(input.files?.[0]));
+  drop.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  for (const ev of ['dragenter', 'dragover']) drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add('over'); });
+  drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+  drop.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); drop.classList.remove('over'); go(e.dataTransfer?.files?.[0]); });
+  f.addEventListener('submit', (e) => e.preventDefault());
+  ui.openDialog(t('pNew'), d);
 }
 
 /** Dialogue « Enregistrer la bague » : nom du projet ; mise à jour du projet ouvert ou enregistrement en nouveau projet. */

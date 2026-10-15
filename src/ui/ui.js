@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { displayName } from '../cloud/name.js';
 import { emitTrack } from '../cloud/track.js';
 import { joinFlow } from './atelier.js';
-import { renderMenu, openSaveDialog } from './menu.js';
+import { renderMenu, openSaveDialog, openNewProjectDialog } from './menu.js';
 import { openBackoffice } from './backoffice.js';
 import { shouldPlayIntro, playIntro } from '../intro/intro.js';
 import { FEATURES } from '../config/features.js';
@@ -582,6 +582,7 @@ export class UI {
       case 'signout': (await this.svc.cloud()).auth.signOut() /* le rechargement vers la page de connexion est déclenché par main.js */; break;
       case 'projects-close': this.closeProjects(); break;
       case 'menu-save': this.closeProjects(); this.openSaveDialog(); break;
+      case 'menu-new': this.closeProjects(); this.openNewProject(() => this.openBackoffice('projects')); break;
       case 'menu-nav': this.closeProjects(); this.openBackoffice(el.dataset.tab); break;
       case 'photo': this.takePhoto(); break;
       case 'whatsnew': this.changelog({ force: true }); break;
@@ -747,6 +748,7 @@ export class UI {
   }
   renderMenu() { return renderMenu(this); }                       // contenu du menu : voir menu.js
   openSaveDialog(onDone) { openSaveDialog(this, onDone); }
+  openNewProject(onDone) { openNewProjectDialog(this, onDone); }
   openBackoffice(tab, params) { return openBackoffice(this, tab, params); } // pages : voir backoffice.js et pages/
 
 
