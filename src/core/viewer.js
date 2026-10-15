@@ -52,7 +52,7 @@ export class Viewer {
     this.root = null;
     this.radius = 20;
 
-    this.fx = QUALITY.post ? new Fx(this) : null; // accumulation d'images, profondeur de champ (voir fx.js)
+    this.fx = QUALITY.post && Fx.supported(this.renderer) ? new Fx(this) : null; // accumulation d'images, profondeur de champ (voir fx.js)
     this._shadow = this._makeShadow();
     this.scene.add(this._shadow);
     this.contact = QUALITY.contactShadow ? new ContactShadow(this, this._shadow) : null; // ombre de contact calculée (voir contactShadow.js)

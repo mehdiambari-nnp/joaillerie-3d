@@ -8,7 +8,7 @@ import { UI } from './ui/ui.js';
 import { t } from './ui/i18n.js';
 import { importModel, sniffFormat } from './import/fbxImport.js';
 import { buildDemoRingGLB } from './demo/proceduralRing.js';
-import { parseShareHash, shortShareRef, parseShareJson, cleanVariants } from './state/store.js';
+import { parseShareHash, shortShareRef, parseShareJson, cleanVariants, needsLogin } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
 import { getCloud } from './cloud/index.js';
 
@@ -21,10 +21,20 @@ function hasWebGL2() {
 
 async function boot() {
   if (!hasWebGL2()) { root.innerHTML = `<p style="padding:24px;font:16px system-ui">${t('webgl')}</p>`; return; }
-  // Porte d'entrée : sans lien de partage, l'outil exige un compte joaillier (Firebase). Un lien client s'ouvre directement.
-  if (!/[#&][cs]=/.test(location.hash)) {
+  const hasLink = /[#&][cs]=/.test(location.hash);
+  let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV, hasLink); // vrai tant que l'intro n'a pas pris la main
+  let pending = parseShareHash(location.hash); // lien long (#c=) : configuration lue sur place
+  let shareFailed = false;
+  const shortRef = shortShareRef(location.hash); // lien court (#s=) : configuration à récupérer sur le serveur
+  if (shortRef) {
+    try { pending = parseShareJson(await (await getCloud()).shares.get(shortRef)); if (!pending) throw new Error('lien illisible'); }
+    catch (e) { console.warn('Lien de partage introuvable', e); shareFailed = true; introPending = false; } // lien introuvable : modèle par défaut, sans l'écrin
+  }
+  // Porte d'entrée : seul un lien CLIENT valide s'ouvre sans compte. Tout le reste (adresse nue, lien joaillier, lien illisible ou modifié)
+  // exige la connexion d'un joaillier (Firebase). Les liens joaillier gardent leur configuration une fois connecté.
+  {
     const cloud = await getCloud();
-    if (cloud.auth.enabled) {
+    if (needsLogin(pending, cloud.auth.enabled)) {
       await (await import('./ui/login.js')).showLogin(root, cloud);
       cloud.auth.onChange((user) => { if (!user) location.reload(); }); // session expirée ou déconnexion : retour à la page de connexion
     }
@@ -34,14 +44,6 @@ async function boot() {
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
   const app = new Configurator(holder);
   const svc = { options: {}, last: null, cloud: getCloud };
-  let introPending = shouldPlayIntro(theme, params, import.meta.env.DEV, /[#&][cs]=/.test(location.hash)); // vrai tant que l'intro n'a pas pris la main
-  let pending = parseShareHash(location.hash); // lien long (#c=) : configuration lue sur place
-  let shareFailed = false;
-  const shortRef = shortShareRef(location.hash); // lien court (#s=) : configuration à récupérer sur le serveur
-  if (shortRef) {
-    try { pending = parseShareJson(await (await getCloud()).shares.get(shortRef)); if (!pending) throw new Error('lien illisible'); }
-    catch (e) { console.warn('Lien de partage introuvable', e); shareFailed = true; introPending = false; } // lien introuvable : modèle par défaut, sans l'écrin
-  }
 
   const ui = new UI(root, app, svc);
   ui.initTheme(); app.viewer._applyBackground();

@@ -7,6 +7,7 @@ import { startServer, launch, collect, waitModel } from './helpers.mjs';
 const OUT = 'docs/screenshots/';
 const HAS_GEMV = fs.existsSync('assets/test/MAQUETTE_GEMV.fbx');
 fs.mkdirSync(OUT, { recursive: true });
+fs.mkdirSync('tests/e2e/.tmp', { recursive: true });
 let failed = 0;
 const ok = (c, msg) => { console.log(`${c ? '  ✓' : '  ✗'} ${msg}`); if (!c) failed++; };
 const step = (s) => console.log(`\n▶ ${s}`);

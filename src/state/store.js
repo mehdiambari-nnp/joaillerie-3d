@@ -109,6 +109,9 @@ export function cleanVariants(v) {
     .filter((x) => x.id);
 }
 
+/** Porte d'entrée : seul un lien CLIENT valide s'ouvre sans compte ; adresse nue, lien joaillier ou lien illisible exigent la connexion. */
+export const needsLogin = (pending, authEnabled) => !!authEnabled && !pending?.client;
+
 /** Préférences par viewer (jamais bloquant si le stockage est indisponible : mode privé iOS, etc.). */
 export const prefs = {
   get(k, d = null) { try { const v = localStorage.getItem('rc:' + k); return v == null ? d : JSON.parse(v); } catch { return d; } },

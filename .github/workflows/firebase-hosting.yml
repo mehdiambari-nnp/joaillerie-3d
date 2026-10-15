@@ -1,21 +1,39 @@
-# Déploiement Firebase Hosting : aperçu sur chaque pull request, production à chaque push sur main.
+# Contrôles à chaque pull request et push sur main ; déploiement Firebase Hosting seulement si tout est vert :
+# aperçu sur chaque pull request, production à chaque push sur main.
 # Authentification sans clé (Workload Identity Federation). Variables de dépôt : WIF_PROVIDER, WIF_SERVICE_ACCOUNT, FIREBASE_PROJECT_ID.
 name: Firebase Hosting
 on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Audit des dépendances de production (failles high et critiques)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Tests unitaires
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Tests de bout en bout (Chromium)
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
+          npm run test:e2e
+
   deploy:
+    needs: test
     runs-on: ubuntu-latest
     permissions: { contents: read, id-token: write }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: 22 }
+        with: { node-version: 22, cache: npm }
       - run: npm ci
-      - name: Audit des dépendances (bloque les failles critiques de production)
-        run: npm audit --omit=dev --audit-level=critical
-      - run: npm test --if-present -- --exclude tests/unit/import.test.js
       - run: npm run build
       - uses: google-github-actions/auth@v3
         with:

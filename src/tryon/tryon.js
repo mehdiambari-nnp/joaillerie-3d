@@ -109,6 +109,7 @@ export class TryOn {
       this.intro.remove();
       await this._enter();
     } catch (e) {
+      stopCamera(this.video); // le flux peut être ouvert alors que le suivi de la main a échoué : on éteint la caméra
       btn.disabled = false; btn.textContent = t('tryonStart');
       err.hidden = false;
       err.textContent = e instanceof CameraError ? (e.code === 'denied' ? t('tryonDenied') : t('tryonNoCam')) : `${t('errorGeneric')} (${e.message})`;

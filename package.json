@@ -36,5 +36,8 @@
     "qrcode": "1.5.4",
     "three": "0.183.2",
     "three-mesh-bvh": "0.9.16"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "1.14.6"
   }
 }

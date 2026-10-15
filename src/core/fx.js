@@ -89,6 +89,13 @@ export class Fx {
       uniforms: { tColor: { value: null }, tDepth: { value: null }, uTexel: { value: new THREE.Vector2() }, uNear: { value: 1 }, uFar: { value: 100 }, uFocus: { value: 10 }, uRange: { value: 5 }, uMaxBlur: { value: 0 } },
     });
     this.dofOk = this.q.dof;
+    this.msaa = viewer.renderer.extensions.has('EXT_color_buffer_float') ? this.q.msaa : 0; // l'anticrénelage matériel d'un tampon flottant exige cette extension
+  }
+
+  /** Le pipeline exige des tampons à virgule flottante (demi-précision au minimum) ; sinon on garde le rendu direct. */
+  static supported(renderer) {
+    const e = renderer.extensions;
+    return e.has('EXT_color_buffer_float') || e.has('EXT_color_buffer_half_float');
   }
 
   get max() { return this.q.accumFrames; }
@@ -104,7 +111,7 @@ export class Fx {
     this.w = w; this.h = h; this.scale = s; this.n = 0;
     this._disposeTargets();
     const opt = { type: THREE.HalfFloatType, format: THREE.RGBAFormat, depthBuffer: false, stencilBuffer: false, generateMipmaps: false };
-    this.rtScene = new THREE.WebGLRenderTarget(w, h, { ...opt, depthBuffer: true, stencilBuffer: true, samples: this.q.msaa });
+    this.rtScene = new THREE.WebGLRenderTarget(w, h, { ...opt, depthBuffer: true, stencilBuffer: true, samples: this.msaa });
     if (this.dofOk) {
       const dt = new THREE.DepthTexture(w, h);
       dt.format = THREE.DepthStencilFormat; dt.type = THREE.UnsignedInt248Type;
@@ -132,13 +139,19 @@ export class Fx {
 
     const bg = scene.background;
     scene.background = null;
-    const prev = { target: r.getRenderTarget(), auto: r.autoClear, tm: r.toneMapping };
-    r.setRenderTarget(this.rtScene);
-    r.setClearColor(0x000000, 0); r.clear(true, true, true);
-    r.autoClear = false;
-    r.render(scene, camera);
-    scene.background = bg;
-    if (jitter) camera.clearViewOffset();
+    const prev = { target: r.getRenderTarget(), auto: r.autoClear };
+    try {
+      r.setRenderTarget(this.rtScene);
+      r.setClearColor(0x000000, 0); r.clear(true, true, true);
+      r.autoClear = false;
+      r.render(scene, camera);
+    } catch (e) { // une erreur de rendu ne doit laisser ni tampon actif ni effacement automatique coupé
+      r.autoClear = prev.auto; r.setRenderTarget(prev.target);
+      throw e;
+    } finally { // ... ni fond supprimé ni décalage de caméra (autoClear reste coupé pour les passes de cumul suivantes)
+      scene.background = bg;
+      if (jitter) camera.clearViewOffset();
+    }
 
     // cumul : première image = remplacement ; ensuite moyenne glissante exacte (poids 1/(n+1))
     this.accumMat.blending = first ? THREE.NoBlending : THREE.CustomBlending;
