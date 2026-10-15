@@ -41,6 +41,10 @@ Données : `invites/{jeton}`, `workspaces/{owner}/members/{uid}`, `users/{uid}/m
 ### Tester en local sans toucher à la production
 `npm run emulators` (Auth, Firestore, Storage fictifs, projet `demo-jewel3d`), puis `npm run dev` et ouvrir `http://localhost:5173/?emulator`. Pour simuler deux joailliers dans le même navigateur, utiliser deux origines : `http://localhost:5173/?emulator` et `http://127.0.0.1:5173/?emulator` (les sessions sont séparées).
 
+## Menu et backoffice (tableau de bord, projets, liens, joailliers)
+Le menu burger ne contient que des entrées : chacune ouvre une **page** du backoffice (onglets en haut ; barre du bas sur mobile) : *Tableau de bord* (indicateurs sur 7 jours, contacts à relancer, activité récente), *Projets* (recherche, archivage, duplication, renommage, visibilité), *Liens clients*, *Joailliers* (invitations, membres, visibilité).
+**Visibilité des projets** : chaque projet porte `private` et `archived` (booléens). Un projet **privé** n'est visible que du propriétaire ; les joailliers invités ne voient que les projets non privés et ne peuvent pas changer la visibilité (règles Firestore). Les projets créés avant cette version n'ont pas ces champs : le propriétaire les complète automatiquement à l'ouverture de ses projets ; **tant que ce n'est pas fait, les invités ne les voient pas**. Déployer les règles avant la mise en ligne : `npx firebase deploy --only firestore --project jewel3d-e8caa`.
+
 ## Liens clients suivis (backoffice « Liens clients »)
 Dans *Partager*, le lien client n'est plus générique : le joaillier crée **un lien par envoi** (avec un nom privé, ex. « Mme Dupont – alliance »). Menu burger → **Liens clients** :
 - **Suivi** : consultations, appareils distincts, temps total et moyen (temps *visible à l'écran*), écrin ouvert, essayages sur la main, photos, appareil principal, historique détaillé (date, durée, appareil, actions), graphique sur 14 jours, repère d'**intérêt** (faible / moyen / fort).

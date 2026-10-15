@@ -8,38 +8,6 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 const fill = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? '');
 const days = (ms) => Math.max(1, Math.ceil((ms - Date.now()) / 86400000));
 
-/** Blocs du tiroir « Mes projets » : sélecteur d'atelier (en haut) et joailliers / atelier partagé (en bas). Vide hors Firebase. */
-export async function workspaceBlocks(cloud) {
-  const w = cloud.workspaces;
-  if (!w || !cloud.auth.user) return { top: '', bottom: '' };
-  let list = [], members = [], invites = [];
-  try { await w.validate(); list = await w.list(); } catch (e) { console.warn('Ateliers indisponibles', e); }
-  const own = w.isOwn, cur = list.find((o) => o.owner === w.active);
-  let top = '';
-  if (list.length > 1) {
-    top = `<section class="dr-sec dr-ws"><h3 class="dr-t">${t('workshop')}</h3>
-      <select data-r="ws" aria-label="${esc(t('workshop'))}">${list.map((o) => `<option value="${esc(o.owner)}"${o.owner === w.active ? ' selected' : ''}>${o.self ? esc(t('myWorkshop')) : esc(fill(t('workshopOf'), { name: o.name || '…' }))}</option>`).join('')}</select></section>`;
-  }
-  let bottom = '';
-  if (own) {
-    try { [members, invites] = await Promise.all([w.members(), w.invites.list()]); } catch (e) { console.warn('Joailliers indisponibles', e); }
-    const memberRows = members.map((m) => `<li data-uid="${esc(m.uid)}"><span><b>${esc(m.name || m.email)}</b><small>${esc(m.email)}</small></span>
-        <button class="icon-btn" data-a="ws-remove" aria-label="${esc(t('removeMember'))}" title="${esc(t('removeMember'))}">✕</button></li>`).join('');
-    const inviteRows = invites.map((i) => `<li class="pending" data-token="${esc(i.token)}"><span><b>${esc(i.email || t('invitePending'))}</b><small>${esc(t('invitePending'))} · ${esc(fill(t('inviteExpires'), { n: days(i.expires) }))}</small></span>
-        <button class="btn small" data-a="ws-copy">${t('copyLink')}</button>
-        <button class="icon-btn" data-a="ws-revoke" aria-label="${esc(t('inviteRevoke'))}" title="${esc(t('inviteRevoke'))}">✕</button></li>`).join('');
-    bottom = `<section class="dr-sec"><h3 class="dr-t">${t('jewelers')}<span class="dr-n">${members.length}</span></h3>
-      ${!members.length && !invites.length ? `<p class="proj-empty">${t('noMembers')}</p>` : ''}
-      <ul class="mem-list">${memberRows}${inviteRows}</ul>
-      <button class="btn wide" data-a="ws-invite">${t('inviteBtn')}</button></section>`;
-  } else {
-    bottom = `<section class="dr-sec"><h3 class="dr-t">${t('sharedWorkshop')}</h3>
-      <p class="dr-note">${esc(fill(t('inWorkshopOf'), { name: cur?.name || '…' }))}</p>
-      <button class="btn wide" data-a="ws-leave">${t('leaveWs')}</button></section>`;
-  }
-  return { top, bottom };
-}
-
 /** Dialogue d'invitation : e-mail facultatif (repère) → lien à usage unique à copier ou à envoyer par e-mail. */
 export function openInviteDialog(ui, cloud, onDone) {
   const form = ui.html(`<p class="muted">${t('inviteLead')}</p>

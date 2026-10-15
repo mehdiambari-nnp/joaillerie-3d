@@ -114,7 +114,7 @@ async function boot() {
       if (meta.env) app.viewer.setEnvironment(meta.env);
       if (meta.envRot != null) app.viewer.setEnvironmentRotation(meta.envRot);
       app.exploder.assembleNow();
-      svc.projectId = id;
+      svc.projectId = id; svc.projectName = meta.name;
       return true;
     } catch (e) { console.warn(e); ui.toast(t('projectsUnavailable')); return false; }
   };
