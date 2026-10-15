@@ -2,6 +2,17 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.5.1', date: '2026-10-16',
+    fr: [
+      'Bouton « Client » : l’écrin s’ouvre comme pour votre client, pour juger son expérience complète',
+      'Les vignettes des projets enregistrés sont toujours en vue 3/4, quel que soit l’angle de la caméra',
+    ],
+    en: [
+      'Client button: the box opens just as it does for your client, so you can judge the full experience',
+      'Saved-project thumbnails are always a 3/4 view, whatever the camera angle',
+    ],
+  },
+  {
     version: '0.5.0', date: '2026-10-15',
     fr: [
       'Rendu plus net et plus stable : images cumulées à l’arrêt (arêtes fines lissées, éclats des pierres sans scintillement)',

@@ -366,7 +366,10 @@ export class Viewer {
   }
 
   /** Capture PNG (échelle ×k, fond transparent ou rempli). Avec le pipeline : images cumulées + mise au point, comme à l'arrêt. */
-  async capture({ scale = 2, background = null } = {}) {
+  async capture({ scale = 2, background = null, view = null } = {}) {
+    // `view` (direction depuis la cible) : cadrage imposé le temps de la capture (ex. vignette en 3/4), caméra du joaillier restituée ensuite
+    const saved = view ? { pos: this.camera.position.clone(), target: this.controls.target.clone(), anim: this.anim } : null;
+    if (saved) { this.anim = null; this.controls.target.copy(this.box.getCenter(new THREE.Vector3())); this.setView(view, false); }
     const prevPR = this.renderer.getPixelRatio();
     const w = this.container.clientWidth, h = this.container.clientHeight;
     this.renderer.setPixelRatio(Math.min(scale, 3));
@@ -383,6 +386,7 @@ export class Viewer {
     ctx.drawImage(this.canvas, 0, 0);
     this.renderer.setPixelRatio(prevPR);
     this.renderer.setSize(w, h, false);
+    if (saved) { this.camera.position.copy(saved.pos); this.controls.target.copy(saved.target); this.anim = saved.anim; this.controls.update(); }
     this.fx?.reset();
     this.invalidate();
     return new Promise((res) => out.toBlob(res, 'image/png'));

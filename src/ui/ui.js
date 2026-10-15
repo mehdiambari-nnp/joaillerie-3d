@@ -1,7 +1,9 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
+import * as THREE from 'three';
 import { displayName } from '../cloud/name.js';
 import { workspaceBlocks, openInviteDialog, joinFlow } from './atelier.js';
+import { shouldPlayIntro, playIntro } from '../intro/intro.js';
 import { FEATURES } from '../config/features.js';
 import { CHANGELOG, CURRENT_VERSION, unseenEntries } from '../config/changelog.js';
 import { LANG } from './i18n.js';
@@ -477,7 +479,7 @@ export class UI {
       return;
     }
     const md = tgt.closest('.seg [data-mode]');
-    if (md) { this.setMode(md.dataset.mode); return; }
+    if (md) { this.userSetMode(md.dataset.mode); return; }
     const pb = tgt.closest('[data-pop-btn]');
     if (pb) { this.togglePop(pb.dataset.popBtn); return; }
     const vw = tgt.closest('[data-view]');
@@ -545,7 +547,7 @@ export class UI {
       case 'theme': this.toggleTheme(); break;
       case 'present': this.setPresent(this.el.dataset.present !== '1'); break;
       case 'present-exit': this.setPresent(false); break;
-      case 'exit-client': if (!this.locked) this.setMode(prefs.get('mode', 'vitrine') === 'atelier' ? 'atelier' : 'vitrine'); break;
+      case 'exit-client': if (!this.locked) { this.skipIntro?.(); this.setMode(prefs.get('mode', 'vitrine') === 'atelier' ? 'atelier' : 'vitrine'); } break;
       case 'dlg-close': this.dlg.close(); break;
       case 'zhide': { const z = app.zones.find((zz) => zz.pieceIds.some((id) => app.selection.has(id))); if (z) app.setHidden(z.pieceIds, !z.pieceIds.every((id) => app.hidden.has(id))); break; }
       case 'zsplit': { const z = app.zones.find((zz) => zz.pieceIds.some((id) => app.selection.has(id))); if (z) app.splitZone(z.id); break; }
@@ -605,6 +607,33 @@ export class UI {
     if (on && canFs) document.documentElement.requestFullscreen().catch(() => {});
     if (!on && document.fullscreenElement) document.exitFullscreen?.();
     for (const d of [50, 250]) setTimeout(() => this.app.viewer.resize(), d);
+  }
+
+  /**
+   * Bascule demandée par le joaillier (bouton Client / Joaillier). Vers « Client », l'écrin s'ouvre comme pour le client réel
+   * (vue d'accueil, bague assemblée, sans sélection) : le joaillier juge ainsi l'expérience complète. Retour au mode Joaillier : l'intro s'interrompt.
+   * `setMode` reste sans animation (appel programmatique, tests, ouverture d'un lien client).
+   */
+  userSetMode(m) {
+    if (m !== 'client') this.skipIntro?.();
+    const toClient = m === 'client' && this.mode !== 'client' && !this.locked;
+    this.setMode(m);
+    if (toClient) this.playClientIntro();
+  }
+
+  async playClientIntro() {
+    const app = this.app;
+    // demande explicite du joaillier : seul `?nointro` et la préférence « réduire les animations » l'écartent (pas la règle des captures de test)
+    const params = new URLSearchParams(); if (new URLSearchParams(location.search).has('nointro')) params.set('nointro', '1');
+    if (!app.model || this.introPlaying || !shouldPlayIntro(theme, params, false, true)) return;
+    this.introPlaying = true;
+    try {
+      app.exploder?.assembleNow?.(); app.clearSelection();                   // ce que voit le client : bague assemblée, rien de sélectionné
+      const v = app.viewer;
+      v.anim = null; v.controls.target.copy(v.box.getCenter(new THREE.Vector3())); v.setView([0.62, 0.45, 0.64], false); // vue d'accueil
+      await playIntro(app, this, theme);
+    } catch (e) { console.warn('Aperçu client : intro ignorée', e); }
+    finally { this.introPlaying = false; app.model && (app.model.root.visible = true); }
   }
 
   setMode(m) {
@@ -774,8 +803,8 @@ export class UI {
     if (!app.model || !s.last) return;
     const name = ($('[data-r=projname]', this.root).value || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
     try {
-      let thumb = null;
-      try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg] })); }); } catch { /* vignette facultative */ }
+      let thumb = null; // vignette toujours en 3/4, quel que soit l'angle de la caméra du joaillier
+      try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
       const id = asNew || !s.projectId ? newId() : s.projectId;
       await (await s.cloud()).projects.save({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
       s.projectId = id;
