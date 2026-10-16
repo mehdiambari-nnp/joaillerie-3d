@@ -17,6 +17,17 @@ export const CHANGELOG = [
     ],
   },
   {
+    version: '0.8.2', date: '2026-10-16',
+    fr: [
+      'Les droits d’un joaillier invité se mettent à jour sans avoir à recharger la page',
+      'Tableau de bord sur téléphone : boutons d’action alignés',
+    ],
+    en: [
+      'A guest jeweler’s rights now update without reloading the page',
+      'Dashboard on phones: aligned action buttons',
+    ],
+  },
+  {
     version: '0.8.1', date: '2026-10-16',
     fr: [
       'Nouveau bouton « Nouveau projet » : donnez un nom, choisissez ou déposez un fichier 3D, le projet est créé et enregistré',

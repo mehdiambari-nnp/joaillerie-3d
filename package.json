@@ -20,7 +20,8 @@
     "build:offline": "vite build --mode offline",
     "test:rules": "firebase emulators:exec --only firestore --project demo-jewel3d \"vitest run --config vitest.rules.config.js\"",
     "emulators": "firebase emulators:start --only auth,firestore,storage --project demo-jewel3d",
-    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true"
+    "prepare": "git config core.hooksPath .githooks 2>/dev/null || true",
+    "guide": "node scripts/guide.mjs"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "6.0.0",

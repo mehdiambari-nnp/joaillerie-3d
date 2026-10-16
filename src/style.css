@@ -776,3 +776,4 @@ html.has-privacy .app { height: calc(100dvh - var(--privacy-h)); }
 .gem-info p { margin: 0; } .gi-props { font-size: 12.5px; letter-spacing: .03em; color: var(--ink); font-weight: 500; } .gi-note { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
 .gi-warn { font-size: 12px; line-height: 1.35; color: var(--ink); padding: 6px 9px; border-left: 2px solid #d9a441; background: color-mix(in srgb, #d9a441 14%, transparent); }
 .gi-kin { display: grid; gap: 2px; } .gi-kin > span { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+@media (max-width: 700px) { .bo-quick { display: grid; grid-template-columns: 1fr; width: 100%; } .bo-quick .btn { width: 100%; } }
