@@ -1,7 +1,6 @@
 // Service Firebase : Auth (joaillier), Cloud Storage (modèles, adressés par empreinte, lisibles par lien), Firestore (projets par utilisateur).
 // Le SDK n'est chargé qu'à la demande (import dynamique depuis ./index.js).
-import { initializeApp } from 'firebase/app';
-import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, signOut, updateProfile, connectAuthEmulator } from 'firebase/auth';
+import { createAuth } from './firebase-auth.js';
 import { getFirestore, connectFirestoreEmulator, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, writeBatch, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getStorage, connectStorageEmulator, ref, uploadBytesResumable, getBytes, getMetadata } from 'firebase/storage';
 import { modelId, gzip, gunzip } from '../share/remote.js';
@@ -9,35 +8,13 @@ import { createWorkspaces } from './workspaces.js';
 import { createLinks } from './links.js';
 import { displayName } from './name.js';
 
-// Développement : `?emulator` branche l'application sur les émulateurs locaux (npm run emulators) : comptes et données fictifs,
-// projet « demo-jewel3d », rien n'est écrit en production. Jamais actif dans le build publié (import.meta.env.DEV).
-const useEmulator = () => { try { return import.meta.env.DEV && new URLSearchParams(location.search).has('emulator'); } catch { return false; } };
-
 const hex12 = () => Array.from(crypto.getRandomValues(new Uint8Array(6)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 export function create(config) {
-  const emu = useEmulator();
-  const app = initializeApp(emu ? { ...config, projectId: 'demo-jewel3d', apiKey: 'demo-key', storageBucket: 'demo-jewel3d.appspot.com' } : config);
-  const auth = getAuth(app), db = getFirestore(app), storage = getStorage(app);
-  if (emu) { connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true }); connectFirestoreEmulator(db, '127.0.0.1', 8080); connectStorageEmulator(storage, '127.0.0.1', 9199); }
-  const state = { user: undefined, subs: new Set() }; // undefined : état pas encore connu
-  onAuthStateChanged(auth, (u) => { state.user = u ? { uid: u.uid, email: u.email, name: u.displayName || '' } : null; state.subs.forEach((f) => f(state.user)); });
+  const { app, auth, authApi, emu } = createAuth(config);
+  const db = getFirestore(app), storage = getStorage(app);
+  if (emu) { connectFirestoreEmulator(db, '127.0.0.1', 8080); connectStorageEmulator(storage, '127.0.0.1', 9199); }
   const uid = () => { if (!auth.currentUser) throw Object.assign(new Error('Connexion requise'), { code: 'auth/required' }); return auth.currentUser.uid; };
-
-  const authApi = {
-    enabled: true,
-    get user() { return state.user ?? null; },
-    onChange(cb) { state.subs.add(cb); if (state.user !== undefined) cb(state.user); return () => state.subs.delete(cb); },
-    signIn: (email, pw) => signInWithEmailAndPassword(auth, email, pw),
-    async signUp(email, pw, name = '') { // le nom (prénom + nom) est enregistré dans le profil du compte
-      const cred = await createUserWithEmailAndPassword(auth, email, pw);
-      if (name) { try { await updateProfile(cred.user, { displayName: name }); if (state.user) state.user.name = name; } catch (e) { console.warn('Nom non enregistré', e); } }
-      return cred;
-    },
-    signInGoogle: () => signInWithPopup(auth, new GoogleAuthProvider()),
-    reset: (email) => sendPasswordResetEmail(auth, email),
-    signOut: () => signOut(auth),
-  };
 
   const exists = async (r) => { try { await getMetadata(r); return true; } catch (e) { if (e.code === 'storage/object-not-found') return false; throw e; } };
 

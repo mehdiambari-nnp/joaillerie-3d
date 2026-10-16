@@ -4,7 +4,7 @@ import theme from './config/theme.js'; // marque blanche : polices + palettes du
 import './style.css';
 import { t } from './ui/i18n.js';
 import { parseShareHash, shortShareRef, parseShareJson, needsLogin, trackedLinkRef } from './state/store.js';
-import { getCloud } from './cloud/index.js';
+import { getCloud, getAuthCloud } from './cloud/index.js';
 
 const root = document.getElementById('app');
 const params = new URLSearchParams(location.search);
@@ -16,6 +16,8 @@ function hasWebGL2() {
 async function boot() {
   if (!hasWebGL2()) { root.innerHTML = `<p style="padding:24px;font:16px system-ui">${t('webgl')}</p>`; return; }
   const hasLink = /[#&][csl]=/.test(location.hash);
+  // Lien client : l'application va très probablement s'ouvrir, on charge son code dès maintenant, en parallèle de la lecture du lien.
+  let appP = hasLink ? import('./appMain.js') : null;
   let pending = parseShareHash(location.hash); // lien long (#c=) : configuration lue sur place
   let shareFailed = false;
   const shortRef = shortShareRef(location.hash); // lien court (#s=) : configuration à récupérer sur le serveur
@@ -40,15 +42,22 @@ async function boot() {
   // Porte d'entrée : seul un lien CLIENT valide s'ouvre sans compte. Tout le reste (adresse nue, lien joaillier, lien illisible ou modifié)
   // exige la connexion d'un joaillier (Firebase). Les liens joaillier gardent leur configuration une fois connecté.
   {
-    const cloud = await getCloud();
+    // lien client : le service complet est de toute façon nécessaire ; adresse nue (joaillier) : l'authentification seule suffit pour la connexion
+    const cloud = hasLink ? await getCloud() : await getAuthCloud();
     if (needsLogin(pending, cloud.auth.enabled)) {
+      // dès le premier geste (clic, touche) sur le formulaire, on charge l'application en arrière-plan : elle s'ouvre aussitôt après la connexion
+      const warm = () => { appP ??= import('./appMain.js'); };
+      root.addEventListener('pointerdown', warm, { once: true }); root.addEventListener('keydown', warm, { once: true }); // pas 'focusin' : la page donne d'elle-même le focus au champ e-mail
       await (await import('./ui/login.js')).showLogin(root, cloud);
       cloud.auth.onChange((user) => { if (!user) location.reload(); }); // session expirée ou déconnexion : retour à la page de connexion
     }
+    getCloud(); // Firestore / Storage : chargés en arrière-plan, pendant le démarrage de l'application
   }
   if (import.meta.env.DEV && params.has('debug')) import('eruda').then((m) => m.default.init()); // console intégrée (iPhone sans Mac) ; absente du build publié
 
-  await (await import('./appMain.js')).startApp({ root, params, pending, shareFailed, tracking, hasLink });
+  // Modèle par défaut : téléchargement lancé maintenant (en parallèle du chargement de three.js), sauf si le lien porte son propre fichier
+  const prefetch = !pending?.remote && theme.defaultModelUrl && !params.has('model') ? fetch(import.meta.env.BASE_URL + theme.defaultModelUrl).catch(() => null) : null;
+  await (await (appP ??= import('./appMain.js'))).startApp({ root, params, pending, shareFailed, tracking, hasLink, prefetch });
 }
 
 boot();

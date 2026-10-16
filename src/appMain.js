@@ -12,8 +12,8 @@ import { cleanVariants, parseInviteHash } from './state/store.js';
 import { shouldPlayIntro, playIntro } from './intro/intro.js';
 import { getCloud } from './cloud/index.js';
 
-/** @param {{root: HTMLElement, params: URLSearchParams, pending: any, shareFailed: boolean, tracking: any, hasLink: boolean}} ctx */
-export async function startApp({ root, params, pending, shareFailed, tracking, hasLink }) {
+/** @param {{root: HTMLElement, params: URLSearchParams, pending: any, shareFailed: boolean, tracking: any, hasLink: boolean, prefetch?: Promise<Response|null>|null}} ctx */
+export async function startApp({ root, params, pending, shareFailed, tracking, hasLink, prefetch = null }) {
   let introPending = !shareFailed && shouldPlayIntro(theme, params, import.meta.env.DEV, hasLink); // vrai tant que l'intro n'a pas pris la main
   const holder = document.createElement('div'); // le viewer est ensuite déplacé dans l'interface
   const app = new Configurator(holder);
@@ -22,7 +22,7 @@ export async function startApp({ root, params, pending, shareFailed, tracking, h
   const ui = new UI(root, app, svc);
   ui.initTheme(); app.viewer._applyBackground();
   if (pending?.client) ui.lockClient(); // lien client : interface épurée et verrouillée
-  window.__rc = { app, ui, THREE }; // pratique pour le débogage et les tests E2E
+  window.__rc = import.meta.env.DEV ? { app, ui, THREE } : { app, ui }; // débogage et tests E2E ; sans THREE en production : l'exposer empêchait de retirer le code three.js inutilisé
   if (tracking) import('./ui/privacy.js').then((m) => m.showPrivacyBar(ui)); // information du client, visible dès l'ouverture (écrin compris)
   if (tracking) getCloud().then((c) => c.links.track(tracking.id, tracking.owner)); // mesure de la consultation dès l'ouverture (silencieuse, anonyme) : l'ouverture de l'écrin est comptée
 
@@ -89,7 +89,7 @@ export async function startApp({ root, params, pending, shareFailed, tracking, h
   // Modèle par défaut du client (themes/<client>/<defaultModel>), repli : bague de démonstration
   async function loadThemeModel() {
     try {
-      const r = await fetch(import.meta.env.BASE_URL + theme.defaultModelUrl);
+      const r = (prefetch && (await prefetch)) || (await fetch(import.meta.env.BASE_URL + theme.defaultModelUrl)); // téléchargement déjà lancé par main.js
       if (!r.ok) return false;
       const name = theme.defaultModelUrl.split('/').pop();
       await load(await r.arrayBuffer(), name, {}, null, name);
