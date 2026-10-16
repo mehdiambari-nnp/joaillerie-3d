@@ -236,7 +236,7 @@ if (photo) {
   await page.evaluate(() => document.querySelector('[data-a=start]').click());
   let found = false;
   try {
-    await page.waitForFunction(() => window.__rc.ui.tryon.anchor?.visible === true, null, { timeout: 90000 });
+    await page.waitForFunction(() => window.__rc.ui.tryon?.anchor?.visible === true, null, { timeout: 90000 });
     found = true;
   } catch {}
   await page.waitForTimeout(800);

@@ -27,6 +27,17 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').repl
 
 export const startColors = (theme) => (theme.defaultScheme === 'dark' ? theme.colors.dark : theme.colors.light);
 
+/**
+ * Écran d'attente intégré au HTML (marque + barre de chargement), affiché dès le premier octet : le JavaScript de l'application pèse plusieurs
+ * centaines de Ko, et sans cela l'écran reste vide jusqu'à son exécution. Remplacé par l'interface (#app est réécrit). Animation sur
+ * `transform` seulement (composée par le GPU), coupée si l'utilisateur réduit les animations.
+ */
+export function splash(theme, logos) {
+  const c = startColors(theme), mark = logos.wordmark || logos.monogram || '';
+  return `<style>html,body{margin:0;background:${c.bg};color:${c.ink}}.boot{min-height:100vh;min-height:100dvh;display:grid;place-content:center;justify-items:center;gap:22px}.boot svg{width:min(52vw,220px);height:auto;display:block}.boot i{position:relative;display:block;width:120px;height:2px;overflow:hidden;background:${c.line}}.boot i::after{content:"";position:absolute;inset:0;background:${c.accent};transform:translateX(-100%);animation:boot 1.3s ease-in-out infinite}@keyframes boot{to{transform:translateX(100%)}}@media(prefers-reduced-motion:reduce){.boot i::after{animation:none;transform:none;opacity:.5}}</style>
+  <div id="app"><div class="boot" role="status" aria-label="${esc(theme.brand.name)}">${mark}<i></i></div></div>`;
+}
+
 export function manifestOf(theme) {
   const light = startColors(theme);
   return {
@@ -64,7 +75,8 @@ export default function themePlugin() {
         .replace(/<title>[^<]*<\/title>/, `<title>${esc(b.name)}</title>`)
         .replace(/(name="description" content=")[^"]*/, `$1${esc(b.description)}`)
         .replace(/(name="apple-mobile-web-app-title" content=")[^"]*/, `$1${esc(b.name)}`)
-        .replace(/(name="theme-color" content=")[^"]*/, `$1${startColors(theme).bg}`);
+        .replace(/(name="theme-color" content=")[^"]*/, `$1${startColors(theme).bg}`)
+        .replace('<div id="app"></div>', splash(theme, logos));
     },
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
