@@ -2,6 +2,17 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.9.1', date: '2026-10-16',
+    fr: [
+      'Pierres opaques et translucides (rhodochrosite, jade, lapis, malachite, turquoise, onyx, perle…) : rendu en cabochon poli, avec reflets doux et chair translucide',
+      'Rhodochrosite refaite d’après une pierre réelle : rose-corail, nuages et voiles laiteux',
+    ],
+    en: [
+      'Opaque and translucent stones (rhodochrosite, jade, lapis, malachite, turquoise, onyx, pearl…): polished cabochon rendering with soft reflections and translucent flesh',
+      'Rhodochrosite redone from a real stone: coral pink, clouds and milky veils',
+    ],
+  },
+  {
     version: '0.9.0', date: '2026-10-16',
     fr: [
       'Sélecteur de pierres refait d’après l’Atlas chromatique des gemmes : 7 familles de couleur et plus de 50 pierres',

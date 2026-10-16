@@ -71,6 +71,8 @@ export function installGemShader(material, data) {
     uGemMix: { value: 0 },        // 0 = une teinte, 1 = selon l'éclairage, 2 = bicolore
     uGemWarm: gemLight,
     uGemPat: { value: 0 },        // motif procédural des pierres opaques (GEM_PATTERNS)
+    uGemDome: { value: 0 },       // pierres opaques = cabochons : normale bombée (0 = facettes plates, 1 = dôme)
+    uGemSSS: { value: 0 },        // translucidité : lumière diffusée dans la masse (éclaire les ombres, adoucit)
     uPC1: { value: new THREE.Color('#888888') }, uPC2: { value: new THREE.Color('#888888') }, uPC3: { value: new THREE.Color('#888888') },
   };
   material.userData.gemU = U;
@@ -85,18 +87,19 @@ export function installGemShader(material, data) {
     shader.fragmentShader = shader.fragmentShader
       .replace('void main() {', `${GEM_GLSL}\nvoid main() {`)
       .replace('#include <color_fragment>', '#include <color_fragment>\n  if (uGemPat > 0.5) diffuseColor.rgb = gemPatColor();')
-      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  if (uGemPat > 0.5) totalEmissiveRadiance += gemPatGlow(normal);')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  if (uGemDome > 0.0) normal = gemDome(normal);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  if (uGemPat > 0.5) totalEmissiveRadiance += gemPatGlow(normal);\n  totalEmissiveRadiance += uGemSSS * diffuseColor.rgb * (0.7 + 0.6 * (1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0)));')
       .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
         `if (uGemOn > 0.5) totalDiffuse = gemRadiance();
          vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;`);
   };
-  material.customProgramCacheKey = () => 'gemrt3';
+  material.customProgramCacheKey = () => 'gemrt4';
   return U;
 }
 
 const GEM_GLSL = /* glsl */`
 uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
-uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
+uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
 uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone;
 float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -105,6 +108,14 @@ float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f)
 varying vec3 vGemPos; varying vec3 vGemCam; varying mat3 vGemM;
 float gzF(vec3 x) { return (0.5 * gzN(x) + 0.25 * gzN(x * 2.07 + 3.1) + 0.125 * gzN(x * 4.13 + 7.7) + 0.0625 * gzN(x * 8.3 + 11.3)) / 0.9375; }
 vec3 gzW(vec3 q, float s) { return vec3(gzN(q * s), gzN(q * s + 7.0), gzN(q * s + 13.0)) - 0.5; }
+
+// Cabochon : la pierre taillée en facettes est ombrée comme un dôme poli (normale = direction depuis le centre de la pierre), pour des reflets
+// doux et continus comme sur une vraie pierre polie, au lieu d'un plan à facettes. La silhouette reste celle du modèle.
+vec3 gemDome(vec3 nView) {
+  vec3 nObj = normalize(vGemPos - uGemCenter);
+  vec3 nD = normalize((viewMatrix * vec4(vGemM * nObj, 0.0)).xyz);
+  return normalize(mix(nView, nD, uGemDome));
+}
 
 // Pierres opaques ou translucides : couleur de surface procédurale (espace objet de la pierre, rayon ≈ 1), motif propre à chaque espèce.
 vec3 gemPatColor() {
@@ -136,9 +147,12 @@ vec3 gemPatColor() {
     c = mix(uPC3, uPC1, smoothstep(-0.7, 0.4, sw)); c = mix(c, uPC2, smoothstep(0.55, 1.0, sw) * 0.8);
   } else if (t < 8.5) {                // sugilite : marbrures
     c = mix(uPC3, uPC1, smoothstep(0.2, 0.7, gzF(q * 3.4))); c = mix(c, uPC2, smoothstep(0.6, 0.9, gzF(q * 6.0 + 3.0)) * 0.6);
-  } else if (t < 9.5) {                // rhodochrosite : bandes roses concentriques
-    float b = 0.5 + 0.5 * sin(length(q + 0.5 * gzW(q, 1.9)) * 20.0);
-    c = mix(uPC3, uPC2, smoothstep(0.1, 0.9, b)); c = mix(c, uPC1, 0.5 + 0.3 * n);
+  } else if (t < 9.5) {                // rhodochrosite : chair rose-corail, nuages profonds et voiles laiteux étirés, petites inclusions claires
+    float cl = gzF(q * 2.0 + gzW(q, 1.3) * 1.4);
+    float vl = gzF(vec3(q.x * 1.1, q.y * 4.2, q.z * 1.1) + gzW(q, 2.0) * 1.2 + 3.0);
+    c = mix(uPC3, uPC1, smoothstep(0.28, 0.62, cl));
+    c = mix(c, uPC2, smoothstep(0.42, 0.75, vl) * 0.95);
+    c = mix(c, vec3(1.0, 0.88, 0.9), smoothstep(0.87, 0.93, gzN(q * 24.0)) * 0.3);
   } else if (t < 10.5) {               // opale noble : fond sombre (les feux sont dans gemPatGlow)
     c = uPC1 * (0.7 + 0.6 * n);
   } else if (t < 11.5) {               // labradorite : gris sombre moiré (les éclairs sont dans gemPatGlow)
@@ -245,6 +259,8 @@ export function updateGemUniforms(material, g) {
   const att2 = new THREE.Color(g.att2 ?? g.att ?? '#ffffff');
   U.uGemSigma2.value.set(s(att2.r), s(att2.g), s(att2.b));
   U.uGemPat.value = g.opaque && g.pattern ? GEM_PATTERNS[g.pattern] ?? 0 : 0;
+  U.uGemDome.value = g.opaque ? 0.85 : 0; // opaques = cabochons
+  U.uGemSSS.value = g.opaque ? g.sss ?? 0 : 0;
   U.uPC1.value.set(g.hex ?? '#888888'); U.uPC2.value.set(g.hex2 ?? g.hex ?? '#888888'); U.uPC3.value.set(g.hex3 ?? g.hex ?? '#888888');
 }
 
