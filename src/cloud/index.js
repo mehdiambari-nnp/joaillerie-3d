@@ -10,3 +10,8 @@ export function getCloud() {
   pending ??= (theme.firebase ? import('./firebase.js') : import('./local.js')).then((m) => m.create(theme.firebase));
   return pending;
 }
+
+/** Service minimal pour la page de connexion : l'authentification seule (Firebase) ; hors Firebase, le service complet (déjà léger). */
+export function getAuthCloud() {
+  return theme.firebase ? import('./firebase-auth.js').then((m) => ({ auth: m.createAuth(theme.firebase).authApi })) : getCloud();
+}

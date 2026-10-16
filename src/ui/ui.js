@@ -19,7 +19,6 @@ import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
 import { newId, thumbnail } from '../projects/projects.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
-import { TryOn } from '../tryon/tryon.js';
 import { frenchRingSize } from '../import/zones.js';
 import { fill } from './pages/util.js';
 
@@ -68,7 +67,15 @@ export class UI {
     this.build();
     this.bind();
     this.renderAll();
-    this.tryon = new TryOn(app, $('.viewport', root), { toast: (m) => this.toast(m) });
+    this.tryon = null; // chargé à la première ouverture de l'essayage (MediaPipe ≈ 150 Ko, inutile tant qu'on ne l'utilise pas)
+  }
+
+  async openTryOn() {
+    if (!this.tryon) {
+      const { TryOn } = await import('../tryon/tryon.js');
+      this.tryon ||= new TryOn(this.app, $('.viewport', this.root), { toast: (m) => this.toast(m) });
+    }
+    this.tryon.open();
   }
 
   // ---------- Squelette ----------
@@ -630,7 +637,7 @@ export class UI {
       case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
       case 'ar': this.openAR(); break;
-      case 'tryon': emitTrack('tryon'); this.tryon.open(); break;
+      case 'tryon': emitTrack('tryon'); this.openTryOn(); break;
     }
   }
 
@@ -885,7 +892,7 @@ export class UI {
     if (this.svc.isHostable?.() && !this.svc.last?.remote) {
       const wait = this.html(`<p class="muted">${t('sharePrep')}</p><div class="progress-inline"><i></i></div>`);
       this.openDialog(t('share'), wait);
-      try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.width = Math.round(p * 100) + '%'; }); }
+      try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.transform = `scaleX(${Math.max(0.08, p)})`; }); }
       catch (e) { console.warn('Hébergement du modèle impossible', e); hostFailed = true; }
     } else remote = await this.hostModel().catch(() => null);
     const rights = await Promise.resolve(cloud.workspaces?.rights?.()).catch(() => null);
@@ -1033,7 +1040,7 @@ export class UI {
   progress(pct, label) {
     const p = $('.progress', this.root);
     p.hidden = pct >= 100;
-    $('.bar i', p).style.width = pct + '%';
+    $('.bar i', p).style.transform = `scaleX(${Math.max(0, Math.min(100, pct)) / 100})`;
     $('span', p).textContent = label || '';
   }
 
@@ -1066,8 +1073,15 @@ export class UI {
     this.openDialog(t('whatsNew'), d);
   }
 
-  /** Génère les billes (WebGL temporaire) puis rafraîchit la palette. */
+  /**
+   * Génère les billes de métaux et de finitions (second contexte WebGL temporaire : plusieurs centaines de ms de calcul) puis rafraîchit la palette.
+   * Inutile pour un client (interface épurée, sans palette) ; pour le joaillier, différé au moment où le navigateur est au repos,
+   * pour ne pas retarder l'affichage de la bague. D'ici là, les pastilles de couleur CSS servent de repli.
+   */
   loadThumbnails() {
-    setTimeout(() => { try { this.thumbs = renderThumbnails(112); } catch { /* repli : pastilles de couleur CSS */ } this.renderPalette(); }, 60);
+    if (this.locked) return;
+    const run = () => { try { this.thumbs = renderThumbnails(112); } catch { /* repli : pastilles de couleur CSS */ } this.renderPalette(); };
+    if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 4000 });
+    else setTimeout(run, 1500);
   }
 }
