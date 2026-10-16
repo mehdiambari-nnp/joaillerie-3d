@@ -2,7 +2,7 @@
 // un seul contexte persistant sur iOS (limite mémoire) → ce moteur est détruit juste après.
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { METALS, FINISHES, GEMS, DEFAULT_METAL, resolveGem } from './library.js';
+import { METALS, FINISHES, DEFAULT_METAL } from './library.js';
 import { createMaterial } from './factory.js';
 
 /** Retourne { metals:{id:url}, finishes:{id:url}, gems:{id:url} }. */
@@ -35,9 +35,6 @@ export function renderThumbnails(size = 112) {
   bg.colorSpace = THREE.SRGBColorSpace;
 
   const sphere = new THREE.SphereGeometry(1, 48, 32);
-  const gemGeo = new THREE.IcosahedronGeometry(1.05, 1).toNonIndexed();
-  gemGeo.computeVertexNormals();
-  gemGeo.scale(1, 0.9, 1);
 
   const shoot = (mesh, mat, withBg) => {
     scene.background = withBg ? bg : null;
@@ -52,19 +49,12 @@ export function renderThumbnails(size = 112) {
   };
   const canvas = () => renderer.domElement;
   const ball = new THREE.Mesh(sphere);
-  const gem = new THREE.Mesh(gemGeo);
-  gem.rotation.set(0.5, 0.4, 0);
   ball.rotation.x = 0.4;
 
   for (const m of METALS) out.metals[m.id] = shoot(ball, createMaterial('metal', { m: m.id, f: 'polish' }), false);
   for (const f of FINISHES) out.finishes[f.id] = shoot(ball, createMaterial('metal', { m: DEFAULT_METAL.m, f: f.id }), false);
-  for (const gm of GEMS) {
-    const mat = createMaterial('gem', { m: gm.id });
-    mat.thickness = 1.4; // sphère de rayon 1 : épaisseur adaptée (la scène des bagues est en mm)
-    if (!gm.opaque) mat.attenuationDistance = Math.max(0.5, resolveGem({ m: gm.id }).attDist / 3);
-    out.gems[gm.id] = shoot(gem, mat, true);
-  }
-  env.dispose(); pmrem.dispose(); sphere.dispose(); gemGeo.dispose(); bg.dispose();
+  // pierres : pastilles SVG (gemicon.js), plus de vignettes 3D (le catalogue compte une cinquantaine de pierres)
+  env.dispose(); pmrem.dispose(); sphere.dispose(); bg.dispose();
   renderer.forceContextLoss(); renderer.dispose();
   return out;
 }

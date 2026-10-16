@@ -10,6 +10,10 @@ import * as THREE from 'three';
 const CUBE = 256;
 // iPhone / iPad : moins de rebonds et d'itérations (même rendu à l'œil, GPU mobile ménagé)
 const MOBILE = typeof navigator !== 'undefined' && /iPhone|iPad|Android/i.test(navigator.userAgent);
+// Lumière « chaude » (0 = jour, 1 = ampoule / coucher de soleil), partagée par toutes les pierres : l'alexandrite y change de couleur.
+export const gemLight = { value: 0 };
+export const setGemLight = (w) => { gemLight.value = w; };
+export const GEM_PATTERNS = { lapis: 1, turquoise: 2, jade: 3, malachite: 4, tigereye: 5, carnelian: 6, charoite: 7, mottled: 8, banded: 9, opal: 10, labrador: 11, moonstone: 12 };
 export const GEM_MAX_BOUNCES = MOBILE ? 4 : 6;
 const GEM_NEWTON = MOBILE ? 6 : 8;
 
@@ -63,6 +67,11 @@ export function installGemShader(material, data) {
     uGemGain: { value: 1.0 },
     uGemZone: { value: 0 },        // zonation de croissance / inclusions : variation locale de l'absorption (pierres de couleur)
     uGemBase: { value: data.radius }, // trajet minimal : la lumière traverse déjà ~ un rayon avant la 1re facette de sortie
+    uGemSigma2: { value: new THREE.Vector3(0, 0, 0) }, // 2e teinte (alexandrite à la lumière chaude, 2e moitié de l'ametrine)
+    uGemMix: { value: 0 },        // 0 = une teinte, 1 = selon l'éclairage, 2 = bicolore
+    uGemWarm: gemLight,
+    uGemPat: { value: 0 },        // motif procédural des pierres opaques (GEM_PATTERNS)
+    uPC1: { value: new THREE.Color('#888888') }, uPC2: { value: new THREE.Color('#888888') }, uPC3: { value: new THREE.Color('#888888') },
   };
   material.userData.gemU = U;
   material.userData.gemData = data;
@@ -75,22 +84,95 @@ export function installGemShader(material, data) {
         vGemPos = position; vGemCam = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz; vGemM = mat3(modelMatrix);`);
     shader.fragmentShader = shader.fragmentShader
       .replace('void main() {', `${GEM_GLSL}\nvoid main() {`)
+      .replace('#include <color_fragment>', '#include <color_fragment>\n  if (uGemPat > 0.5) diffuseColor.rgb = gemPatColor();')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  if (uGemPat > 0.5) totalEmissiveRadiance += gemPatGlow(normal);')
       .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
         `if (uGemOn > 0.5) totalDiffuse = gemRadiance();
          vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;`);
   };
-  material.customProgramCacheKey = () => 'gemrt2';
+  material.customProgramCacheKey = () => 'gemrt3';
   return U;
 }
 
 const GEM_GLSL = /* glsl */`
 uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
+uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
 uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone;
 float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(gzH(i), gzH(i + vec3(1, 0, 0)), f.x), mix(gzH(i + vec3(0, 1, 0)), gzH(i + vec3(1, 1, 0)), f.x), f.y),
              mix(mix(gzH(i + vec3(0, 0, 1)), gzH(i + vec3(1, 0, 1)), f.x), mix(gzH(i + vec3(0, 1, 1)), gzH(i + vec3(1, 1, 1)), f.x), f.y), f.z); }
 varying vec3 vGemPos; varying vec3 vGemCam; varying mat3 vGemM;
+float gzF(vec3 x) { return (0.5 * gzN(x) + 0.25 * gzN(x * 2.07 + 3.1) + 0.125 * gzN(x * 4.13 + 7.7) + 0.0625 * gzN(x * 8.3 + 11.3)) / 0.9375; }
+vec3 gzW(vec3 q, float s) { return vec3(gzN(q * s), gzN(q * s + 7.0), gzN(q * s + 13.0)) - 0.5; }
+
+// Pierres opaques ou translucides : couleur de surface procédurale (espace objet de la pierre, rayon ≈ 1), motif propre à chaque espèce.
+vec3 gemPatColor() {
+  vec3 q = (vGemPos - uGemCenter) / uGemBase;
+  float t = uGemPat, n = gzF(q * 2.5);
+  vec3 c = uPC1;
+  if (t < 1.5) {                       // lapis-lazuli : fond bleu nuageux, veines de calcite, paillettes de pyrite
+    c = uPC1 * (0.4 + 0.7 * n);
+    float w = abs(gzN(q * 4.4 + 4.0) - 0.5);
+    c = mix(c, uPC3, smoothstep(0.03, 0.0, w) * 0.6);
+    c = mix(c, uPC2, smoothstep(0.84, 0.92, gzN(q * 30.0)) * (0.4 + n));
+  } else if (t < 2.5) {                // turquoise : fond crayeux, réseau de matrice brune
+    c = mix(uPC1, uPC3, smoothstep(0.35, 0.8, gzF(q * 5.0)) * 0.6);
+    float w = abs(gzN(q * 6.0 + 9.0) - 0.5);
+    c = mix(c, uPC2, smoothstep(0.045, 0.0, w) * 0.9 * smoothstep(0.35, 0.6, n));
+  } else if (t < 3.5) {                // jade : nuages doux
+    c = mix(uPC3, uPC2, smoothstep(0.25, 0.8, gzF(q * 3.0))); c = mix(c, uPC1, 0.5); c *= 0.9 + 0.2 * gzN(q * 14.0);
+  } else if (t < 4.5) {                // malachite : bandes concentriques déformées
+    float d = length(q * vec3(1.0, 1.25, 1.0) + 0.55 * gzW(q, 1.7));
+    float b = 0.5 + 0.5 * sin(d * 26.0 + gzF(q * 4.0) * 5.0);
+    c = mix(uPC2, uPC1, smoothstep(0.2, 0.8, b)); c = mix(c, uPC3, smoothstep(0.88, 1.0, b) * 0.35);
+  } else if (t < 5.5) {                // œil de tigre : fibres parallèles
+    float b = 0.5 + 0.5 * sin(dot(q, vec3(0.75, 0.1, 0.65)) * 34.0 + gzF(q * 2.0) * 6.0);
+    c = mix(uPC2, uPC1, smoothstep(0.1, 0.9, b)) * (0.8 + 0.35 * gzN(q * 9.0));
+  } else if (t < 6.5) {                // cornaline : calcédoine nuageuse
+    c = mix(uPC3, uPC2, smoothstep(0.25, 0.85, gzF(q * 2.6))); c = mix(c, uPC1, 0.35);
+  } else if (t < 7.5) {                // charoïte : tourbillons soyeux
+    float sw = sin((q.x + 0.9 * gzF(q * 2.2)) * 11.0 + gzN(q * 5.0) * 4.0);
+    c = mix(uPC3, uPC1, smoothstep(-0.7, 0.4, sw)); c = mix(c, uPC2, smoothstep(0.55, 1.0, sw) * 0.8);
+  } else if (t < 8.5) {                // sugilite : marbrures
+    c = mix(uPC3, uPC1, smoothstep(0.2, 0.7, gzF(q * 3.4))); c = mix(c, uPC2, smoothstep(0.6, 0.9, gzF(q * 6.0 + 3.0)) * 0.6);
+  } else if (t < 9.5) {                // rhodochrosite : bandes roses concentriques
+    float b = 0.5 + 0.5 * sin(length(q + 0.5 * gzW(q, 1.9)) * 20.0);
+    c = mix(uPC3, uPC2, smoothstep(0.1, 0.9, b)); c = mix(c, uPC1, 0.5 + 0.3 * n);
+  } else if (t < 10.5) {               // opale noble : fond sombre (les feux sont dans gemPatGlow)
+    c = uPC1 * (0.7 + 0.6 * n);
+  } else if (t < 11.5) {               // labradorite : gris sombre moiré (les éclairs sont dans gemPatGlow)
+    c = uPC1 * (0.55 + 0.9 * gzF(q * 3.0)); c = mix(c, vec3(0.03), smoothstep(0.7, 0.9, gzN(q * 9.0)) * 0.5);
+  } else {                             // pierre de lune : laiteuse
+    c = mix(uPC1, vec3(0.9), 0.15 * n) * (0.9 + 0.2 * gzN(q * 6.0));
+  }
+  return c;
+}
+
+// Reflets qui dépendent de l'angle de vue : feux de l'opale, éclairs de la labradorite, lueur de la pierre de lune, chatoyance de l'œil de tigre.
+vec3 gemPatGlow(vec3 n) {
+  vec3 q = (vGemPos - uGemCenter) / uGemBase;
+  float ndv = clamp(dot(n, normalize(vViewPosition)), 0.0, 1.0), t = uGemPat;
+  vec3 g = vec3(0.0);
+  if (t > 9.5 && t < 10.5) {
+    float pm = smoothstep(0.5, 0.7, gzF(q * 2.6));
+    float h = fract(gzF(q * 3.0) * 1.2 + ndv * 1.1);
+    vec3 rgb = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+    g = rgb * pm * (0.12 + 0.28 * ndv);
+  } else if (t > 10.5 && t < 11.5) {
+    float pm = smoothstep(0.38, 0.58, gzF(q * 2.4 + 3.0));
+    float flash = pow(max(0.0, sin(ndv * 6.0 + gzF(q * 2.0) * 8.0)), 3.0);
+    g = mix(uPC2, uPC3, smoothstep(0.35, 0.7, gzN(q * 3.0))) * flash * pm * 0.9;
+  } else if (t > 11.5) {
+    g = uPC2 * pow(1.0 - ndv, 2.0) * 0.5 * (0.6 + 0.4 * gzN(q * 3.0));
+  } else if (t > 4.5 && t < 5.5) {
+    float b = 0.5 + 0.5 * sin(dot(q, vec3(0.75, 0.1, 0.65)) * 34.0 + gzF(q * 2.0) * 6.0);
+    g = uPC3 * b * b * b * (0.08 + 0.22 * (1.0 - ndv));
+  } else if (t > 0.5 && t < 1.5) {
+    g = uPC2 * smoothstep(0.82, 0.9, gzN(q * 22.0)) * 0.25;   // éclats de pyrite
+  }
+  return g;
+}
 
 vec3 gemEnv(vec3 dirObj) {
   vec3 w = normalize(vGemM * dirObj);
@@ -134,11 +216,14 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
 vec3 gemRadiance() {
   vec3 nObj = normalize(cross(dFdx(vGemPos), dFdy(vGemPos)));
   if (dot(nObj, vGemPos - uGemCenter) < 0.0) nObj = -nObj;
+  vec3 sg = uGemSigma;
+  if (uGemMix > 1.5) sg = mix(uGemSigma, uGemSigma2, smoothstep(-0.15, 0.15, dot((vGemPos - uGemCenter) / uGemBase, normalize(vec3(0.62, 0.31, 0.72))))); // ametrine : deux moitiés
+  else if (uGemMix > 0.5) sg = mix(uGemSigma, uGemSigma2, uGemWarm); // alexandrite : la lumière change la couleur
   vec3 c;
   if (uGemDisp > 1e-4) {
     float h = 0.5 * uGemDisp;
-    c = vec3(gemTrace(nObj, uGemIor - h, uGemSigma).r, gemTrace(nObj, uGemIor, uGemSigma).g, gemTrace(nObj, uGemIor + h, uGemSigma).b);
-  } else c = gemTrace(nObj, uGemIor, uGemSigma);
+    c = vec3(gemTrace(nObj, uGemIor - h, sg).r, gemTrace(nObj, uGemIor, sg).g, gemTrace(nObj, uGemIor + h, sg).b);
+  } else c = gemTrace(nObj, uGemIor, sg);
   return c * uGemGain;
 }
 `;
@@ -155,6 +240,12 @@ export function updateGemUniforms(material, g) {
   U.uGemSigma.value.set(s(att.r), s(att.g), s(att.b));
   U.uGemGain.value = g.sparkle ? 1.5 : 1.35;
   U.uGemZone.value = g.sparkle ? 0 : 0.3; // pierres de couleur : zonation / inclusions discrètes
+  // 2e teinte (alexandrite, ametrine) et motif des pierres opaques
+  U.uGemMix.value = g.change ? 1 : g.bicolor ? 2 : 0;
+  const att2 = new THREE.Color(g.att2 ?? g.att ?? '#ffffff');
+  U.uGemSigma2.value.set(s(att2.r), s(att2.g), s(att2.b));
+  U.uGemPat.value = g.opaque && g.pattern ? GEM_PATTERNS[g.pattern] ?? 0 : 0;
+  U.uPC1.value.set(g.hex ?? '#888888'); U.uPC2.value.set(g.hex2 ?? g.hex ?? '#888888'); U.uPC3.value.set(g.hex3 ?? g.hex ?? '#888888');
 }
 
 export function disposeGemData(data) { data?.rt?.dispose(); }

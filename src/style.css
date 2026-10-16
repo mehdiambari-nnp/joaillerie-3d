@@ -762,3 +762,17 @@ html.has-privacy .app { height: calc(100dvh - var(--privacy-h)); }
 .np-drop { display: grid; justify-items: center; gap: 8px; padding: 28px 18px; margin-top: 8px; text-align: center; border: 1px dashed color-mix(in srgb, var(--ink) 40%, transparent); border-radius: var(--radius); cursor: pointer; transition: background .2s, border-color .2s; }
 .np-drop:hover, .np-drop.over, .np-drop:focus-visible { background: var(--surface-2); border-color: var(--ink); }
 .np-drop b { font: 500 17px/1.2 var(--serif); } .np-drop small { color: var(--muted); font-size: 12px; }
+
+/* sélecteur de pierres : familles de l'atlas, recherche, fiche */
+.gem-tools { margin: 2px 0 10px; }
+.gem-tools input { width: 100%; padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 16px; outline: none; }
+.gem-tools input:focus { border-color: var(--ink); }
+.palette.gems { display: block; }
+.gem-fam { margin: 0 0 10px; } .gem-fam[hidden], .gem-fam .dot[hidden], .gem-none[hidden] { display: none; }
+.gem-fam h4 { margin: 4px 0 4px; font: 500 10.5px/1.2 var(--sans, inherit); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.gem-fam .dots { flex-wrap: wrap; row-gap: 4px; }
+.gem-none { margin: 8px 0; font-size: 12.5px; color: var(--muted); }
+.gem-info { margin: 4px 0 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface-2); display: grid; gap: 6px; }
+.gem-info p { margin: 0; } .gi-props { font-size: 12.5px; letter-spacing: .03em; color: var(--ink); font-weight: 500; } .gi-note { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.gi-warn { font-size: 12px; line-height: 1.35; color: var(--ink); padding: 6px 9px; border-left: 2px solid #d9a441; background: color-mix(in srgb, #d9a441 14%, transparent); }
+.gi-kin { display: grid; gap: 2px; } .gi-kin > span { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }

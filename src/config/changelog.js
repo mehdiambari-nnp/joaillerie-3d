@@ -2,6 +2,21 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.9.0', date: '2026-10-16',
+    fr: [
+      'Sélecteur de pierres refait d’après l’Atlas chromatique des gemmes : 7 familles de couleur et plus de 50 pierres',
+      'Nouvelles pierres : spinelle, rubellite, topaze, tanzanite, tsavorite, jade, malachite, lapis-lazuli, turquoise, œil de tigre, opale, labradorite, pierre de lune…',
+      'Alexandrite : elle change de couleur avec l’éclairage ; ametrine bicolore',
+      'Fiche de chaque pierre : espèce, dureté, indice de réfraction, avertissement pour les pierres tendres, autres variétés de la même espèce ; recherche par nom',
+    ],
+    en: [
+      'Stone picker rebuilt from the Gem Colour Atlas: 7 colour families and over 50 stones',
+      'New stones: spinel, rubellite, topaz, tanzanite, tsavorite, jade, malachite, lapis lazuli, turquoise, tiger’s eye, opal, labradorite, moonstone…',
+      'Alexandrite changes colour with the lighting; bicolour ametrine',
+      'Stone card: species, hardness, refractive index, warning for soft stones, other varieties of the same species; search by name',
+    ],
+  },
+  {
     version: '0.8.1', date: '2026-10-16',
     fr: [
       'Nouveau bouton « Nouveau projet » : donnez un nom, choisissez ou déposez un fichier 3D, le projet est créé et enregistré',
