@@ -93,7 +93,7 @@ export function installGemShader(material, data) {
         `if (uGemOn > 0.5) totalDiffuse = gemRadiance();
          vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;`);
   };
-  material.customProgramCacheKey = () => 'gemrt4';
+  material.customProgramCacheKey = () => 'gemrt5';
   return U;
 }
 
@@ -117,6 +117,16 @@ vec3 gemDome(vec3 nView) {
   return normalize(mix(nView, nD, uGemDome));
 }
 
+// Œil de tigre : larges bandes irrégulières (largeur variable, déformées) + fibres très fines. band ∈ [0,1], fib ∈ [0,1].
+const vec3 TIG_B = vec3(0.75, 0.1, 0.65), TIG_F = vec3(-0.62, 0.3, 0.73);
+void gemTiger(vec3 q, out float band, out float fib) {
+  float w = gzF(q * 1.25 + 5.0);
+  float s = dot(q, TIG_B) * 9.0 + w * 3.6;
+  band = clamp(0.5 + 0.5 * sin(s) + 0.38 * (gzN(vec3(s * 0.8, 3.0, 1.0)) - 0.5), 0.0, 1.0);
+  vec3 t3 = cross(TIG_B, TIG_F);
+  fib = gzN(vec3(dot(q, TIG_B) * 64.0, dot(q, t3) * 64.0, dot(q, TIG_F) * 5.0)) * 0.6 + gzN(vec3(dot(q, TIG_B) * 150.0, dot(q, t3) * 150.0, dot(q, TIG_F) * 9.0)) * 0.4;
+}
+
 // Pierres opaques ou translucides : couleur de surface procédurale (espace objet de la pierre, rayon ≈ 1), motif propre à chaque espèce.
 vec3 gemPatColor() {
   vec3 q = (vGemPos - uGemCenter) / uGemBase;
@@ -137,9 +147,12 @@ vec3 gemPatColor() {
     float d = length(q * vec3(1.0, 1.25, 1.0) + 0.55 * gzW(q, 1.7));
     float b = 0.5 + 0.5 * sin(d * 26.0 + gzF(q * 4.0) * 5.0);
     c = mix(uPC2, uPC1, smoothstep(0.2, 0.8, b)); c = mix(c, uPC3, smoothstep(0.88, 1.0, b) * 0.35);
-  } else if (t < 5.5) {                // œil de tigre : fibres parallèles
-    float b = 0.5 + 0.5 * sin(dot(q, vec3(0.75, 0.1, 0.65)) * 34.0 + gzF(q * 2.0) * 6.0);
-    c = mix(uPC2, uPC1, smoothstep(0.1, 0.9, b)) * (0.8 + 0.35 * gzN(q * 9.0));
+  } else if (t < 5.5) {                // œil de tigre : bandes brun sombre / ambre / or, fibres soyeuses, zones olive-noir
+    float band, fib; gemTiger(q, band, fib);
+    c = mix(uPC2, uPC1, smoothstep(0.15, 0.7, band));
+    c = mix(c, uPC3, smoothstep(0.6, 1.0, band) * (0.25 + 0.5 * fib));
+    c = mix(c, vec3(0.05, 0.045, 0.02), smoothstep(0.62, 0.8, gzF(q * 1.1 + 9.0)) * 0.7);
+    c *= 0.78 + 0.4 * fib;
   } else if (t < 6.5) {                // cornaline : calcédoine nuageuse
     c = mix(uPC3, uPC2, smoothstep(0.25, 0.85, gzF(q * 2.6))); c = mix(c, uPC1, 0.35);
   } else if (t < 7.5) {                // charoïte : tourbillons soyeux
@@ -180,8 +193,12 @@ vec3 gemPatGlow(vec3 n) {
   } else if (t > 11.5) {
     g = uPC2 * pow(1.0 - ndv, 2.0) * 0.5 * (0.6 + 0.4 * gzN(q * 3.0));
   } else if (t > 4.5 && t < 5.5) {
-    float b = 0.5 + 0.5 * sin(dot(q, vec3(0.75, 0.1, 0.65)) * 34.0 + gzF(q * 2.0) * 6.0);
-    g = uPC3 * b * b * b * (0.08 + 0.22 * (1.0 - ndv));
+    // chatoyance : ligne lumineuse perpendiculaire aux fibres, là où la surface leur est tangente ; elle glisse quand on tourne la pierre
+    float band, fib; gemTiger(q, band, fib);
+    vec3 fV = normalize((viewMatrix * vec4(vGemM * TIG_F, 0.0)).xyz);
+    float dn = dot(n, fV);
+    float line = exp(-dn * dn / 0.03);
+    g = uPC3 * line * (0.25 + 0.75 * band) * (0.35 + 0.65 * fib) * 1.7;
   } else if (t > 0.5 && t < 1.5) {
     g = uPC2 * smoothstep(0.82, 0.9, gzN(q * 22.0)) * 0.25;   // éclats de pyrite
   }

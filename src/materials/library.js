@@ -92,7 +92,7 @@ export const GEMS = [
   { id: 'diamond', group: 'neutral', name: 'Diamant', mineral: 'Diamant', mohs: '10', sparkle: true, hex: '#f4f8ff', swatch: '#f4f8ff', note: 'Le plus dur ; indice 2,42 et feu inégalés.' },
   { id: 'quartz-clear', group: 'neutral', name: 'Cristal de roche', mineral: 'Quartz', mohs: '7', hex: '#f1f7fa', ior: 1.54, disp: 0.013, note: 'Quartz incolore.' },
   { id: 'quartz-smoky', group: 'neutral', name: 'Quartz fumé', mineral: 'Quartz', mohs: '7', hex: '#7a6552', ior: 1.55, disp: 0.013, note: 'Brun fumée.' },
-  { id: 'tiger-eye', group: 'neutral', name: 'Œil de tigre', mineral: 'Quartz', mohs: '6,5–7', opaque: true, pattern: 'tigereye', hex: '#9a6420', hex2: '#4a2a0c', hex3: '#f2c25a', roughness: 0.12, note: 'Bandes dorées et brunes : reflet mobile (chatoyance).' },
+  { id: 'tiger-eye', group: 'neutral', name: 'Œil de tigre', mineral: 'Quartz', mohs: '6,5–7', opaque: true, pattern: 'tigereye', hex: '#9c6518', hex2: '#2e1b09', hex3: '#f0be4a', roughness: 0.12, note: 'Bandes brunes et dorées, fibres soyeuses : un reflet lumineux glisse sur la pierre quand on la tourne (chatoyance).' },
   { id: 'black', group: 'neutral', name: 'Onyx', mineral: 'Calcédoine', mohs: '6,5–7', opaque: true, hex: '#0b0b0d', roughness: 0.08, note: 'Noir profond et uni.' },
   { id: 'obsidian', group: 'neutral', name: 'Obsidienne', mineral: 'Verre volcanique', mohs: '5–5,5', opaque: true, hex: '#0c0c10', roughness: 0.05, sheen: true, note: 'Noir vitreux ; verre naturel, fragile.' },
   { id: 'black-tourmaline', group: 'neutral', name: 'Tourmaline noire', mineral: 'Tourmaline', mohs: '7–7,5', opaque: true, hex: '#121216', roughness: 0.1, note: 'Noir opaque, tourmaline (schorl).' },
