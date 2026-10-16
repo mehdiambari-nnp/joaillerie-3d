@@ -10,6 +10,7 @@ import { resolveRights, permsPatch, OWNER_RIGHTS } from './rights.js';
 
 export const INVITE_TTL = 7 * 24 * 3600 * 1000;
 const KEY = 'rc:workspace';
+const RIGHTS_TTL = 20000; // les droits peuvent être modifiés par le propriétaire pendant la session : relus au plus toutes les 20 s
 const token = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 
 /** @param {import('firebase/firestore').Firestore} db @param {() => {uid:string, email:string, name:string}} me utilisateur courant (exige d'être connecté) */
@@ -28,10 +29,10 @@ export function createWorkspaces(db, me) {
     /** Mes droits dans l'atelier actif (tout, si c'est le mien). Mis en cache jusqu'au changement d'atelier. */
     async rights() {
       if (api.isOwn) return OWNER_RIGHTS;
-      if (mineCache && mineCache.owner === api.active) return mineCache.r;
+      if (mineCache && mineCache.owner === api.active && Date.now() - mineCache.at < RIGHTS_TTL) return mineCache.r;
       const s = await getDoc(doc(db, 'workspaces', api.active, 'members', me().uid));
       const r = resolveRights(s.exists() ? s.data() : null);
-      mineCache = { owner: api.active, r }; return r;
+      mineCache = { owner: api.active, r, at: Date.now() }; return r;
     },
     refreshRights() { mineCache = null; },
 

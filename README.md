@@ -1,5 +1,9 @@
 # Joaillerie 3D — configurateur de bagues
 
+![Le configurateur](docs/images/03-matieres.jpg)
+
+> **Guide illustré : [docs/GUIDE.md](docs/GUIDE.md)** — configurer, partager un lien client, suivre ses clients, travailler à plusieurs (captures générées depuis l'application).
+
 Web app (HTML5 / CSS3 / JS + three.js) : importez un `.fbx` (ou GLB/OBJ), tournez la bague comme sur Sketchfab,
 touchez une partie (corps, griffes, chaton, pierres…) et appliquez une matière (or, platine, diamant, émeraude…) en temps réel.
 Partage par lien, export GLB/USDZ, **AR Quick Look** (iPhone, désactivée pour l'instant dans l'interface) et **essayage sur la main** (caméra + MediaPipe).
@@ -18,6 +22,7 @@ npm run test:e2e       # E2E Chromium headless, mode offline (captures dans docs
 npm run build          # dist/ statique (Firebase) ; npm run build:offline pour la variante sans Firebase
 npm run emulators      # émulateurs Firebase (Auth/Firestore/Storage) ; ouvrir ?emulator pour s'y brancher
 npm run test:rules     # règles de sécurité Firestore sur l'émulateur (Java requis)
+npm run guide          # régénère les captures du guide (docs/images/) ; exige « npm run emulators » dans un autre terminal
 npm run deploy:all     # règles Firestore/Storage + Hosting (npx firebase login --reauth si la session a expiré)
 ```
 

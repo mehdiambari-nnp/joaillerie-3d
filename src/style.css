@@ -762,3 +762,4 @@ html.has-privacy .app { height: calc(100dvh - var(--privacy-h)); }
 .np-drop { display: grid; justify-items: center; gap: 8px; padding: 28px 18px; margin-top: 8px; text-align: center; border: 1px dashed color-mix(in srgb, var(--ink) 40%, transparent); border-radius: var(--radius); cursor: pointer; transition: background .2s, border-color .2s; }
 .np-drop:hover, .np-drop.over, .np-drop:focus-visible { background: var(--surface-2); border-color: var(--ink); }
 .np-drop b { font: 500 17px/1.2 var(--serif); } .np-drop small { color: var(--muted); font-size: 12px; }
+@media (max-width: 700px) { .bo-quick { display: grid; grid-template-columns: 1fr; width: 100%; } .bo-quick .btn { width: 100%; } }
