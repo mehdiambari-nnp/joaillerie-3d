@@ -83,11 +83,16 @@ export function create(config) {
       let docs;
       if (own) docs = (await getDocs(col())).docs;
       else {
-        const r = await workspaces.rights(), me = auth.currentUser.uid, seen = new Map();
-        const queries = [getDocs(query(col(), where('sharedWith', 'array-contains', me)))];
-        if (r.projects === 'all') queries.push(getDocs(query(col(), where('private', '==', false))));
-        for (const s of await Promise.all(queries)) for (const d of s.docs) seen.set(d.id, d);
-        docs = [...seen.values()];
+        const me = auth.currentUser.uid;
+        const fetchAll = async () => {
+          const r = await workspaces.rights(), seen = new Map();
+          const queries = [getDocs(query(col(), where('sharedWith', 'array-contains', me)))];
+          if (r.projects === 'all') queries.push(getDocs(query(col(), where('private', '==', false))));
+          for (const s of await Promise.all(queries)) for (const d of s.docs) seen.set(d.id, d);
+          return [...seen.values()];
+        };
+        try { docs = await fetchAll(); }
+        catch (e) { if (e?.code !== 'permission-denied') throw e; workspaces.refreshRights(); docs = await fetchAll(); } // droits modifiés par le propriétaire depuis la dernière lecture
       }
       const snap = { docs };
       const out = snap.docs.map((d) => { const { config, options, ...rest } = d.data(); return { id: d.id, ...rest }; }); // la configuration n'est lue qu'à l'ouverture
