@@ -19,7 +19,6 @@ import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
 import { newId, thumbnail } from '../projects/projects.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
-import { TryOn } from '../tryon/tryon.js';
 import { frenchRingSize } from '../import/zones.js';
 import { fill } from './pages/util.js';
 
@@ -68,7 +67,15 @@ export class UI {
     this.build();
     this.bind();
     this.renderAll();
-    this.tryon = new TryOn(app, $('.viewport', root), { toast: (m) => this.toast(m) });
+    this.tryon = null; // chargé à la première ouverture de l'essayage (MediaPipe ≈ 150 Ko, inutile tant qu'on ne l'utilise pas)
+  }
+
+  async openTryOn() {
+    if (!this.tryon) {
+      const { TryOn } = await import('../tryon/tryon.js');
+      this.tryon ||= new TryOn(this.app, $('.viewport', this.root), { toast: (m) => this.toast(m) });
+    }
+    this.tryon.open();
   }
 
   // ---------- Squelette ----------
@@ -630,7 +637,7 @@ export class UI {
       case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
       case 'ar': this.openAR(); break;
-      case 'tryon': emitTrack('tryon'); this.tryon.open(); break;
+      case 'tryon': emitTrack('tryon'); this.openTryOn(); break;
     }
   }
 

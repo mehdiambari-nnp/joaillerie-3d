@@ -45,7 +45,7 @@ export default defineConfig(({ command }) => ({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/three/')) return 'three';
-          if (id.includes('@mediapipe/tasks-vision')) return 'mediapipe';
+          // (MediaPipe : pas de chunk manuel — rangé avec l'essayage, il emportait l'assistant d'import dynamique et se chargeait partout)
         },
       },
     },
