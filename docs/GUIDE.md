@@ -142,4 +142,5 @@ L'application est conçue d'abord pour le téléphone : le configurateur s'utili
 ## 10. Pour les développeurs
 - Démarrer, tester, déployer : [README](../README.md). Mise en route Firebase, règles de sécurité, droits, déploiement : [FIREBASE.md](FIREBASE.md). Choix de conception : [DECISIONS.md](../DECISIONS.md). Test sur iPhone : [IOS_TESTS.md](IOS_TESTS.md).
 - **Régénérer les captures de ce guide** : `npm run emulators` (autre terminal), puis `npm run guide`. Le script (`scripts/guide.mjs`) réinitialise les émulateurs (jamais la production), crée des comptes fictifs, enregistre des projets, crée des liens clients, simule des consultations, invite un second joaillier, puis photographie chaque écran dans `docs/images/` (JPEG, ≈ 1,7 Mo au total). Aucune donnée réelle n'est utilisée.
+- **Version PDF** à transmettre (sans les passages techniques) : `npm run guide:pdf` produit `docs/Guide-Domuse.pdf` (A4, captures incluses ; fichier non versionné, à régénérer).
 - Les captures sont **versionnées** (contrairement à `docs/screenshots/` des tests E2E) : relancer le script et les valider à l'œil avant de commiter une évolution visible de l'interface.
