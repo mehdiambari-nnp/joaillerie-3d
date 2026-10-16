@@ -2,6 +2,11 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.9.2', date: '2026-10-16',
+    fr: ['Tant que l’écrin est présent, on ne peut plus sélectionner les parties de la bague qui s’y trouve'],
+    en: ['While the box is present, the parts of the ring inside it can no longer be selected'],
+  },
+  {
     version: '0.9.1', date: '2026-10-16',
     fr: [
       'Pierres opaques et translucides (rhodochrosite, jade, lapis, malachite, turquoise, onyx, perle…) : rendu en cabochon poli, avec reflets doux et chair translucide',

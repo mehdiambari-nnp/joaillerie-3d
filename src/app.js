@@ -35,6 +35,7 @@ export class Configurator extends Emitter {
     this.hover = null;
     this.multi = false;
     this.interactive = true; // false en mode client : pas de sélection de pièces
+    this.pickBlocked = false; // vrai pendant l'écrin d'introduction : la bague est dans la boîte, on ne peut pas en toucher les parties
     this._zoomKey = '';
     this.on('selection', () => this._autoZoom());
     this.granularity = 'zone'; // 'zone' | 'piece'
@@ -136,15 +137,21 @@ export class Configurator extends Emitter {
   applyToSelection(a, opts) { this.applyMaterial([...this.selection], a, opts); }
 
   // ---------- Sélection ----------
+  /** Bloque (ou rétablit) la sélection à la souris / au doigt ; efface la sélection et le survol en cours. */
+  setPickBlocked(on) {
+    this.pickBlocked = on;
+    if (on) { this.hover = null; this.clearSelection(); }
+  }
+
   _onHover(id, e) {
-    if (!this.interactive) return;
+    if (!this.interactive || this.pickBlocked) return;
     this.hover = id;
     this._refreshHighlight();
     this.emit('hover', id ? this.pieceById(id) : null, e);
   }
 
   _onPick(id, { shift }) {
-    if (!this.interactive) return;
+    if (!this.interactive || this.pickBlocked) return;
     if (!id) { if (!shift && !this.multi) this.clearSelection(); return; }
     const zone = this.granularity === 'zone' ? this.zoneOfPiece(id) : null;
     // 1er clic : toute la partie ; clic suivant dans une partie déjà (en partie) sélectionnée : on bascule la pièce visée

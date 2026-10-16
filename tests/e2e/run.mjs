@@ -27,10 +27,19 @@ step('Introduction : écrin fermé → ouverture → bague libre');
   await p0.waitForSelector('.intro-open', { timeout: 60000 });
   ok(await p0.evaluate(() => document.querySelector('.app').dataset.intro === '1' && !!__rc.introBox), 'écrin affiché, interface masquée');
   ok(await p0.evaluate(() => __rc.app.model.root.position.y < 0), 'la bague est descendue dans l’écrin');
+  ok(await p0.evaluate(() => { // la bague est dans l'écrin : on ne peut en sélectionner aucune partie (ni la survoler)
+    const a = __rc.app, id = a.zones[0].pieceIds[0], was = a.interactive; a.interactive = true;
+    a._onPick(id, { shift: false }); a._onHover(id, {});
+    const r = a.pickBlocked === true && a.selection.size === 0 && !a.hover; a.interactive = was; return r;
+  }), 'écrin présent : aucune partie de la bague sélectionnable');
   await p0.locator('.intro-open').click();
   await p0.waitForFunction(() => !document.querySelector('.app').dataset.intro, null, { timeout: 30000 });
   ok(await p0.evaluate(() => __rc.app.model.root.position.y === 0 && __rc.app.model.root.rotation.y === 0 && !document.querySelector('.intro-hint')), 'bague remise en place, indice retiré');
   ok(await p0.evaluate(() => __rc.app.viewer.controls.enabled), 'contrôles de la vue 3D de nouveau actifs');
+  ok(await p0.evaluate(() => { // écrin retiré : la sélection fonctionne de nouveau
+    const a = __rc.app, id = a.zones[0].pieceIds[0], was = a.interactive; a.interactive = true;
+    a._onPick(id, { shift: false }); const r = a.pickBlocked === false && a.selection.size > 0; a.clearSelection(); a.interactive = was; return r;
+  }), 'écrin retiré : les parties redeviennent sélectionnables');
   ok(await p0.evaluate(() => !__rc.app.viewer.fx || __rc.app.viewer.fx.n >= 1), 'pipeline d’image : au moins une image rendue (ou rendu direct si le GPU ne le gère pas)');
   ok(l0.errors.length === 0, 'aucune erreur console (intro) ' + JSON.stringify(l0.errors));
   await b0.close();
