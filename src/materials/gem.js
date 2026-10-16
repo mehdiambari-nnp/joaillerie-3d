@@ -72,6 +72,7 @@ export function installGemShader(material, data) {
     uGemWarm: gemLight,
     uGemPat: { value: 0 },        // motif procédural des pierres opaques (GEM_PATTERNS)
     uGemDome: { value: 0 },       // pierres opaques = cabochons : normale bombée (0 = facettes plates, 1 = dôme)
+    uGemAO: { value: 0.5 },       // force de l'occlusion ambiante au bord des pierres serties
     uGemSSS: { value: 0 },        // translucidité : lumière diffusée dans la masse (éclaire les ombres, adoucit)
     uPC1: { value: new THREE.Color('#888888') }, uPC2: { value: new THREE.Color('#888888') }, uPC3: { value: new THREE.Color('#888888') },
   };
@@ -88,18 +89,22 @@ export function installGemShader(material, data) {
       .replace('void main() {', `${GEM_GLSL}\nvoid main() {`)
       .replace('#include <color_fragment>', '#include <color_fragment>\n  if (uGemPat > 0.5) diffuseColor.rgb = gemPatColor();')
       .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  if (uGemDome > 0.0) normal = gemDome(normal);')
+      // « cartes » procédurales : brillance (rugosité) et spéculaire propres à chaque minéral, calculées dans l'espace de la pierre (pas d'UV nécessaires)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  vec2 gemSurf = vec2(1.0); if (uGemPat > 0.5) { gemSurf = gemPatSurf(); roughnessFactor = clamp(roughnessFactor * gemSurf.x, 0.025, 1.0); }')
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  if (uGemPat > 0.5) material.specularColor *= gemSurf.y;')
+      .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n  if (uGemDome > 0.0) { float gao = gemAO(); reflectedLight.indirectDiffuse *= gao; reflectedLight.indirectSpecular *= mix(1.0, gao, 0.85); }')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  if (uGemPat > 0.5) totalEmissiveRadiance += gemPatGlow(normal);\n  totalEmissiveRadiance += uGemSSS * diffuseColor.rgb * (0.7 + 0.6 * (1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0)));')
       .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
         `if (uGemOn > 0.5) totalDiffuse = gemRadiance();
          vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;`);
   };
-  material.customProgramCacheKey = () => 'gemrt5';
+  material.customProgramCacheKey = () => 'gemrt6';
   return U;
 }
 
 const GEM_GLSL = /* glsl */`
 uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
-uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
+uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform float uGemAO; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
 uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone;
 float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -174,6 +179,52 @@ vec3 gemPatColor() {
     c = mix(uPC1, vec3(0.9), 0.15 * n) * (0.9 + 0.2 * gzN(q * 6.0));
   }
   return c;
+}
+
+// Cartes de surface procédurales : x = facteur de rugosité (inverse de la « glossiness map »), y = facteur de spéculaire (« specular map »).
+vec2 gemPatSurf() {
+  vec3 q = (vGemPos - uGemCenter) / uGemBase;
+  float t = uGemPat, n = gzF(q * 2.5);
+  float rm = 1.0, sm = 1.0;
+  if (t < 1.5) {                       // lapis : veines de calcite plus mates, paillettes de pyrite très brillantes
+    float vein = smoothstep(0.03, 0.0, abs(gzN(q * 4.4 + 4.0) - 0.5));
+    float fl = smoothstep(0.84, 0.92, gzN(q * 30.0));
+    rm = mix(1.0, 2.4, vein) * mix(1.0, 0.35, fl); sm = mix(1.0, 0.7, vein) * mix(1.0, 2.0, fl);
+  } else if (t < 2.5) {                // turquoise : fond crayeux et mat, matrice plus dure donc plus brillante
+    float mx = smoothstep(0.045, 0.0, abs(gzN(q * 6.0 + 9.0) - 0.5)) * smoothstep(0.35, 0.6, n);
+    rm = mix(2.6, 1.0, mx); sm = mix(0.75, 1.0, mx);
+  } else if (t < 3.5) {                // jade : éclat gras, nuageux
+    rm = 1.5 + 0.9 * gzF(q * 3.0); sm = 0.9;
+  } else if (t < 4.5) {                // malachite : les bandes claires et sombres ne se polissent pas pareil
+    float b = 0.5 + 0.5 * sin(length(q * vec3(1.0, 1.25, 1.0) + 0.55 * gzW(q, 1.7)) * 26.0 + gzF(q * 4.0) * 5.0);
+    rm = mix(0.8, 1.7, b);
+  } else if (t < 5.5) {                // œil de tigre : fibres = éclat soyeux (rugosité qui varie dans le sens des fibres)
+    float band, fib; gemTiger(q, band, fib);
+    rm = (0.65 + 1.0 * fib) * mix(1.25, 0.8, band); sm = 0.9 + 0.4 * band;
+  } else if (t < 6.5) {                // cornaline : vitreuse
+    rm = 0.9 + 0.5 * gzF(q * 2.6);
+  } else if (t < 7.5) {                // charoïte : soyeuse
+    rm = 1.2 + 0.9 * gzN(q * 20.0); sm = 0.9;
+  } else if (t < 8.5) {                // sugilite
+    rm = 1.1 + 0.6 * n;
+  } else if (t < 9.5) {                // rhodochrosite : les voiles laiteux sont plus mats que la chair translucide
+    float vl = gzF(vec3(q.x * 1.1, q.y * 4.2, q.z * 1.1) + gzW(q, 2.0) * 1.2 + 3.0);
+    float v = smoothstep(0.42, 0.75, vl);
+    rm = mix(1.0, 2.0, v); sm = mix(1.0, 0.75, v);
+  } else if (t < 10.5) {               // opale : verre
+    rm = 0.6; sm = 1.2;
+  } else if (t < 11.5) {               // labradorite
+    rm = 0.9 + 0.5 * gzN(q * 8.0);
+  } else {                             // pierre de lune : laiteuse
+    rm = 1.4 + 0.7 * n; sm = 0.9;
+  }
+  return vec2(rm, sm);
+}
+
+// Occlusion ambiante d'une pierre sertie : la lumière d'ambiance atteint mal le bord, caché sous le serti (sertissure).
+float gemAO() {
+  float r = length((vGemPos - uGemCenter) / uGemBase);
+  return 1.0 - uGemAO * smoothstep(0.62, 0.98, r);
 }
 
 // Reflets qui dépendent de l'angle de vue : feux de l'opale, éclairs de la labradorite, lueur de la pierre de lune, chatoyance de l'œil de tigre.
