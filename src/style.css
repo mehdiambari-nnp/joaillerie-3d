@@ -789,3 +789,37 @@ html.has-privacy .app { height: calc(100dvh - var(--privacy-h)); }
 .gem-top:not(.open) .gem-info, .gem-top:not(.open) .gem-tools { display: none; }
 .gem-top:not(.open) { box-shadow: none; }
 @media (min-width: 900px) { .gem-top { --pt: 18px; } }
+
+/* Atelier d'or : feuille de réglages PBR (remplace la feuille matière pendant le réglage ; la bague reste visible au-dessus) */
+.app[data-lab='1'] .panel { display: none; }
+.lab { position: relative; z-index: 6; background: var(--surface); border-top: 1px solid var(--line); border-radius: 22px 22px 0 0; box-shadow: 0 -12px 34px rgba(0, 0, 0, .25); max-height: 48dvh; display: flex; flex-direction: column; }
+.lab[hidden] { display: none; }
+.lab-h { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 6px; }
+.lab-h h3 { margin: 0; font: 500 21px/1.2 var(--serif); }
+.lab-b { overflow: auto; padding: 4px 16px calc(14px + var(--safe-b, 0px)); -webkit-overflow-scrolling: touch; }
+.lab-note { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.lab-save { display: flex; gap: 8px; margin-bottom: 6px; }
+.lab-save input { flex: 1; min-width: 0; padding: 9px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface-2); color: var(--ink); font-size: 16px; outline: none; }
+.lab-chk { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
+.lab-mine h4 { margin: 8px 0 6px; font-size: 10.5px; letter-spacing: .22em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+.lab-empty { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
+.lab-row { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.lab-row i { width: 22px; height: 22px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2); flex: none; }
+.lab-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; }
+.lg { border-top: 1px solid var(--line); }
+.lg summary { cursor: pointer; padding: 11px 2px; font: 500 16px/1.2 var(--serif); list-style: none; }
+.lg summary::-webkit-details-marker { display: none; }
+.lg summary::after { content: '⌄'; float: right; color: var(--muted); transition: transform .2s; }
+.lg[open] summary::after { transform: rotate(180deg); }
+.lg-b { padding: 0 2px 10px; display: grid; gap: 10px; }
+.lf { display: grid; gap: 4px; font-size: 12.5px; color: var(--muted); }
+.lf span { display: flex; justify-content: space-between; gap: 10px; }
+.lf output { color: var(--ink); font-variant-numeric: tabular-nums; }
+.lf input[type=range] { width: 100%; }
+.lf-color { grid-template-columns: 1fr auto; align-items: center; }
+.lf-color input { width: 44px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: none; }
+.lf select { padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); color: var(--ink); font-size: 16px; }
+.lab-envs { display: flex; flex-wrap: wrap; gap: 6px; }
+.lab-reset { margin-top: 10px; }
+.ball .lab-b { display: grid; place-items: center; background: conic-gradient(from 30deg, #8a5a14, #ffd77a, #fff2c4, #c98a1e, #8a5a14); color: #3a2506; font-size: 20px; }
+@media (min-width: 900px) { .lab { border-radius: 0; max-height: none; box-shadow: none; border-top: 0; border-left: 1px solid var(--line); } }

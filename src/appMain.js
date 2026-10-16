@@ -33,7 +33,7 @@ export async function startApp({ root, params, pending, shareFailed, tracking, h
     try {
       const model = await importModel(buffer, name, { ...opts, onProgress: (p, l) => ui.progress(p, l) });
       let cfg = config ?? model.project ?? null;
-      if (pending && (pending.modelId === modelId)) { cfg = { ...(cfg || {}), assign: pending.assign, hidden: pending.hidden }; }
+      if (pending && (pending.modelId === modelId)) { cfg = { ...(cfg || {}), assign: pending.assign, hidden: pending.hidden, ...(pending.light ? { light: pending.light } : {}) }; }
       app.setModel(model, modelId, cfg);
       if (introPending) model.root.visible = false; // masquée jusqu'à ce que l'écrin soit prêt (pas d'apparition avant l'intro)
       if (model.project?.variants) { app.variants = cleanVariants(model.project.variants); app.emit('variants'); }

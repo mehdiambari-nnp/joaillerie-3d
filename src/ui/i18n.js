@@ -3,6 +3,7 @@ import theme from 'virtual:theme';
 const BRAND = theme.brand.name;
 const fr = {
   app: BRAND,
+  labOpen: 'Atelier d’or',
   open: 'Ouvrir un fichier',
   modeAtelier: 'Atelier', modeVitrine: 'Joaillier', modeClient: 'Client',
   customColor: 'Teinte libre', hue: 'Teinte', intensity: 'Intensité', lightness: 'Clarté', hexLabel: 'Code couleur',
@@ -134,6 +135,7 @@ const fr = {
 };
 const en = {
   ...fr,
+  labOpen: 'Gold lab',
   open: 'Open a file', modeAtelier: 'Workshop', modeVitrine: 'Jeweller', modeClient: 'Client',
   customColor: 'Custom colour', hue: 'Hue', intensity: 'Intensity', lightness: 'Lightness', hexLabel: 'Colour code', exitPreview: 'Exit client preview', exitPresent: 'Exit fullscreen', enterPresent: 'Fullscreen',
   clientLink: 'Client link (minimal, no settings)', jewelerLink: 'Jeweller link (editable)', clientNote: 'The client only sees the configured ring: no settings, no selection.', clientPreview: 'Client preview',

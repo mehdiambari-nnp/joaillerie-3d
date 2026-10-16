@@ -14,6 +14,8 @@ import theme, { brandHTML } from '../config/theme.js';
 import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
+import { LabPanel } from './lab-panel.js';
+import { LAB, listLabs, sanitizeLight } from '../materials/lab.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
 import { newId, thumbnail } from '../projects/projects.js';
@@ -139,6 +141,7 @@ export class UI {
     this.mount = $('.viewer-mount', this.root);
     this.app.viewer.attachTo(this.mount);
     this.dlg = $('#dlg', this.root);
+    this.lab = new LabPanel(this);
     this.tooltip = $('.tooltip', this.root);
   }
 
@@ -373,14 +376,16 @@ export class UI {
       ? `<div class="gem-tools"><input type="search" data-r="gemq" value="${esc(this.gemQ || '')}" placeholder="${esc(t('gemSearch'))}" aria-label="${esc(t('gemSearch'))}" autocomplete="off" spellcheck="false"></div>`
         + this.gemDots(list, sameM) + `<p class="gem-none" data-r="gemnone" hidden>${esc(t('gemNoMatch'))}</p>` + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
       : list.map((m) => this.ball(m, 'metals', m.id === sameM)).join('')
-        + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '');
+        + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '')
+        + (!allowed ? listLabs().map((p) => `<button class="ball" role="option" data-labpick="${p.id}" aria-label="${esc(p.name)}" aria-pressed="${sameM === LAB && assigns.every((x) => x.l?.n === p.name)}" title="${esc(p.name)}"><span class="b" style="--sw:${p.l.color}"></span><span class="n">${esc(p.name)}</span></button>`).join('')
+          + `<button class="ball" data-lab-open aria-label="${t('labOpen')}" title="${t('labOpen')}"><span class="b lab-b">✦</span><span class="n">${t('labOpen')}</span></button>` : '');
     const fin = kind === 'metal'
       ? `<div class="finish-seg" role="group" aria-label="${t('finishes')}">${FINISHES.map((f) => {
         const g = f.gauge && f.id === sameF && sameI != null; // le bouton actif devient un curseur d'intensité
         const hint = g ? ` · ${t('gauge_' + f.gauge)}` : '';
         return `<button class="pill${g ? ' gauge' : ''}" data-finish="${f.id}" aria-pressed="${f.id === sameF}"${g ? ` style="--g:${Math.round(sameI * 100)}%" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(sameI * 100)}" aria-label="${esc(f.name + hint)}" title="${esc(t('gaugeHint'))}"` : ''}>${esc(f.name)}</button>`;
       }).join('')}</div>` : '';
-    const name = sameM ? describeAssignment({ m: sameM, f: sameF, c: sameC }, kind) : t('severalMaterials');
+    const name = sameM ? (sameM === LAB ? (assigns[0].l?.n || t('labOpen')) : describeAssignment({ m: sameM, f: sameF, c: sameC }, kind)) : t('severalMaterials');
     const sw = swatchOf(kind, assigns[0]);
     const cHex = (sameC ?? this.customHex[kind]).toUpperCase();
     const acc = (id, head, body) => `<section class="acc ${this.acc[id] ? 'open' : ''}" data-accsec="${id}">
@@ -514,6 +519,13 @@ export class UI {
   onClick(e) {
     const app = this.app;
     const tgt = e.target;
+    if (tgt.closest('[data-lab-open]')) { this.lab.open(); return; }
+    const lp = tgt.closest('[data-labpick]');
+    if (lp) {
+      const p = listLabs().find((x) => x.id === lp.dataset.labpick);
+      if (p) { app.applyToSelection({ m: LAB, l: { ...p.l, n: p.name } }); const lt = sanitizeLight(p.light); if (lt) this.lab.applyLight(lt); }
+      return;
+    }
     const fold = tgt.closest('[data-fold]');
     if (fold) { const k = fold.dataset.fold; this.subOpen ||= new Set(); this.subOpen.has(k) ? this.subOpen.delete(k) : this.subOpen.add(k); this.acc = { zones: true, mat: false, custom: false }; this.renderZones(); return; }
     const eyep = tgt.closest('[data-eyep]');
@@ -641,6 +653,7 @@ export class UI {
       case 'projects': this.openProjects(); break;
       case 'signout': (await this.svc.cloud()).auth.signOut() /* le rechargement vers la page de connexion est déclenché par main.js */; break;
       case 'projects-close': this.closeProjects(); break;
+      case 'menu-lab': this.closeProjects(); this.lab.open(); break;
       case 'menu-save': this.closeProjects(); this.openSaveDialog(); break;
       case 'menu-new': this.closeProjects(); this.openNewProject(() => this.openBackoffice('projects')); break;
       case 'menu-nav': this.closeProjects(); this.openBackoffice(el.dataset.tab); break;
@@ -791,7 +804,7 @@ export class UI {
     const a = this.app;
     return buildShareUrl(location.origin + location.pathname, {
       client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden],
-      env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI),
+      env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI), light: a.viewer.getLight(),
     });
   }
 
@@ -866,7 +879,7 @@ export class UI {
   /** Lien court (#s=<12 caractères>) : la configuration est déposée sur le serveur. Repli : lien long si le dépôt échoue. */
   async shortShareUrl(client, remote) {
     const a = this.app, base = location.origin + location.pathname;
-    const opts = { client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI) };
+    const opts = { client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI), light: a.viewer.getLight() };
     try {
       const json = JSON.stringify(sharePayload(opts)), id = await shareId(json);
       await (await this.svc.cloud()).shares.put(id, json);
@@ -954,7 +967,7 @@ export class UI {
   async clientPayloadJson(remote) {
     const a = this.app;
     if (remote === undefined) remote = await this.hostModel().catch(() => null);
-    return JSON.stringify(sharePayload({ client: true, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI) }));
+    return JSON.stringify(sharePayload({ client: true, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI), light: a.viewer.getLight() }));
   }
   /** Crée un lien client suivi : nom donné par le joaillier, vignette 3/4, configuration actuelle. */
   async createTrackedLink(label, remote) {
