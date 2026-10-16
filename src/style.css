@@ -823,3 +823,4 @@ html.has-privacy .app { height: calc(100dvh - var(--privacy-h)); }
 .lab-reset { margin-top: 10px; }
 .ball .lab-b { display: grid; place-items: center; background: conic-gradient(from 30deg, #8a5a14, #ffd77a, #fff2c4, #c98a1e, #8a5a14); color: #3a2506; font-size: 20px; }
 @media (min-width: 900px) { .lab { border-radius: 0; max-height: none; box-shadow: none; border-top: 0; border-left: 1px solid var(--line); } }
+.lab-row small { display: block; font-size: 10.5px; color: var(--muted); letter-spacing: .04em; }

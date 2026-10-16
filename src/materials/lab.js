@@ -105,24 +105,53 @@ export function sanitizeLight(x) {
   return Object.keys(out).length ? out : null;
 }
 
-// ---------- Bibliothèque personnelle (appareil) ----------
+// ---------- Bibliothèque de textures ----------
+// Avec un compte (Firebase) : stockée dans l'atelier actif (users/{propriétaire}/labs) → partagée par tous les joailliers de l'atelier.
+// Sans compte (mode local) ou si le serveur est injoignable : appareil (localStorage). `cloud.labs` = { list, save, remove }.
 const KEY = 'rc:labs';
-export function listLabs() {
+let backend = null;
+let cache = null;
+
+const norm = (x) => ({ id: String(x.id), name: String(x.name || '').slice(0, 40) || 'Sans nom', l: sanitizeLab(typeof x.l === 'string' ? safeParse(x.l) : x.l), light: sanitizeLight(typeof x.light === 'string' ? safeParse(x.light) : x.light), by: typeof x.by === 'string' ? x.by : '' });
+function safeParse(s) { try { return JSON.parse(s); } catch { return null; } }
+function readLocal() {
   try {
     const a = JSON.parse(localStorage.getItem(KEY) || '[]');
-    return (Array.isArray(a) ? a : []).filter((x) => x && typeof x.id === 'string').map((x) => ({ id: x.id, name: String(x.name || '').slice(0, 40) || 'Sans nom', l: sanitizeLab(x.l), light: sanitizeLight(x.light) }));
+    return (Array.isArray(a) ? a : []).filter((x) => x && typeof x.id === 'string').map(norm);
   } catch { return []; }
 }
-function write(list) { try { localStorage.setItem(KEY, JSON.stringify(list)); return true; } catch { return false; } }
+function writeLocal(list) { try { localStorage.setItem(KEY, JSON.stringify(list)); return true; } catch { return false; } }
 
-/** Enregistre (ou remplace, à nom identique) une texture. Renvoie la liste à jour, ou null si le stockage est impossible. */
-export function saveLab(name, l, light = null) {
+/** Relit la bibliothèque (à l'ouverture et à chaque changement d'atelier). Hors ligne ou refusé : copie de l'appareil. */
+export async function refreshLabs() {
+  if (backend) {
+    try {
+      cache = (await backend.list()).map(norm).sort((a, b) => a.name.localeCompare(b.name));
+      writeLocal(cache); // copie hors ligne
+      return cache;
+    } catch (e) { console.warn('Textures de l’atelier indisponibles', e); }
+  }
+  cache = readLocal();
+  return cache;
+}
+export async function initLabs(cloud) { backend = cloud?.labs ?? null; return refreshLabs(); }
+export function listLabs() { return cache ?? readLocal(); }
+
+/** Enregistre (ou remplace, à nom identique) une texture. Renvoie la liste à jour, ou null si l'enregistrement est impossible. */
+export async function saveLab(name, l, light = null) {
   const nm = String(name || '').trim().slice(0, 40);
   if (!nm) return null;
   const list = listLabs();
   const i = list.findIndex((x) => x.name.toLowerCase() === nm.toLowerCase());
-  const item = { id: i >= 0 ? list[i].id : 'l' + Date.now().toString(36), name: nm, l: sanitizeLab({ ...l, n: nm }), light: sanitizeLight(light) };
-  if (i >= 0) list[i] = item; else list.push(item);
-  return write(list) ? list : null;
+  const item = { id: i >= 0 ? list[i].id : 'l' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: nm, l: sanitizeLab({ ...l, n: nm }), light: sanitizeLight(light) };
+  if (backend) {
+    try { await backend.save({ ...item, l: labPack(item.l), light: item.light ? JSON.stringify(item.light) : null }); return await refreshLabs(); } catch (e) { console.warn(e); return null; }
+  }
+  const next = list.slice(); if (i >= 0) next[i] = item; else next.push(item);
+  if (!writeLocal(next)) return null;
+  cache = next; return next;
 }
-export function deleteLab(id) { const list = listLabs().filter((x) => x.id !== id); write(list); return list; }
+export async function deleteLab(id) {
+  if (backend) { try { await backend.remove(id); } catch (e) { console.warn(e); return null; } return refreshLabs(); }
+  cache = listLabs().filter((x) => x.id !== id); writeLocal(cache); return cache;
+}

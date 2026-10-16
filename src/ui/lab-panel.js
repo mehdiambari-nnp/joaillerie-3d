@@ -1,6 +1,6 @@
 // Atelier d'or : feuille de réglages PBR + éclairage ambiant, appliquée en direct aux métaux sélectionnés (ou à tous les métaux).
 // Le joaillier règle, voit la bague changer, puis enregistre sa texture sous son propre nom (bibliothèque de l'appareil).
-import { LAB, LAB_DEFAULT, LAB_GROUPS, LAB_LIGHT_GROUP, sanitizeLab, sanitizeLight, listLabs, saveLab, deleteLab } from '../materials/lab.js';
+import { LAB, LAB_DEFAULT, LAB_GROUPS, LAB_LIGHT_GROUP, sanitizeLab, sanitizeLight, listLabs, saveLab, deleteLab, refreshLabs } from '../materials/lab.js';
 import { resolveMetal, rgbToHex, FINISHES } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { LANG } from './i18n.js';
@@ -9,12 +9,13 @@ const I = LANG === 'en' ? 1 : 0;
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TX = {
   title: ['Atelier d’or', 'Gold lab'],
-  intro: ['Réglez la matière en direct sur la bague ; elle s’applique aux métaux sélectionnés (sinon à tous).', 'Tune the material live on the ring; it applies to the selected metals (otherwise all).'],
+  intro: ['Réglez la matière en direct sur la bague ; elle s’applique aux métaux sélectionnés (sinon à tous). Les textures enregistrées sont partagées avec tous les joailliers de l’atelier.', 'Tune the material live on the ring; it applies to the selected metals (otherwise all). Saved textures are shared with every jeweller of the workshop.'],
   name: ['Nom de la texture', 'Texture name'], save: ['Enregistrer', 'Save'], saved: ['Texture enregistrée', 'Texture saved'],
-  noName: ['Donnez un nom à votre texture.', 'Give your texture a name.'], full: ['Enregistrement impossible sur cet appareil.', 'Cannot save on this device.'],
+  noName: ['Donnez un nom à votre texture.', 'Give your texture a name.'], full: ['Enregistrement impossible (droits ou connexion).', 'Cannot save (rights or connection).'],
   mine: ['Mes textures', 'My textures'], none: ['Aucune texture enregistrée.', 'No saved texture yet.'],
   load: ['Charger', 'Load'], del: ['Supprimer', 'Delete'], reset: ['Réinitialiser', 'Reset'], close: ['Fermer', 'Close'],
   withLight: ['Enregistrer aussi l’éclairage', 'Also save the lighting'],
+  delFail: ['Suppression refusée pour votre compte.', 'Deletion not allowed for your account.'],
   env: ['Environnement', 'Environment'], delAsk: ['Supprimer cette texture ?', 'Delete this texture?'],
 };
 const tx = (k) => TX[k][I];
@@ -61,6 +62,7 @@ export class LabPanel {
     this.el.hidden = false;
     this.ui.el.dataset.lab = '1';
     this.render(); this.push(true);
+    refreshLabs().then(() => { if (this.isOpen) this.render(); }); // textures de l'atelier (partagées avec les autres joailliers)
     this.ui.toggleLabBodyClass?.(true);
   }
 
@@ -111,7 +113,7 @@ export class LabPanel {
           <button class="btn primary small" data-lab-a="save">${tx('save')}</button>
         </div>
         <label class="lab-chk"><input type="checkbox" data-lwl ${this.withLight ? 'checked' : ''}> ${tx('withLight')}</label>
-        <div class="lab-mine"><h4>${tx('mine')}</h4>${labs.length ? labs.map((p) => `<div class="lab-row"><i style="--sw:${p.l.color}"></i><span>${esc(p.name)}</span><button class="btn small" data-lab-a="load" data-id="${p.id}">${tx('load')}</button><button class="icon-btn small" data-lab-a="del" data-id="${p.id}" aria-label="${tx('del')}" title="${tx('del')}">🗑</button></div>`).join('') : `<p class="lab-empty">${tx('none')}</p>`}</div>
+        <div class="lab-mine"><h4>${tx('mine')}</h4>${labs.length ? labs.map((p) => `<div class="lab-row"><i style="--sw:${p.l.color}"></i><span>${esc(p.name)}${p.by ? `<small>${esc(p.by)}</small>` : ''}</span><button class="btn small" data-lab-a="load" data-id="${p.id}">${tx('load')}</button><button class="icon-btn small" data-lab-a="del" data-id="${p.id}" aria-label="${tx('del')}" title="${tx('del')}">🗑</button></div>`).join('') : `<p class="lab-empty">${tx('none')}</p>`}</div>
         ${LAB_GROUPS.map((g) => group(g, g.fields.map((f) => this.fieldHtml(f, this.l[f.k])).join(''))).join('')}
         ${group(LAB_LIGHT_GROUP, `<div class="lab-envs">${ENVIRONMENTS.map((e) => `<button class="btn small ${vw.envId === e.id ? 'primary' : ''}" data-lab-a="env" data-lenv="${e.id}">${esc(e.name)}</button>`).join('')}</div>`
           + LAB_LIGHT_GROUP.fields.map((f) => this.fieldHtml(f, lightVals[f.k], 'L:')).join(''))}
@@ -147,7 +149,7 @@ export class LabPanel {
       const name = (this.name || '').trim();
       if (!name) { this.ui.toast(tx('noName')); return; }
       this.name = name; this.l = sanitizeLab({ ...this.l, n: name });
-      const list = saveLab(name, this.l, this.withLight ? this.currentLight() : null);
+      const list = await saveLab(name, this.l, this.withLight ? this.currentLight() : null);
       if (!list) { this.ui.toast(tx('full')); return; }
       this.push(false);
       this.ui.toast(tx('saved')); this.render();
@@ -158,7 +160,7 @@ export class LabPanel {
       this.push(false); this.render();
     } else if (a === 'del') {
       if (!confirm(tx('delAsk'))) return;
-      deleteLab(b.dataset.id); this.render();
+      if (!(await deleteLab(b.dataset.id))) this.ui.toast(tx('delFail')); this.render();
     }
   }
 }

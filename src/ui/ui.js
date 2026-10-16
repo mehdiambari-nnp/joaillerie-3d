@@ -15,7 +15,7 @@ import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { LabPanel } from './lab-panel.js';
-import { LAB, listLabs, sanitizeLight } from '../materials/lab.js';
+import { LAB, listLabs, sanitizeLight, initLabs, refreshLabs } from '../materials/lab.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
 import { newId, thumbnail } from '../projects/projects.js';
@@ -142,6 +142,7 @@ export class UI {
     this.app.viewer.attachTo(this.mount);
     this.dlg = $('#dlg', this.root);
     this.lab = new LabPanel(this);
+    Promise.resolve(this.svc?.cloud?.()).then((c) => initLabs(c)).then(() => this.renderAll?.()).catch(() => {}); // textures de l'atelier
     this.tooltip = $('.tooltip', this.root);
   }
 
@@ -869,6 +870,7 @@ export class UI {
   async switchWorkshop(owner) {
     const c = await this.svc.cloud(); c.workspaces?.setActive(owner);
     this.svc.projectId = null; await this.renderMenu(); this.backoffice?.reload();
+    refreshLabs().then(() => this.renderAll());
   }
   /** Lien d'invitation (#i=) ouvert : propose de rejoindre l'atelier ; on arrive sur la page Projets de l'atelier rejoint. */
   async joinWorkshop(token) {

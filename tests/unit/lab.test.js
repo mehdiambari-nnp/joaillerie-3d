@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { sanitizeLab, labPack, labUnpack, LAB_DEFAULT, LAB } from '../../src/materials/lab.js';
+import { sanitizeLab, labPack, labUnpack, LAB_DEFAULT, LAB, initLabs, saveLab, deleteLab } from '../../src/materials/lab.js';
 import { packAssign, unpackAssign, sharePayload, encodeShare, decodeShare } from '../../src/state/store.js';
 import { normalizeAssignment, resolveMetal, isMaterialFor } from '../../src/materials/library.js';
 
@@ -28,5 +28,27 @@ describe('Atelier d’or', () => {
     expect(normalizeAssignment('gem', { m: LAB, l: {} }).m).not.toBe(LAB);
     const r = resolveMetal({ m: LAB, l: { roughness: 0.3, tex: 'brushed' } });
     expect(r.fin.roughness).toBe(0.3); expect(r.fin.brushed).toBe(true); expect(r.lab.gain).toBe(2);
+  });
+
+  it('bibliothèque partagée : enregistre, relit et supprime via le service de l’atelier', async () => {
+    const store = new Map();
+    const labs = {
+      list: async () => [...store.values()],
+      save: async (it) => { store.set(it.id, { ...it, by: 'Collègue' }); },
+      remove: async (id) => { store.delete(id); },
+    };
+    await initLabs({ labs });
+    const list = await saveLab('Or chaud', { roughness: 0.3 }, { n: 1.5, x: 1 });
+    expect(list.map((x) => x.name)).toEqual(['Or chaud']);
+    expect(list[0].l.roughness).toBe(0.3); expect(list[0].l.n).toBe('Or chaud'); expect(list[0].light.n).toBe(1.5); expect(list[0].by).toBe('Collègue');
+    const again = await saveLab('or CHAUD', { roughness: 0.5 }); // même nom : remplacé, pas dupliqué
+    expect(again).toHaveLength(1); expect(again[0].l.roughness).toBe(0.5);
+    expect(await deleteLab(again[0].id)).toEqual([]);
+    await initLabs(null);
+  });
+  it('serveur refusé : enregistrement signalé (null), pas d’exception', async () => {
+    await initLabs({ labs: { list: async () => [], save: async () => { throw new Error('permission-denied'); }, remove: async () => {} } });
+    expect(await saveLab('X', {})).toBeNull();
+    await initLabs(null);
   });
 });
