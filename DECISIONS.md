@@ -160,3 +160,10 @@
 - **Repli** : si le dépôt échoue (réseau, pas de compte en mode Firebase), le lien long `#c=` est généré comme avant ; les anciens liens longs continuent de fonctionner. Un lien court introuvable affiche un message et le modèle par défaut.
 - **Serveur** : `/api/shares/:id` (GET/PUT, 16 Ko max, sans écrasement) ajouté à la fonction Netlify, renommée `netlify/functions/api.mjs` (routes `/api/models/*` et `/api/shares/*`) ; collection Firestore `shares/{id}` côté Firebase (lecture publique par identifiant, création par un joaillier connecté, pas de modification). Interface `cloud.shares` {put, get} pour les deux services.
 - **Firebase en option de build** : la configuration n'est plus dans `theme.json` mais dans `themes/<client>/firebase.json`, injectée uniquement avec `vite build --mode firebase` (`npm run build:firebase`, `dev:firebase`, `deploy:all`). Un build normal (Netlify) reste en mode local, sans Firebase : la production Netlify n'est pas affectée tant que la bascule n'est pas faite. Le workflow GitHub utilise `build:firebase`.
+
+## Itération 25 — Or aligné sur une vidéo de bagues réelles
+- Mesure (teinte, saturation, luminosité par quantiles) d'une vidéo de deux bagues en or : teinte ≈ 36–38° (orangée), ombres brunes lumineuses, reflets dorés jamais blancs, dégradés larges et doux. L'ancien rendu était verdâtre (41–45°), sombre et pâle.
+- `envMapIntensity` n'a aucun effet sans `material.envMap` (three ≥ r163) : l'éclairage est monté via un gain ×2 sur la couleur linéaire des métaux (`METAL_GAIN` dans `factory.js`) plutôt que via `scene.environmentIntensity` (qui aurait aussi éclairci pierres et boîte).
+- Ors réchauffés (`yellow` F0 [1, 0.60, 0.12], `yellow-deep`, `yellow-light`, `champagne` décalés) ; finition Poli : rugosité 0.05 → 0.18 pour des reflets plus larges et doux.
+- Résultat mesuré : ombres (142,102,17), tons moyens (219,163,57), reflets (251,201,127) vs cible (140–170,95–112,…) / (182–225,127–162,…) / (255,205–211,100–110).
+- À vérifier sur iPhone : or rose / blanc (gain ×2 appliqué à tous les métaux).

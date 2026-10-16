@@ -7,10 +7,10 @@ export const CUSTOM = 'custom';
 // Couleurs de métaux = réflectance F0 en RGB LINÉAIRE (metalness = 1).
 export const METALS = [
   // Nuances d'or jaune : plus l'alliage est riche en or pur, plus la teinte est intense et saturée ; plus il contient d'argent, plus elle pâlit.
-  { id: 'yellow-deep', name: 'Or jaune intense', rgb: [1.0, 0.70, 0.20], swatch: '#e8ae38' },
-  { id: 'yellow', name: 'Or jaune', rgb: [1.0, 0.766, 0.336], swatch: '#e8c36a' },
-  { id: 'yellow-light', name: 'Or jaune clair', rgb: [0.98, 0.80, 0.46], swatch: '#e9cb85' },
-  { id: 'champagne', name: 'Or champagne', rgb: [0.95, 0.82, 0.59], swatch: '#e6d6ae' },
+  { id: 'yellow-deep', name: 'Or jaune intense', rgb: [1.0, 0.54, 0.08], swatch: '#e8a22c' },
+  { id: 'yellow', name: 'Or jaune', rgb: [1.0, 0.60, 0.12], swatch: '#e8b44a' },
+  { id: 'yellow-light', name: 'Or jaune clair', rgb: [0.98, 0.72, 0.28], swatch: '#e9c06a' },
+  { id: 'champagne', name: 'Or champagne', rgb: [0.95, 0.76, 0.42], swatch: '#e6caa0' },
   { id: 'rose', name: 'Or rose', rgb: [0.96, 0.67, 0.58], swatch: '#eaaa97' },
   { id: 'red', name: 'Or rouge', rgb: [0.93, 0.5, 0.4], swatch: '#dc8a73' },
   { id: 'grey', name: 'Or gris', rgb: [0.74, 0.73, 0.71], swatch: '#c2bfb8' },
@@ -18,7 +18,7 @@ export const METALS = [
 ];
 
 export const FINISHES = [
-  { id: 'polish', name: 'Poli', roughness: 0.05, anisotropy: 0 },
+  { id: 'polish', name: 'Poli', roughness: 0.18, anisotropy: 0 },
   // Réglées d'après des pièces réelles : satiné = reflet doux + stries fines ; brossé = mat uniforme à grain très fin ; martelé = facettes brillantes.
   // `i0` = intensité par défaut (0..1) ; le curseur du bouton la règle : satiné = degré de satinage, brossé = orientation (0–90°), martelé = taille des coups.
   { id: 'satin', name: 'Satiné', roughness: 0.4, anisotropy: 0, i0: 0.62, gauge: 'satin' },
