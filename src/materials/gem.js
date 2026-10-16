@@ -72,6 +72,7 @@ export function installGemShader(material, data) {
     uGemWarm: gemLight,
     uGemPat: { value: 0 },        // motif procédural des pierres opaques (GEM_PATTERNS)
     uGemDome: { value: 0 },       // pierres opaques = cabochons : normale bombée (0 = facettes plates, 1 = dôme)
+    uGemBump: { value: 0.2 },    // relief fin déduit du motif
     uGemAO: { value: 0.5 },       // force de l'occlusion ambiante au bord des pierres serties
     uGemSSS: { value: 0 },        // translucidité : lumière diffusée dans la masse (éclaire les ombres, adoucit)
     uPC1: { value: new THREE.Color('#888888') }, uPC2: { value: new THREE.Color('#888888') }, uPC3: { value: new THREE.Color('#888888') },
@@ -87,24 +88,24 @@ export function installGemShader(material, data) {
         vGemPos = position; vGemCam = (inverse(modelMatrix) * vec4(cameraPosition, 1.0)).xyz; vGemM = mat3(modelMatrix);`);
     shader.fragmentShader = shader.fragmentShader
       .replace('void main() {', `${GEM_GLSL}\nvoid main() {`)
-      .replace('#include <color_fragment>', '#include <color_fragment>\n  if (uGemPat > 0.5) diffuseColor.rgb = gemPatColor();')
-      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  if (uGemDome > 0.0) normal = gemDome(normal);')
+      .replace('#include <color_fragment>', '#include <color_fragment>\n  if (uGemPat > 0.5) { gemPatEval(); diffuseColor.rgb = gPC; }')
+      .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\n  if (uGemDome > 0.0) normal = gemDome(normal);\n  if (uGemPat > 0.5) normal = gemBump(normal, gPH, uGemBump);')
       // « cartes » procédurales : brillance (rugosité) et spéculaire propres à chaque minéral, calculées dans l'espace de la pierre (pas d'UV nécessaires)
-      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  vec2 gemSurf = vec2(1.0); if (uGemPat > 0.5) { gemSurf = gemPatSurf(); roughnessFactor = clamp(roughnessFactor * gemSurf.x, 0.025, 1.0); }')
-      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  if (uGemPat > 0.5) material.specularColor *= gemSurf.y;')
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\n  if (uGemPat > 0.5) roughnessFactor = clamp(roughnessFactor * gPR, 0.025, 1.0);')
+      .replace('#include <lights_physical_fragment>', '#include <lights_physical_fragment>\n  if (uGemPat > 0.5) material.specularColor *= gPS;')
       .replace('#include <aomap_fragment>', '#include <aomap_fragment>\n  if (uGemDome > 0.0) { float gao = gemAO(); reflectedLight.indirectDiffuse *= gao; reflectedLight.indirectSpecular *= mix(1.0, gao, 0.85); }')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n  if (uGemPat > 0.5) totalEmissiveRadiance += gemPatGlow(normal);\n  totalEmissiveRadiance += uGemSSS * diffuseColor.rgb * (0.7 + 0.6 * (1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0)));')
       .replace('vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
         `if (uGemOn > 0.5) totalDiffuse = gemRadiance();
          vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;`);
   };
-  material.customProgramCacheKey = () => 'gemrt6';
+  material.customProgramCacheKey = () => 'gemrt7';
   return U;
 }
 
 const GEM_GLSL = /* glsl */`
 uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
-uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform float uGemAO; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
+uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform float uGemAO; uniform float uGemBump; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
 uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone;
 float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -132,93 +133,84 @@ void gemTiger(vec3 q, out float band, out float fib) {
   fib = gzN(vec3(dot(q, TIG_B) * 64.0, dot(q, t3) * 64.0, dot(q, TIG_F) * 5.0)) * 0.6 + gzN(vec3(dot(q, TIG_B) * 150.0, dot(q, t3) * 150.0, dot(q, TIG_F) * 9.0)) * 0.4;
 }
 
-// Pierres opaques ou translucides : couleur de surface procédurale (espace objet de la pierre, rayon ≈ 1), motif propre à chaque espèce.
-vec3 gemPatColor() {
+// ---- Motif des pierres opaques / translucides : UNE SEULE source de vérité ----
+// Le motif est calculé une fois par pixel (gemPatEval) dans l'espace objet de la pierre (rayon ≈ 1) : couleur, brillance, spéculaire, relief
+// et masques d'effets en sortent ensemble, donc les reflets suivent toujours la texture de couleur (veine mate là où il y a une veine,
+// paillette brillante là où il y a une paillette). Pas d'UV : le motif est positionné par le programme lui-même.
+vec3 gPC = vec3(0.5);          // couleur de surface
+float gPR = 1.0, gPS = 1.0;    // facteurs de rugosité (« glossiness map ») et de spéculaire (« specular map »)
+float gPH = 0.0;               // hauteur (relief fin, pour la normale)
+float gPA = 0.0, gPB = 0.0, gPF = 0.0; // masques d'effets : accent (veine, paillette, plaque), bande, fibre / phase
+
+void gemPatEval() {
   vec3 q = (vGemPos - uGemCenter) / uGemBase;
   float t = uGemPat, n = gzF(q * 2.5);
   vec3 c = uPC1;
-  if (t < 1.5) {                       // lapis-lazuli : fond bleu nuageux, veines de calcite, paillettes de pyrite
-    c = uPC1 * (0.4 + 0.7 * n);
-    float w = abs(gzN(q * 4.4 + 4.0) - 0.5);
-    c = mix(c, uPC3, smoothstep(0.03, 0.0, w) * 0.6);
-    c = mix(c, uPC2, smoothstep(0.84, 0.92, gzN(q * 30.0)) * (0.4 + n));
-  } else if (t < 2.5) {                // turquoise : fond crayeux, réseau de matrice brune
-    c = mix(uPC1, uPC3, smoothstep(0.35, 0.8, gzF(q * 5.0)) * 0.6);
-    float w = abs(gzN(q * 6.0 + 9.0) - 0.5);
-    c = mix(c, uPC2, smoothstep(0.045, 0.0, w) * 0.9 * smoothstep(0.35, 0.6, n));
-  } else if (t < 3.5) {                // jade : nuages doux
-    c = mix(uPC3, uPC2, smoothstep(0.25, 0.8, gzF(q * 3.0))); c = mix(c, uPC1, 0.5); c *= 0.9 + 0.2 * gzN(q * 14.0);
-  } else if (t < 4.5) {                // malachite : bandes concentriques déformées
+  if (t < 1.5) {                       // lapis-lazuli : fond bleu nuageux, veines de calcite (mates, en creux), paillettes de pyrite (brillantes, en relief)
+    float vein = smoothstep(0.03, 0.0, abs(gzN(q * 4.4 + 4.0) - 0.5));
+    float fl = smoothstep(0.84, 0.92, gzN(q * 30.0));
+    c = uPC1 * (0.4 + 0.7 * n); c = mix(c, uPC3, vein * 0.6); c = mix(c, uPC2, fl * (0.4 + n));
+    gPR = mix(1.0, 2.4, vein) * mix(1.0, 0.35, fl); gPS = mix(1.0, 0.7, vein) * mix(1.0, 2.0, fl);
+    gPH = -vein * 0.3; gPA = fl;
+  } else if (t < 2.5) {                // turquoise : fond crayeux et mat, matrice brune plus dure donc plus brillante et en relief
+    float mx = smoothstep(0.045, 0.0, abs(gzN(q * 6.0 + 9.0) - 0.5)) * smoothstep(0.35, 0.6, n);
+    c = mix(uPC1, uPC3, smoothstep(0.35, 0.8, gzF(q * 5.0)) * 0.6); c = mix(c, uPC2, mx * 0.9);
+    gPR = mix(2.6, 1.0, mx); gPS = mix(0.75, 1.0, mx); gPH = mx * 0.3;
+  } else if (t < 3.5) {                // jade : nuages doux, éclat gras, très léger grain « peau d'orange »
+    float cl = gzF(q * 3.0);
+    c = mix(uPC3, uPC2, smoothstep(0.25, 0.8, cl)); c = mix(c, uPC1, 0.5); c *= 0.9 + 0.2 * gzN(q * 14.0);
+    gPR = 1.5 + 0.9 * cl; gPS = 0.9;
+  } else if (t < 4.5) {                // malachite : bandes concentriques ; les bandes claires, plus dures, se polissent mieux et affleurent
     float d = length(q * vec3(1.0, 1.25, 1.0) + 0.55 * gzW(q, 1.7));
     float b = 0.5 + 0.5 * sin(d * 26.0 + gzF(q * 4.0) * 5.0);
     c = mix(uPC2, uPC1, smoothstep(0.2, 0.8, b)); c = mix(c, uPC3, smoothstep(0.88, 1.0, b) * 0.35);
+    gPR = mix(1.7, 0.8, b); gPH = b * 0.08; gPB = b;
   } else if (t < 5.5) {                // œil de tigre : bandes brun sombre / ambre / or, fibres soyeuses, zones olive-noir
     float band, fib; gemTiger(q, band, fib);
     c = mix(uPC2, uPC1, smoothstep(0.15, 0.7, band));
     c = mix(c, uPC3, smoothstep(0.6, 1.0, band) * (0.25 + 0.5 * fib));
     c = mix(c, vec3(0.05, 0.045, 0.02), smoothstep(0.62, 0.8, gzF(q * 1.1 + 9.0)) * 0.7);
     c *= 0.78 + 0.4 * fib;
-  } else if (t < 6.5) {                // cornaline : calcédoine nuageuse
-    c = mix(uPC3, uPC2, smoothstep(0.25, 0.85, gzF(q * 2.6))); c = mix(c, uPC1, 0.35);
+    gPR = (0.65 + 1.0 * fib) * mix(1.25, 0.8, band); gPS = 0.9 + 0.4 * band; gPH = band * 0.15; gPB = band; gPF = fib;
+  } else if (t < 6.5) {                // cornaline : calcédoine nuageuse, vitreuse
+    float cl = gzF(q * 2.6);
+    c = mix(uPC3, uPC2, smoothstep(0.25, 0.85, cl)); c = mix(c, uPC1, 0.35);
+    gPR = 0.9 + 0.5 * cl;
   } else if (t < 7.5) {                // charoïte : tourbillons soyeux
     float sw = sin((q.x + 0.9 * gzF(q * 2.2)) * 11.0 + gzN(q * 5.0) * 4.0);
     c = mix(uPC3, uPC1, smoothstep(-0.7, 0.4, sw)); c = mix(c, uPC2, smoothstep(0.55, 1.0, sw) * 0.8);
+    gPR = 1.2 + 0.9 * gzN(q * 20.0); gPS = 0.9; gPH = sw * 0.1;
   } else if (t < 8.5) {                // sugilite : marbrures
     c = mix(uPC3, uPC1, smoothstep(0.2, 0.7, gzF(q * 3.4))); c = mix(c, uPC2, smoothstep(0.6, 0.9, gzF(q * 6.0 + 3.0)) * 0.6);
-  } else if (t < 9.5) {                // rhodochrosite : chair rose-corail, nuages profonds et voiles laiteux étirés, petites inclusions claires
+    gPR = 1.1 + 0.6 * n;
+  } else if (t < 9.5) {                // rhodochrosite : chair rose-corail, nuages profonds, voiles laiteux (plus mats) et fines inclusions claires
     float cl = gzF(q * 2.0 + gzW(q, 1.3) * 1.4);
     float vl = gzF(vec3(q.x * 1.1, q.y * 4.2, q.z * 1.1) + gzW(q, 2.0) * 1.2 + 3.0);
-    c = mix(uPC3, uPC1, smoothstep(0.28, 0.62, cl));
-    c = mix(c, uPC2, smoothstep(0.42, 0.75, vl) * 0.95);
+    float v = smoothstep(0.42, 0.75, vl);
+    c = mix(uPC3, uPC1, smoothstep(0.28, 0.62, cl)); c = mix(c, uPC2, v * 0.95);
     c = mix(c, vec3(1.0, 0.88, 0.9), smoothstep(0.87, 0.93, gzN(q * 24.0)) * 0.3);
-  } else if (t < 10.5) {               // opale noble : fond sombre (les feux sont dans gemPatGlow)
+    gPR = mix(1.0, 2.0, v); gPS = mix(1.0, 0.75, v); gPH = v * 0.2;
+  } else if (t < 10.5) {               // opale noble : fond sombre vitreux ; plaques de feux (masque gPA, teinte gPB)
     c = uPC1 * (0.7 + 0.6 * n);
-  } else if (t < 11.5) {               // labradorite : gris sombre moiré (les éclairs sont dans gemPatGlow)
+    gPR = 0.6; gPS = 1.2; gPA = smoothstep(0.5, 0.7, gzF(q * 2.6)); gPB = gzF(q * 3.0);
+  } else if (t < 11.5) {               // labradorite : gris sombre moiré ; plaques d'éclairs (gPA), phase (gPB), teinte bleu/or (gPF)
     c = uPC1 * (0.55 + 0.9 * gzF(q * 3.0)); c = mix(c, vec3(0.03), smoothstep(0.7, 0.9, gzN(q * 9.0)) * 0.5);
-  } else {                             // pierre de lune : laiteuse
+    gPR = 0.9 + 0.5 * gzN(q * 8.0); gPA = smoothstep(0.38, 0.58, gzF(q * 2.4 + 3.0)); gPB = gzF(q * 2.0); gPF = smoothstep(0.35, 0.7, gzN(q * 3.0));
+  } else {                             // pierre de lune : laiteuse ; lueur bleutée plus ou moins forte (gPA)
     c = mix(uPC1, vec3(0.9), 0.15 * n) * (0.9 + 0.2 * gzN(q * 6.0));
+    gPR = 1.4 + 0.7 * n; gPS = 0.9; gPA = 0.6 + 0.4 * gzN(q * 3.0);
   }
-  return c;
+  gPC = c;
 }
 
-// Cartes de surface procédurales : x = facteur de rugosité (inverse de la « glossiness map »), y = facteur de spéculaire (« specular map »).
-vec2 gemPatSurf() {
-  vec3 q = (vGemPos - uGemCenter) / uGemBase;
-  float t = uGemPat, n = gzF(q * 2.5);
-  float rm = 1.0, sm = 1.0;
-  if (t < 1.5) {                       // lapis : veines de calcite plus mates, paillettes de pyrite très brillantes
-    float vein = smoothstep(0.03, 0.0, abs(gzN(q * 4.4 + 4.0) - 0.5));
-    float fl = smoothstep(0.84, 0.92, gzN(q * 30.0));
-    rm = mix(1.0, 2.4, vein) * mix(1.0, 0.35, fl); sm = mix(1.0, 0.7, vein) * mix(1.0, 2.0, fl);
-  } else if (t < 2.5) {                // turquoise : fond crayeux et mat, matrice plus dure donc plus brillante
-    float mx = smoothstep(0.045, 0.0, abs(gzN(q * 6.0 + 9.0) - 0.5)) * smoothstep(0.35, 0.6, n);
-    rm = mix(2.6, 1.0, mx); sm = mix(0.75, 1.0, mx);
-  } else if (t < 3.5) {                // jade : éclat gras, nuageux
-    rm = 1.5 + 0.9 * gzF(q * 3.0); sm = 0.9;
-  } else if (t < 4.5) {                // malachite : les bandes claires et sombres ne se polissent pas pareil
-    float b = 0.5 + 0.5 * sin(length(q * vec3(1.0, 1.25, 1.0) + 0.55 * gzW(q, 1.7)) * 26.0 + gzF(q * 4.0) * 5.0);
-    rm = mix(0.8, 1.7, b);
-  } else if (t < 5.5) {                // œil de tigre : fibres = éclat soyeux (rugosité qui varie dans le sens des fibres)
-    float band, fib; gemTiger(q, band, fib);
-    rm = (0.65 + 1.0 * fib) * mix(1.25, 0.8, band); sm = 0.9 + 0.4 * band;
-  } else if (t < 6.5) {                // cornaline : vitreuse
-    rm = 0.9 + 0.5 * gzF(q * 2.6);
-  } else if (t < 7.5) {                // charoïte : soyeuse
-    rm = 1.2 + 0.9 * gzN(q * 20.0); sm = 0.9;
-  } else if (t < 8.5) {                // sugilite
-    rm = 1.1 + 0.6 * n;
-  } else if (t < 9.5) {                // rhodochrosite : les voiles laiteux sont plus mats que la chair translucide
-    float vl = gzF(vec3(q.x * 1.1, q.y * 4.2, q.z * 1.1) + gzW(q, 2.0) * 1.2 + 3.0);
-    float v = smoothstep(0.42, 0.75, vl);
-    rm = mix(1.0, 2.0, v); sm = mix(1.0, 0.75, v);
-  } else if (t < 10.5) {               // opale : verre
-    rm = 0.6; sm = 1.2;
-  } else if (t < 11.5) {               // labradorite
-    rm = 0.9 + 0.5 * gzN(q * 8.0);
-  } else {                             // pierre de lune : laiteuse
-    rm = 1.4 + 0.7 * n; sm = 0.9;
-  }
-  return vec2(rm, sm);
+// Relief fin déduit du motif (hauteur gPH), sans UV : dérivées d'écran de la hauteur (bump mapping). Réservé aux motifs LISSES (veines, bandes) :
+// sur un grain fin, les dérivées d'écran (par blocs de 2×2 pixels) donnent des artefacts.
+vec3 gemBump(vec3 n, float h, float k) {
+  vec3 sx = dFdx(-vViewPosition), sy = dFdy(-vViewPosition);
+  vec3 r1 = cross(sy, n), r2 = cross(n, sx);
+  float det = dot(sx, r1);
+  vec3 g = sign(det) * (dFdx(h) * r1 + dFdy(h) * r2);
+  return normalize(abs(det) * n - k * g);
 }
 
 // Occlusion ambiante d'une pierre sertie : la lumière d'ambiance atteint mal le bord, caché sous le serti (sertissure).
@@ -227,31 +219,27 @@ float gemAO() {
   return 1.0 - uGemAO * smoothstep(0.62, 0.98, r);
 }
 
-// Reflets qui dépendent de l'angle de vue : feux de l'opale, éclairs de la labradorite, lueur de la pierre de lune, chatoyance de l'œil de tigre.
+// Reflets qui dépendent de l'angle de vue, pilotés par les masques du MÊME motif : feux de l'opale, éclairs de la labradorite,
+// lueur de la pierre de lune, chatoyance de l'œil de tigre, éclats de pyrite du lapis.
 vec3 gemPatGlow(vec3 n) {
-  vec3 q = (vGemPos - uGemCenter) / uGemBase;
   float ndv = clamp(dot(n, normalize(vViewPosition)), 0.0, 1.0), t = uGemPat;
   vec3 g = vec3(0.0);
   if (t > 9.5 && t < 10.5) {
-    float pm = smoothstep(0.5, 0.7, gzF(q * 2.6));
-    float h = fract(gzF(q * 3.0) * 1.2 + ndv * 1.1);
+    float h = fract(gPB * 1.2 + ndv * 1.1);
     vec3 rgb = clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
-    g = rgb * pm * (0.12 + 0.28 * ndv);
+    g = rgb * gPA * (0.12 + 0.28 * ndv);
   } else if (t > 10.5 && t < 11.5) {
-    float pm = smoothstep(0.38, 0.58, gzF(q * 2.4 + 3.0));
-    float flash = pow(max(0.0, sin(ndv * 6.0 + gzF(q * 2.0) * 8.0)), 3.0);
-    g = mix(uPC2, uPC3, smoothstep(0.35, 0.7, gzN(q * 3.0))) * flash * pm * 0.9;
+    float flash = pow(max(0.0, sin(ndv * 6.0 + gPB * 8.0)), 3.0);
+    g = mix(uPC2, uPC3, gPF) * flash * gPA * 0.9;
   } else if (t > 11.5) {
-    g = uPC2 * pow(1.0 - ndv, 2.0) * 0.5 * (0.6 + 0.4 * gzN(q * 3.0));
+    g = uPC2 * pow(1.0 - ndv, 2.0) * 0.5 * gPA;
   } else if (t > 4.5 && t < 5.5) {
     // chatoyance : ligne lumineuse perpendiculaire aux fibres, là où la surface leur est tangente ; elle glisse quand on tourne la pierre
-    float band, fib; gemTiger(q, band, fib);
     vec3 fV = normalize((viewMatrix * vec4(vGemM * TIG_F, 0.0)).xyz);
     float dn = dot(n, fV);
-    float line = exp(-dn * dn / 0.03);
-    g = uPC3 * line * (0.25 + 0.75 * band) * (0.35 + 0.65 * fib) * 1.7;
+    g = uPC3 * exp(-dn * dn / 0.03) * (0.25 + 0.75 * gPB) * (0.35 + 0.65 * gPF) * 1.7;
   } else if (t > 0.5 && t < 1.5) {
-    g = uPC2 * smoothstep(0.82, 0.9, gzN(q * 22.0)) * 0.25;   // éclats de pyrite
+    g = uPC2 * gPA * 0.25;             // éclats de pyrite : exactement là où la couleur en place
   }
   return g;
 }
