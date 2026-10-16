@@ -28,9 +28,24 @@ Importez un fichier 3D (FBX, GLB ou OBJ) avec le bouton ⤒, ou glissez-le dans 
 
 ![Le configurateur, mode joaillier](images/02-configurateur.jpg)
 
-Pour chaque partie : **métal** (or jaune, rose, champagne, platine… en finition polie, satinée, brossée ou martelée), **pierre** (diamant, rubis, saphir, émeraude, et bien d'autres), ou **teinte libre**. Les changements s'appliquent en direct, avec annuler / rétablir. Le rendu s'affine quand on s'arrête (anti-crénelage, reflets stables dans les pierres).
+Pour chaque partie : **métal** (or jaune, rose, champagne, platine… en finition polie, satinée, brossée ou martelée), **pierre** ou **teinte libre**. Les changements s'appliquent en direct, avec annuler / rétablir. Le rendu s'affine quand on s'arrête (anti-crénelage, reflets stables dans les pierres).
 
-![Une pierre centrale en émeraude](images/03-matieres.jpg)
+### Les pierres : l'Atlas chromatique
+Le sélecteur de pierres suit l'*Atlas chromatique des gemmes* : **52 pierres en 7 familles** (rouge, pourpre et rose ; bleu nuit, cyan et aigue-marine ; vert, olive et jade ; jaune, doré et orange ; violet et mauve ; incolore, brun et noir ; polychromes). Chaque pierre a son vrai indice de réfraction et sa vraie dispersion.
+
+![Une pierre centrale en émeraude : familles de l'atlas et recherche](images/03-matieres.jpg)
+
+Une **fiche** accompagne la pierre choisie : espèce, **dureté de Mohs**, indice de réfraction, repère visuel. Sous la dureté 7, un **avertissement** rappelle que la pierre craint les rayures en bague de tous les jours. Les **autres variétés de la même espèce** sont à un clic (le corindon, par exemple : rubis, saphirs de toutes couleurs, padparadscha). Le champ de recherche trouve une pierre par son nom, son espèce ou sa famille.
+
+Les minéraux opaques ont leur **motif propre** : lapis-lazuli (veines blanches et paillettes de pyrite), turquoise (matrice brune), malachite (bandes), œil de tigre (fibres), jade, opale (feux qui changent avec l'angle), labradorite (éclairs bleus et dorés), pierre de lune…
+
+![Lapis-lazuli : fiche, dureté et avertissement](images/03b-pierre-lapis.jpg)
+
+Deux pierres ont un comportement particulier : l'**ametrine** est bicolore (améthyste et citrine dans la même pierre) et l'**alexandrite change de couleur avec l'éclairage**, comme la vraie : verte à la lumière du jour, rouge-violet à la lumière chaude. Changez l'éclairage (bouton soleil) pour la voir basculer.
+
+| Lumière du jour | Coucher de soleil |
+|:---:|:---:|
+| ![Alexandrite, lumière du jour](images/03c-alexandrite-jour.jpg) | ![Alexandrite, coucher de soleil](images/03d-alexandrite-soir.jpg) |
 
 Le bouton **Client** (en haut à droite) montre la bague exactement comme votre client la verra, écrin d'ouverture compris.
 

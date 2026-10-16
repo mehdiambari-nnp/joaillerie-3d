@@ -67,6 +67,16 @@ await ev(pa, () => {
 });
 await shot(pa, '03-matieres', { wait: 3000 });
 
+// pierre opaque à motif (la fiche de la pierre apparaît au-dessus de la palette), puis l'alexandrite sous deux éclairages
+await ev(pa, () => __rc.app.applyToSelection({ m: 'lapis' }, { animate: false }));
+await shot(pa, '03b-pierre-lapis', { wait: 3500 });
+await ev(pa, () => __rc.app.applyToSelection({ m: 'alexandrite' }, { animate: false }));
+await ev(pa, async () => { await __rc.app.viewer.setEnvironment('daylight'); });
+await shot(pa, '03c-alexandrite-jour', { wait: 4000 });
+await ev(pa, async () => { await __rc.app.viewer.setEnvironment('venice'); });
+await shot(pa, '03d-alexandrite-soir', { wait: 4000 });
+await ev(pa, async () => { await __rc.app.viewer.setEnvironment('overpass'); __rc.app.applyToSelection({ m: 'green-emerald' }, { animate: false }); });
+
 await ev(pa, () => { __rc.app.selectZone?.(null); });
 
 // =============== 2. Projets : quatre bagues différentes ===============
