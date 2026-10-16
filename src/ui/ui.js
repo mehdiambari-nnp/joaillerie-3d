@@ -396,8 +396,18 @@ export class UI {
       this.applyGemFilter();
       const info = sameM && sameM !== CUSTOM ? this.gemInfo(sameM, list) : '';
       if (info) $('[data-r=palette]', this.root)?.insertAdjacentHTML('beforebegin', info);
+      this.stickGemTop(host);
     }
     this.renderCustom(kind, customOn, sameM === CUSTOM ? sameC : null);
+  }
+
+  /** Pierres : en-tête (nom), fiche et recherche restent épinglés en haut de la feuille ; seule la liste des pierres défile. */
+  stickGemTop(host) {
+    const sec = host.querySelector('.acc[data-accsec=mat]'); if (!sec) return;
+    const top = document.createElement('div');
+    top.className = `gem-top${this.acc.mat ? ' open' : ''}`;
+    for (const el of [sec.querySelector('.acc-h'), host.querySelector('.gem-info'), host.querySelector('.gem-tools')]) if (el) top.appendChild(el);
+    host.insertBefore(top, host.firstChild);
   }
 
   /** Sélecteur de teinte libre : couleur native + code + teinte / intensité / clarté. */
@@ -542,8 +552,9 @@ export class UI {
       this.acc = { zones: false, mat: false, custom: false }; this.acc[k] = open;
       this.root.querySelectorAll('.acc[data-accsec]').forEach((sec) => {
         const on = !!this.acc[sec.dataset.accsec];
-        sec.classList.toggle('open', on); sec.querySelector('.acc-h')?.setAttribute('aria-expanded', String(on));
+        sec.classList.toggle('open', on); this.root.querySelector(`[data-acc="${sec.dataset.accsec}"]`)?.setAttribute('aria-expanded', String(on));
       });
+      this.root.querySelector('.gem-top')?.classList.toggle('open', !!this.acc.mat);
       return;
     }
     const md = tgt.closest('.seg [data-mode]');

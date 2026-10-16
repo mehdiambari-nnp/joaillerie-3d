@@ -267,3 +267,8 @@ Décisions de conception, par ordre chronologique (les premières ont été pris
 - Ors réchauffés (`yellow` F0 [1, 0.60, 0.12], `yellow-deep`, `yellow-light`, `champagne` décalés) ; finition Poli : rugosité 0.05 → 0.18 pour des reflets plus larges et doux.
 - Résultat mesuré : ombres (142,102,17), tons moyens (219,163,57), reflets (251,201,127) vs cible (140–170,95–112,…) / (182–225,127–162,…) / (255,205–211,100–110).
 - À vérifier sur iPhone : or rose / blanc (gain ×2 appliqué à tous les métaux).
+
+## Itération 26 — Feuille « Pierre » : en-tête, fiche et recherche épinglés
+- Pour une pierre, le nom, la fiche (dureté, indice, avertissement) et le champ de recherche sont regroupés dans `.gem-top` (`position: sticky`, haut de la feuille) ; seule la liste des gemmes défile dessous. Réalisé après rendu en déplaçant les trois éléments (`stickGemTop`) : le sticky ne fonctionne pas dans `.acc-in` (overflow hidden).
+- Replié (accordéon fermé), seul le nom reste visible. `aria-expanded` mis à jour via `[data-acc]` car l'en-tête n'est plus dans sa section.
+- Branche `feature/panneau-pierre-fixe` créée depuis `origin/main` (la branche `dev` avait 85 commits de retard ; l'or de l'itération 25 y est repris par cherry-pick).
