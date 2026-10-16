@@ -2,6 +2,21 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.9.1', date: '2026-10-16',
+    fr: [
+      'Pierres opaques et translucides (rhodochrosite, jade, lapis, malachite, turquoise, onyx, perle…) : rendu en cabochon poli, avec reflets doux et chair translucide',
+      'Reflets plus réalistes : chaque minéral a sa propre brillance (veines mates, paillettes brillantes, éclat soyeux ou gras) et le bord des pierres serties est légèrement assombri sous le serti',
+      'Rhodochrosite refaite d’après une pierre réelle : rose-corail, nuages et voiles laiteux',
+      'Œil de tigre refait d’après des pierres réelles : larges bandes brunes et dorées, fibres soyeuses, reflet lumineux (chatoyance) qui glisse quand on tourne la pierre',
+    ],
+    en: [
+      'Opaque and translucent stones (rhodochrosite, jade, lapis, malachite, turquoise, onyx, pearl…): polished cabochon rendering with soft reflections and translucent flesh',
+      'More realistic reflections: each mineral has its own gloss (matte veins, bright flecks, silky or waxy sheen) and the edge of set stones is slightly darkened under the setting',
+      'Rhodochrosite redone from a real stone: coral pink, clouds and milky veils',
+      'Tiger’s eye redone from real stones: broad brown and gold bands, silky fibres, a bright chatoyant line that glides as you turn the stone',
+    ],
+  },
+  {
     version: '0.9.0', date: '2026-10-16',
     fr: [
       'Sélecteur de pierres refait d’après l’Atlas chromatique des gemmes : 7 familles de couleur et plus de 50 pierres',

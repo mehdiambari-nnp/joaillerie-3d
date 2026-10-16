@@ -224,8 +224,8 @@ function configureGem(m, g) {
     m.transmission = 0; m.thickness = 0; m.ior = 1.5; m.dispersion = 0;
     m.iridescence = g.iridescence ?? 0; m.iridescenceIOR = 1.4;
     // la table plane d'une pierre opaque miroite l'éclairage : vernis doux pour que le motif et la couleur restent lisibles
-    m.clearcoat = g.pattern ? 0 : 0.3; m.clearcoatRoughness = 0.25;
-    m.envMapIntensity = g.pattern ? 0.6 : 0.9;
+    m.clearcoat = g.pattern ? 0.5 : 0.6; m.clearcoatRoughness = 0.07; // cabochon poli : reflet doux et brillant
+    m.envMapIntensity = g.pattern ? 0.85 : 1.1;
   } else if (m.userData.gemU) {
     // ray-tracing interne (src/materials/gem.js) : plus de transmission écran, la pierre calcule sa réfraction
     m.transmission = 0; m.thickness = 0; m.ior = Math.min(2.333, g.ior);
