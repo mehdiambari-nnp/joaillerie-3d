@@ -261,3 +261,14 @@ Décisions de conception, par ordre chronologique (les premières ont été pris
 - **Tâches longues** : les billes de métaux/finitions (second contexte WebGL, plusieurs centaines de ms) ne sont plus calculées pour un client (pas de palette) et, pour le joaillier, sont différées au repos du navigateur. **Animations composées** : barres de progression et halo de l'écrin animés en `transform` / `opacity` (plus de `width` ni de `box-shadow`).
 - **Non fait, à décider** : le modèle par défaut pèse **4,9 Mo même compressé (brotli)** : c'est l'essentiel de la charge d'un lien client. Le FBX est non indexé et en flottants 32 bits ; une conversion en GLB quantifié (meshopt) le diviserait sans doute par 3 à 5, au prix d'un outil d'encodage à ajouter au projet et d'une revérification de la classification des pièces. Autres pistes : HDRI de 1,4 Mo (résolution réduite), écrin affiché avant l'arrivée du modèle.
 
+## Itération 25 — Or aligné sur une vidéo de bagues réelles
+- Mesure (teinte, saturation, luminosité par quantiles) d'une vidéo de deux bagues en or : teinte ≈ 36–38° (orangée), ombres brunes lumineuses, reflets dorés jamais blancs, dégradés larges et doux. L'ancien rendu était verdâtre (41–45°), sombre et pâle.
+- `envMapIntensity` n'a aucun effet sans `material.envMap` (three ≥ r163) : l'éclairage est monté via un gain ×2 sur la couleur linéaire des métaux (`METAL_GAIN` dans `factory.js`) plutôt que via `scene.environmentIntensity` (qui aurait aussi éclairci pierres et boîte).
+- Ors réchauffés (`yellow` F0 [1, 0.60, 0.12], `yellow-deep`, `yellow-light`, `champagne` décalés) ; finition Poli : rugosité 0.05 → 0.18 pour des reflets plus larges et doux.
+- Résultat mesuré : ombres (142,102,17), tons moyens (219,163,57), reflets (251,201,127) vs cible (140–170,95–112,…) / (182–225,127–162,…) / (255,205–211,100–110).
+- À vérifier sur iPhone : or rose / blanc (gain ×2 appliqué à tous les métaux).
+
+## Itération 26 — Feuille « Pierre » : en-tête, fiche et recherche épinglés
+- Pour une pierre, le nom, la fiche (dureté, indice, avertissement) et le champ de recherche sont regroupés dans `.gem-top` (`position: sticky`, haut de la feuille) ; seule la liste des gemmes défile dessous. Réalisé après rendu en déplaçant les trois éléments (`stickGemTop`) : le sticky ne fonctionne pas dans `.acc-in` (overflow hidden).
+- Replié (accordéon fermé), seul le nom reste visible. `aria-expanded` mis à jour via `[data-acc]` car l'en-tête n'est plus dans sa section.
+- Branche `feature/panneau-pierre-fixe` créée depuis `origin/main` (la branche `dev` avait 85 commits de retard ; l'or de l'itération 25 y est repris par cherry-pick).

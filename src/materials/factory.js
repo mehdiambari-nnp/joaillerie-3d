@@ -163,10 +163,13 @@ float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i
 }
 
 /** Paramètres cibles (sans créer de matériau) pour une affectation de métal. */
+const METAL_GAIN = 2.0;
+
 export function metalParams(a) {
   const r = resolveMetal(a);
   return {
-    color: new THREE.Color().setRGB(...r.rgb, THREE.LinearSRGBColorSpace),
+    // ×METAL_GAIN : l'environnement seul sous-éclaire l'or (mesuré sur une vidéo de bagues réelles) ; gain > 1 autorisé en linéaire
+    color: new THREE.Color().setRGB(r.rgb[0] * METAL_GAIN, r.rgb[1] * METAL_GAIN, r.rgb[2] * METAL_GAIN, THREE.LinearSRGBColorSpace),
     roughness: r.fin.roughness,
     anisotropy: r.fin.anisotropy,
     hammered: !!r.fin.hammered,
