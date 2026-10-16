@@ -9,3 +9,5 @@ assets/test/
 
 # captures régénérées à chaque `npm run test:e2e` (locales, non versionnées)
 docs/screenshots/
+docs/Guide-Domuse.pdf
+docs/.guide-pdf.tmp.html
