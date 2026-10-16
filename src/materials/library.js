@@ -2,6 +2,7 @@
 // Principe « joaillier » : on choisit une COULEUR (et une finition pour les métaux), pas une espèce minérale ni un titrage.
 // Une affectation est { m: <id de préréglage> | 'custom', c?: '#rrggbb' (si custom), f?: finition (métaux) }.
 
+import { LAB, sanitizeLab } from './lab.js';
 export const CUSTOM = 'custom';
 
 // Couleurs de métaux = réflectance F0 en RGB LINÉAIRE (metalness = 1).
@@ -143,6 +144,7 @@ export function normalizeAssignment(kind, a) {
     if (m !== CUSTOM && !byId(GEMS, m)) m = LEGACY_GEM[m] ?? DEFAULT_GEM.m;
     return m === CUSTOM ? { m, c: validHex(c) ?? '#4a7de0' } : { m };
   }
+  if (m === LAB) return { m, l: sanitizeLab(a.l) };
   if (m === 'black') return { m: CUSTOM, c: '#2b2b2e', f: LEGACY_FINISH[f] ?? f ?? DEFAULT_METAL.f };
   if (m !== CUSTOM && !byId(METALS, m)) m = LEGACY_METAL[m] ?? DEFAULT_METAL.m;
   f = LEGACY_FINISH[f] ?? f;
@@ -154,6 +156,7 @@ export function normalizeAssignment(kind, a) {
 
 /** L'identifiant m convient-il à ce type de pièce ? */
 export function isMaterialFor(kind, m) {
+  if (m === LAB) return kind !== 'gem';
   return m === CUSTOM || !!byId(kind === 'gem' ? GEMS : METALS, m);
 }
 
@@ -191,8 +194,19 @@ export function hslToHex(h, s, l) {
 const srgbToLinear = (x) => (x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
 
 // ---------- Résolution d'une affectation en paramètres de rendu ----------
+/** Finition d'une texture du joaillier : la texture choisie (lisse / satiné / brossé / martelé) avec la rugosité réglée à la main. */
+function labFinish(l) {
+  const base = byId(FINISHES, { satin: 'satin', brushed: 'brushed', hammered: 'hammered' }[l.tex]) ?? FINISHES[0];
+  const fin = withIntensity(base, l.texI);
+  return { ...fin, roughness: l.roughness, normalScale: l.relief };
+}
+
 export function resolveMetal(a) {
   const n = normalizeAssignment('metal', a) ?? DEFAULT_METAL;
+  if (n.m === LAB) {
+    const rgb = hexToRgb(n.l.color).map((x) => srgbToLinear(x / 255));
+    return { id: LAB, name: n.l.n || 'Texture sur mesure', rgb, swatch: n.l.color, fin: labFinish(n.l), lab: n.l };
+  }
   const fin = withIntensity(byId(FINISHES, n.f) ?? FINISHES[0], n.i);
   if (n.m === CUSTOM) {
     const rgb = hexToRgb(n.c).map((x) => srgbToLinear(x / 255));
@@ -238,6 +252,7 @@ export function resolveGem(a) {
 export function describeAssignment(a, kind) {
   if (!a) return '';
   const k = kind ?? (byId(GEMS, a.m) && !byId(METALS, a.m) ? 'gem' : (byId(METALS, a.m) ? 'metal' : null));
+  if (a.m === LAB) return sanitizeLab(a.l).n || 'Texture sur mesure';
   if (a.m === CUSTOM) return `Teinte ${String(a.c ?? '').toUpperCase()}${a.f ? ' · ' + (byId(FINISHES, a.f)?.name ?? '') : ''}`;
   const metal = byId(METALS, a.m);
   if (metal && k !== 'gem') return `${metal.name}${a.f ? ' · ' + (byId(FINISHES, a.f)?.name ?? '') : ''}`;
@@ -247,6 +262,7 @@ export function describeAssignment(a, kind) {
 /** Couleur d'échantillon (pastille) d'une affectation. */
 export function swatchOf(kind, a) {
   if (!a) return '#ccc';
+  if (a.m === LAB) return sanitizeLab(a.l).color;
   if (a.m === CUSTOM) return a.c ?? '#ccc';
   return (byId(kind === 'gem' ? GEMS : METALS, a.m) ?? {}).swatch ?? '#ccc';
 }

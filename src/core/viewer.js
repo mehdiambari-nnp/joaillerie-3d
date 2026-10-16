@@ -191,6 +191,15 @@ export class Viewer {
 
   setExposure(v) { this.renderer.toneMappingExposure = v; this.invalidate(); }
 
+  /** Éclairage ambiant réglable : intensité de l'environnement (n) et exposition (x). */
+  getLight() { return { n: Math.round(this.scene.environmentIntensity * 100) / 100, x: Math.round(this.renderer.toneMappingExposure * 100) / 100 }; }
+  isLightCustom() { const l = this.getLight(); return l.n !== 1 || l.x !== 1; }
+  setLight({ n, x } = {}) {
+    if (Number.isFinite(n)) this.scene.environmentIntensity = Math.min(4, Math.max(0, n));
+    if (Number.isFinite(x)) this.renderer.toneMappingExposure = Math.min(2.5, Math.max(0.3, x));
+    this.invalidate();
+  }
+
   /** Place la bague dans la scène et cadre la caméra. */
   setModel(root, { views } = {}) {
     if (this.root) this.scene.remove(this.root);

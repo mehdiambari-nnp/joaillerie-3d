@@ -121,5 +121,15 @@ export function create(config) {
     remove: (id) => deleteDoc(doc(col(), id)),
   };
 
-  return { kind: 'firebase', auth: authApi, models, projects, shares, workspaces, links };
+  // Textures d'or de l'atelier actif (users/{propriétaire}/labs) : visibles et utilisables par tous ses joailliers
+  const labsCol = () => { uid(); return collection(db, 'users', workspaces.active, 'labs'); };
+  const labs = {
+    async list() { return (await getDocs(labsCol())).docs.map((d) => ({ id: d.id, ...d.data() })); },
+    async save(it) {
+      uid(); const me = auth.currentUser;
+      await setDoc(doc(labsCol(), it.id), { name: it.name, l: it.l, light: it.light ?? null, by: displayName({ name: me.displayName, email: me.email }), byUid: me.uid, updated: Date.now() });
+    },
+    async remove(id) { await deleteDoc(doc(labsCol(), id)); },
+  };
+  return { kind: 'firebase', auth: authApi, models, projects, shares, workspaces, links, labs };
 }

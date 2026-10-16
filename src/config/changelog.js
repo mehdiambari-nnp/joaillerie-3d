@@ -2,6 +2,17 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.10.0', date: '2026-10-16',
+    fr: [
+      'Atelier d’or : créez votre propre texture de métal avec tous les réglages (couleur, luminosité, rugosité, vernis, anisotropie, irisation, voile, lueur, texture) et l’éclairage ambiant, puis enregistrez-la sous votre nom',
+      'Or plus chaud et plus lumineux, d’après des bagues réelles ; le nom, la fiche et la recherche d’une pierre restent épinglés en haut de la feuille',
+    ],
+    en: [
+      'Gold lab: build your own metal texture with every PBR setting (colour, brightness, roughness, clearcoat, anisotropy, iridescence, sheen, glow, texture) and the ambient lighting, then save it under your own name',
+      'Warmer, brighter gold based on real rings; a stone’s name, details and search stay pinned at the top of the sheet',
+    ],
+  },
+  {
     version: '0.9.2', date: '2026-10-16',
     fr: ['Tant que l’écrin est présent, on ne peut plus sélectionner les parties de la bague qui s’y trouve'],
     en: ['While the box is present, the parts of the ring inside it can no longer be selected'],

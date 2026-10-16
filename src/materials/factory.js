@@ -167,11 +167,13 @@ const METAL_GAIN = 2.0;
 
 export function metalParams(a) {
   const r = resolveMetal(a);
+  const L = r.lab ?? null; // texture sur mesure du joaillier (src/materials/lab.js) : tous les réglages PBR
+  const gain = L ? L.gain : METAL_GAIN;
   return {
-    // ×METAL_GAIN : l'environnement seul sous-éclaire l'or (mesuré sur une vidéo de bagues réelles) ; gain > 1 autorisé en linéaire
-    color: new THREE.Color().setRGB(r.rgb[0] * METAL_GAIN, r.rgb[1] * METAL_GAIN, r.rgb[2] * METAL_GAIN, THREE.LinearSRGBColorSpace),
+    // gain : l'environnement seul sous-éclaire l'or (mesuré sur une vidéo de bagues réelles) ; gain > 1 autorisé en linéaire
+    color: new THREE.Color().setRGB(r.rgb[0] * gain, r.rgb[1] * gain, r.rgb[2] * gain, THREE.LinearSRGBColorSpace),
     roughness: r.fin.roughness,
-    anisotropy: r.fin.anisotropy,
+    anisotropy: L ? L.anisotropy : r.fin.anisotropy,
     hammered: !!r.fin.hammered,
     brushed: !!r.fin.brushed,
     satin: !!r.fin.satin,
@@ -180,7 +182,31 @@ export function metalParams(a) {
     hamSize: r.fin.hamSize ?? 1.1,
     grainAngle: r.fin.grainAngle ?? 0,
     normalScale: r.fin.normalScale ?? 0.6,
+    lab: L,
   };
+}
+
+/** Réglages PBR avancés d'une texture sur mesure (valeurs neutres pour un métal ordinaire). */
+function applyLab(m, p) {
+  const L = p.lab;
+  m.metalness = L ? L.metalness : 1;
+  m.ior = L ? L.ior : 1.5;
+  m.specularIntensity = L ? L.specular : 1;
+  m.specularColor.set(L ? L.specularColor : '#ffffff');
+  m.clearcoat = L ? L.clearcoat : 0;
+  m.clearcoatRoughness = L ? L.clearcoatRoughness : 0;
+  m.anisotropyRotation = L ? (L.anisotropyRot * Math.PI) / 180 : 0;
+  m.iridescence = L ? L.iridescence : 0;
+  m.iridescenceIOR = L ? L.iridescenceIOR : 1.3;
+  m.iridescenceThicknessRange = [100, L ? L.iridescenceThickness : 400];
+  m.sheen = L ? L.sheen : 0;
+  m.sheenRoughness = L ? L.sheenRoughness : 0.5;
+  m.sheenColor.set(L ? L.sheenColor : '#000000');
+  m.emissive.set(L ? L.emissive : '#000000');
+  m.emissiveIntensity = L ? L.emissiveIntensity : 0;
+  // three ne recompile le programme que si une fonction s'active ou se désactive : on évite de le faire à chaque cran d'un curseur
+  const key = [m.clearcoat > 0, m.anisotropy > 0, m.iridescence > 0, m.sheen > 0, m.emissiveIntensity > 0, !!m.normalMap].join();
+  if (m.userData.labKey !== key) { m.userData.labKey = key; m.needsUpdate = true; }
 }
 
 export const gemParams = resolveGem;
@@ -210,6 +236,7 @@ export function createMaterial(kind, a, gemData = null) {
   m.anisotropy = p.anisotropy;
   m.normalMap = metalNormal(p);
   m.normalScale.set(p.normalScale, p.normalScale);
+  applyLab(m, p);
   return m;
 }
 
@@ -265,7 +292,9 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
     material.anisotropy = p.anisotropy;
     material.normalMap = metalNormal(p);
     material.normalScale.set(p.normalScale, p.normalScale);
-    material.needsUpdate = true;
+    applyLab(material, p);
+    if (!p.lab && !material.userData.wasLab) material.needsUpdate = true;
+    material.userData.wasLab = !!p.lab;
     toColor = p.color; toRough = p.roughness;
   }
   if (material.userData.tw) { cancelAnimationFrame(material.userData.tw.raf); tweens.delete(material.userData.tw); }

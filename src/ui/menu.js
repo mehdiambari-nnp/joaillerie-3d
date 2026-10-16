@@ -25,6 +25,7 @@ export async function renderMenu(ui) {
   dr.innerHTML = `<div class="dr-h"><h2>${esc(t('menu'))}</h2><button class="icon-btn" data-a="projects-close" aria-label="${esc(t('close'))}">✕</button></div>
     ${wsBlock}
     ${rights.save ? `<button class="btn primary wide menu-save" data-a="menu-new">${ICONS.plus}${esc(t('pNew'))}</button>` : ''}
+    ${ui.app.model ? `<button class="btn wide menu-save" data-a="menu-lab">✦ ${esc(t('labOpen'))}</button>` : ''}
     ${ui.app.model && rights.save ? `<button class="btn wide menu-save" data-a="menu-save">${esc(t('pSaveCurrent'))}</button>` : ''}
     <nav class="menu-nav" aria-label="${esc(t('menu'))}">${items.map(([k, key]) => `<button type="button" data-a="menu-nav" data-tab="${k}">${ICONS[k]}<span>${esc(t(key))}</span>${badge(k)}</button>`).join('')}</nav>
     ${user ? `<footer class="dr-foot"><p class="dr-who"><span>${esc(displayName(user))}</span><small title="${esc(user.email || '')}">${esc(user.email || '')}</small></p>

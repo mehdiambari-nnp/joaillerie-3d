@@ -7,6 +7,7 @@ import { Picker } from './selection/picker.js';
 import { History } from './state/store.js';
 import { createMaterial, transitionMaterial, setGrainFrame } from './materials/factory.js';
 import { DEFAULT_METAL, DEFAULT_GEM, isMaterialFor, normalizeAssignment, validHex, CUSTOM } from './materials/library.js';
+import { LAB } from './materials/lab.js';
 import { similarPieceIds } from './import/zones.js';
 import { Exploder } from './core/explode.js';
 import { FEATURES } from './config/features.js';
@@ -66,6 +67,7 @@ export class Configurator extends Emitter {
     if (config?.assign) Object.assign(this.assign, config.assign);
     this._normalizeAll();
     this.hidden = new Set(config?.hidden || []);
+    this.viewer.setLight(config?.light ?? { n: 1, x: 1 });
     this.selection.clear();
     for (const p of this.pieces) { this._ensureMaterial(p, false); p.mesh.visible = !this.hidden.has(p.id); }
     this.viewer.setModel(model.root, { views: model.views });
@@ -125,7 +127,7 @@ export class Configurator extends Emitter {
       const prev = this.assign[id] || {};
       const m = a.m ?? prev.m;
       const c = m === CUSTOM ? (validHex(a.c) ?? prev.c) : undefined;
-      this.assign[id] = normalizeAssignment(p.kind, p.kind === 'gem' ? { m, c } : { m, c, f: a.f ?? prev.f ?? DEFAULT_METAL.f, i: a.i ?? (a.f && a.f !== prev.f ? undefined : prev.i) });
+      this.assign[id] = normalizeAssignment(p.kind, p.kind === 'gem' ? { m, c } : { m, c, l: m === LAB ? (a.l ?? prev.l) : undefined, f: a.f ?? prev.f ?? DEFAULT_METAL.f, i: a.i ?? (a.f && a.f !== prev.f ? undefined : prev.i) });
       this._ensureMaterial(p, animate);
     }
     this._refreshHighlight();
@@ -321,6 +323,7 @@ export class Configurator extends Emitter {
       v: 1, normalized: true,
       zones: this.zones.map((z) => ({ id: z.id, name: z.name, type: z.type, pieceIds: z.pieceIds, role: z.role, allowed: z.allowed })),
       assign: this.assign, hidden: [...this.hidden], variants: this.variants,
+      ...(this.viewer.isLightCustom() ? { light: this.viewer.getLight() } : {}),
     };
   }
 }
