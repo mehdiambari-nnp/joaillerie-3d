@@ -220,9 +220,12 @@ function configureGem(m, g) {
   m.metalness = g.sparkle ? 0.15 : 0;
   m.envMapIntensity = g.sparkle ? 2.2 : 1.6;
   if (g.opaque) {
+    if (g.metal) m.metalness = 0.92;   // hématite : éclat métallique
     m.transmission = 0; m.thickness = 0; m.ior = 1.5; m.dispersion = 0;
     m.iridescence = g.iridescence ?? 0; m.iridescenceIOR = 1.4;
-    m.clearcoat = 1; m.clearcoatRoughness = 0.03;
+    // la table plane d'une pierre opaque miroite l'éclairage : vernis doux pour que le motif et la couleur restent lisibles
+    m.clearcoat = g.pattern ? 0 : 0.3; m.clearcoatRoughness = 0.25;
+    m.envMapIntensity = g.pattern ? 0.6 : 0.9;
   } else if (m.userData.gemU) {
     // ray-tracing interne (src/materials/gem.js) : plus de transmission écran, la pierre calcule sa réfraction
     m.transmission = 0; m.thickness = 0; m.ior = Math.min(2.333, g.ior);

@@ -21,6 +21,7 @@ import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighligh
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
 import { TryOn } from '../tryon/tryon.js';
 import { frenchRingSize } from '../import/zones.js';
+import { fill } from './pages/util.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -304,9 +305,43 @@ export class UI {
     };
     const groups = GEM_GROUPS.map((g) => {
       const items = list.filter((x) => x.group === g.id);
-      return items.length ? `<div class="dots" role="group" aria-label="${esc(g.name)}">${items.map((x) => dot(x, x.id === sameM)).join('')}</div>` : '';
+      return items.length ? `<section class="gem-fam" data-fam="${g.id}"><h4>${esc(g.name)}</h4><div class="dots" role="group" aria-label="${esc(g.name)}">${items.map((x) => dot(x, x.id === sameM)).join('')}</div></section>` : '';
     }).join('');
     return groups;
+  }
+
+  /** Fiche de la pierre choisie : espèce, dureté (une bague s'use), indice de réfraction, repère visuel, autres variétés de la même espèce. */
+  gemInfo(id, list) {
+    const g = byId(GEMS, id); if (!g) return '';
+    const mohs = parseFloat(String(g.mohs ?? '').replace(',', '.'));
+    const soft = Number.isFinite(mohs) && mohs < 7;
+    const kin = list.filter((x) => x.mineral === g.mineral && x.id !== g.id);
+    const props = [g.mineral, g.mohs ? fill(t('gemMohs'), { n: g.mohs }) : '', g.ior ? fill(t('gemIor'), { n: String(g.ior).replace('.', ',') }) : g.id === 'diamond' ? fill(t('gemIor'), { n: '2,42' }) : ''].filter(Boolean);
+    return `<div class="gem-info" data-r="geminfo">
+      <p class="gi-props">${props.map(esc).join(' · ')}</p>
+      ${g.note ? `<p class="gi-note">${esc(g.note)}</p>` : ''}
+      ${soft ? `<p class="gi-warn" role="note">${esc(t('gemSoft'))}</p>` : ''}
+      ${kin.length ? `<div class="gi-kin"><span>${esc(t('gemSame'))}</span><div class="dots">${kin.map((x) => `<button class="dot" role="option" data-mat="${x.id}" aria-label="${esc(x.name)}" aria-pressed="false" title="${esc(x.name)}"><span class="gemic" style="--sw:${x.swatch ?? '#bbb'};--gem:${gemIconUrl(x.swatch)}"></span></button>`).join('')}</div></div>` : ''}
+    </div>`;
+  }
+
+  /** Recherche d'une pierre : masque les pastilles qui ne correspondent pas (nom, espèce, famille), sans reconstruire la feuille. */
+  applyGemFilter() {
+    const host = $('[data-r=palette]', this.root); if (!host) return;
+    const q = (this.gemQ || '').trim().toLowerCase();
+    const norm = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const nq = norm(q);
+    let shown = 0;
+    host.querySelectorAll('.gem-fam').forEach((fam) => {
+      let n = 0;
+      fam.querySelectorAll('.dot[data-mat]').forEach((d) => {
+        const g = byId(GEMS, d.dataset.mat);
+        const ok = !nq || norm(`${g?.name} ${g?.mineral ?? ''} ${GEM_GROUPS.find((x) => x.id === g?.group)?.name ?? ''}`).includes(nq);
+        d.hidden = !ok; if (ok) n++;
+      });
+      fam.hidden = n === 0; shown += n;
+    });
+    const none = $('[data-r=gemnone]', this.root); if (none) none.hidden = !(nq && shown === 0);
   }
 
   /** Feuille « matière » : un accordéon (matière courante en en-tête) + un accordéon « teinte libre ». Rien sans sélection. */
@@ -328,7 +363,8 @@ export class UI {
     if (allowed) list = list.filter((x) => allowed.includes(x.id));
     const customOn = !allowed || allowed.includes(CUSTOM);
     const pal = kind === 'gem'
-      ? this.gemDots(list, sameM) + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
+      ? `<div class="gem-tools"><input type="search" data-r="gemq" value="${esc(this.gemQ || '')}" placeholder="${esc(t('gemSearch'))}" aria-label="${esc(t('gemSearch'))}" autocomplete="off" spellcheck="false"></div>`
+        + this.gemDots(list, sameM) + `<p class="gem-none" data-r="gemnone" hidden>${esc(t('gemNoMatch'))}</p>` + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
       : list.map((m) => this.ball(m, 'metals', m.id === sameM)).join('')
         + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '');
     const fin = kind === 'metal'
@@ -349,6 +385,11 @@ export class UI {
       + (customOn ? acc('custom',
         `<i class="sw custom-sw" style="--sw:${sameC ?? this.customHex[kind]}"></i><span class="t"><small>${t('customColor')}</small><b class="hex">${cHex}</b></span>`,
         '<div class="custom" data-r="custom"></div>') : '');
+    if (kind === 'gem') {
+      this.applyGemFilter();
+      const info = sameM && sameM !== CUSTOM ? this.gemInfo(sameM, list) : '';
+      if (info) $('[data-r=palette]', this.root)?.insertAdjacentHTML('beforebegin', info);
+    }
     this.renderCustom(kind, customOn, sameM === CUSTOM ? sameC : null);
   }
 
@@ -520,6 +561,7 @@ export class UI {
 
   onInput(e) {
     const r = e.target.dataset.r;
+    if (r === 'gemq') { this.gemQ = e.target.value; this.applyGemFilter(); return; }
     if (r === 'envrot') this.app.viewer.setEnvironmentRotation(+e.target.value);
     if (r === 'bgblur') this.app.viewer.setBackground('env', { blur: +e.target.value });
     if (r === 'exposure') this.app.viewer.setExposure(+e.target.value);

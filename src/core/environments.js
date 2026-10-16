@@ -6,13 +6,13 @@ import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 
 export const ENVIRONMENTS = [
-  { id: 'studio', name: 'Atelier', group: 'studio' },
-  { id: 'softbox', name: 'Softbox', group: 'studio' },
-  { id: 'daylight', name: 'Jour', group: 'studio' },
-  { id: 'overpass', name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr', tint: [1.06, 1.0, 0.9], sat: 0.35, groundSat: 0, studio: { hdr: 0.85, boxes: 1.3 } },
-  { id: 'venice', name: 'Coucher de soleil', group: 'hdri', url: 'hdr/venice-sunset.hdr' },
-  { id: 'quarry', name: 'Ciel couvert', group: 'hdri', url: 'hdr/quarry.hdr' },
-  { id: 'spruit', name: 'Aube', group: 'hdri', url: 'hdr/spruit-sunrise.hdr' },
+  { id: 'studio', warm: 0.35, name: 'Atelier', group: 'studio' },
+  { id: 'softbox', warm: 0.2, name: 'Softbox', group: 'studio' },
+  { id: 'daylight', warm: 0, name: 'Jour', group: 'studio' },
+  { id: 'overpass', warm: 0.1, name: 'Ville, plein soleil', group: 'hdri', url: 'hdr/overpass.hdr', tint: [1.06, 1.0, 0.9], sat: 0.35, groundSat: 0, studio: { hdr: 0.85, boxes: 1.3 } },
+  { id: 'venice', warm: 1, name: 'Coucher de soleil', group: 'hdri', url: 'hdr/venice-sunset.hdr' },
+  { id: 'quarry', warm: 0, name: 'Ciel couvert', group: 'hdri', url: 'hdr/quarry.hdr' },
+  { id: 'spruit', warm: 0.8, name: 'Aube', group: 'hdri', url: 'hdr/spruit-sunrise.hdr' },
 ];
 
 /** Panneau lumineux (valeurs > 1 : la scène est rendue en HDR dans le PMREM). */

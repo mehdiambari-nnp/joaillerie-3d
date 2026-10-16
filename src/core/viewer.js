@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { getEnvironment, disposeEnvironments } from './environments.js';
+import { getEnvironment, disposeEnvironments, ENVIRONMENTS } from './environments.js';
+import { setGemLight } from '../materials/gem.js';
 import { Fx } from './fx.js';
 import { QUALITY } from './quality.js';
 import { ContactShadow } from './contactShadow.js';
@@ -124,6 +125,7 @@ export class Viewer {
     const env = await getEnvironment(this.renderer, id);
     if (token !== this._envToken) return; // une sélection plus récente a pris le relais
     this.envId = id;
+    setGemLight(ENVIRONMENTS.find((e) => e.id === id)?.warm ?? 0); // l'alexandrite change de couleur avec la chaleur de la lumière
     this.envTexture = env.texture;
     this.envBackground = env.background;
     this.scene.environment = env.texture;
