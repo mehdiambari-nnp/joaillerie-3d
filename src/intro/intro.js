@@ -19,8 +19,12 @@ export function shouldPlayIntro(theme, params, dev, hasShare = false) {
   return true;
 }
 
-/** Joue l'introduction. Résout quand le configurateur est de nouveau libre. */
+/** Joue l'introduction ; la sélection des parties reste bloquée tant que la bague est dans l'écrin (et se rétablit même en cas d'erreur). */
 export async function playIntro(app, ui, theme) {
+  try { return await playIntroInner(app, ui, theme); } finally { app.setPickBlocked(false); }
+}
+
+async function playIntroInner(app, ui, theme) {
   const viewer = app.viewer, model = app.model;
   if (!model) return;
   const root = model.root;
@@ -40,6 +44,7 @@ export async function playIntro(app, ui, theme) {
   const ringStartMinY = ringBox.min.y - L;
   box.group.position.set(c.x, ringStartMinY - box.floorY, c.z);
   viewer.scene.add(box.group);
+  app.setPickBlocked(true); // la bague est dans l'écrin : pas de sélection de ses parties tant qu'il est là
   root.visible = true; // la bague (masquée dès le chargement) n'apparaît que dans l'écrin fermé
   const KEY = 2.6; const key = new THREE.DirectionalLight(0xf6f0ff, KEY); key.position.set(-1, 1.6, 1.2).multiplyScalar(S).add(c); key.target.position.copy(c); viewer.scene.add(key, key.target); // faces de l'écrin bien distinctes
   if (window.__rc) window.__rc.introBox = box;
@@ -135,6 +140,7 @@ export async function playIntro(app, ui, theme) {
     viewer.onFrame.splice(viewer.onFrame.indexOf(frameFn), 1);
     viewer.canvas.removeEventListener('pointerdown', pd); viewer.canvas.removeEventListener('pointerup', pu);
     viewer.scene.remove(box.group, key, key.target); box.dispose();
+    app.setPickBlocked(false);
     root.position.y = startY; root.rotation.y = 0;
     if (sh && shSave) { sh.position.copy(shSave.p); sh.scale.copy(shSave.s); sh.visible = shSave.v; }
     Object.assign(viewer.controls, { enabled: ctlSave.enabled, maxDistance: ctlSave.max, minDistance: ctlSave.min });
