@@ -17,7 +17,31 @@ export const gemFrame = { value: 0 };
 export const setGemLight = (w) => { gemLight.value = w; };
 export const GEM_PATTERNS = { lapis: 1, turquoise: 2, jade: 3, malachite: 4, tigereye: 5, carnelian: 6, charoite: 7, mottled: 8, banded: 9, opal: 10, labrador: 11, moonstone: 12 };
 export const GEM_MAX_BOUNCES = MOBILE ? 4 : 6;
-const GEM_NEWTON = MOBILE ? 9 : 12;
+const GEM_NEWTON = MOBILE ? 6 : 8;
+
+
+const GEM_PLANES = 192;
+/** Plans des facettes d'une pierre convexe : (nx, ny, nz, d) avec n·(x − centre) = d, normale vers l'extérieur. Null si trop de plans ou pierre non convexe. */
+function facetPlanes(geo, center, radius) {
+  const pos = geo.attributes.position, idx = geo.index;
+  const n = idx ? idx.count : pos.count;
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), nn = new THREE.Vector3();
+  const map = new Map(); const out = [];
+  for (let i = 0; i < n; i += 3) {
+    const a = idx ? idx.getX(i) : i, b = idx ? idx.getX(i + 1) : i + 1, c = idx ? idx.getX(i + 2) : i + 2;
+    A.fromBufferAttribute(pos, a); B.fromBufferAttribute(pos, b); C.fromBufferAttribute(pos, c);
+    nn.crossVectors(e1.subVectors(B, A), e2.subVectors(C, A));
+    const area = nn.length(); if (area < 1e-12 * radius * radius) continue;
+    nn.divideScalar(area);
+    let d = nn.dot(A.sub(center));
+    if (d < 0) { nn.negate(); d = -d; } // pierre convexe contenant son centre : le plan est à distance positive
+    const key = Math.round(nn.x * 120) + ',' + Math.round(nn.y * 120) + ',' + Math.round(nn.z * 120) + ',' + Math.round((d / radius) * 120);
+    if (map.has(key)) continue;
+    map.set(key, 1); out.push(nn.x, nn.y, nn.z, d);
+    if (out.length / 4 > GEM_PLANES) return null;
+  }
+  return out.length ? out : null;
+}
 
 /** Construit (une fois) la carte cubique intérieure d'une pierre. Retourne null si le rendu est impossible. */
 export function buildGemData(renderer, mesh) {
@@ -26,7 +50,8 @@ export function buildGemData(renderer, mesh) {
     geo.computeBoundingBox(); geo.computeBoundingSphere();
     const center = geo.boundingBox.getCenter(new THREE.Vector3());
     const radius = geo.boundingSphere.radius * 1.02;
-    const rt = new THREE.WebGLCubeRenderTarget(CUBE, {
+    const planes = facetPlanes(geo, center, radius);
+    const rt = new THREE.WebGLCubeRenderTarget(planes ? 8 : CUBE, { // pierre à facettes planes : la carte cubique ne sert plus (repli seulement)
       type: THREE.HalfFloatType, generateMipmaps: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
     });
     const depthMat = new THREE.ShaderMaterial({
@@ -49,7 +74,7 @@ export function buildGemData(renderer, mesh) {
     depthMat.dispose();
     mesh.updateWorldMatrix(true, false);
     const scale = new THREE.Vector3().setFromMatrixScale(mesh.matrixWorld).x || 1;
-    return { cube: rt.texture, rt, center, radius, scale };
+    return { cube: rt.texture, rt, center, radius, scale, planes };
   } catch (e) {
     console.warn('[gem] carte intérieure impossible, repli sur la transmission standard', e);
     return null;
@@ -61,6 +86,8 @@ export function installGemShader(material, data) {
   const U = {
     uGemOn: { value: 1 },
     uGemCube: { value: data.cube },
+    uGemPl: { value: Array.from({ length: GEM_PLANES }, (_, i) => new THREE.Vector4(data.planes?.[i * 4] ?? 0, data.planes?.[i * 4 + 1] ?? 0, data.planes?.[i * 4 + 2] ?? 0, data.planes?.[i * 4 + 3] ?? 0)) },
+    uGemPlN: { value: data.planes ? data.planes.length / 4 : 0 }, // > 0 : intersections exactes avec les plans des facettes (sans carte cubique)
     uGemCenter: { value: data.center.clone() },
     uGemSigma: { value: new THREE.Vector3(0, 0, 0) },
     uGemIor: { value: 2.42 },
@@ -110,7 +137,7 @@ export function installGemShader(material, data) {
 }
 
 const GEM_GLSL = /* glsl */`
-uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
+uniform float uGemOn; uniform vec4 uGemPl[${GEM_PLANES}]; uniform int uGemPlN; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
 uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemFrame; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform float uGemAO; uniform float uGemBump; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
 uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone; uniform float uGemLock; uniform vec3 uGemBody; uniform float uGemLift;
 float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -264,16 +291,32 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
   float F0 = pow((ior - 1.0) / (ior + 1.0), 2.0);
   vec3 acc = vec3(0.0); float weight = 1.0; vec3 od = sigma * uGemBase * uGemScale; // épaisseur optique cumulée
   for (int b = 0; b < ${GEM_MAX_BOUNCES}; b++) {
-    float t = 0.5 * length(p) + 0.1;
+    float t; vec3 q; vec3 n;
+    if (uGemPlN > 0) {
+      // pierre convexe : la sortie du rayon est le plus proche des plans de facette qu'il va croiser — exact, sans carte cubique
+      t = 1e9; n = vec3(0.0, 1.0, 0.0);
+      for (int k = 0; k < ${GEM_PLANES}; k++) {
+        if (k >= uGemPlN) break;
+        vec4 pl = uGemPl[k]; float dn = dot(pl.xyz, r);
+        if (dn > 1e-5) { float tk = (pl.w - dot(pl.xyz, p)) / dn; if (tk < t) { t = tk; n = pl.xyz; } }
+      }
+      t = max(t, 0.0); if (t > 1e8) t = 0.0;
+      q = p + r * t;
+    } else {
+    t = 0.5 * length(p) + 0.1;
     for (int k = 0; k < ${GEM_NEWTON}; k++) {
       vec3 q = p + r * t; float R = max(length(q), 1e-5);
       float D = textureCube(uGemCube, q / R).a;
       t += clamp((D - R) / max(0.25, dot(q / R, r)), -0.5 * R, 0.5 * R); // pas borné : évite les sauts sur les rayons rasants
     }
     t = max(t, 0.0);
-    vec3 q = p + r * t; vec3 hd = q / max(length(q), 1e-5);
-    vec3 n = textureCube(uGemCube, hd).xyz;
+    q = p + r * t; vec3 hd = q / max(length(q), 1e-5);
+    vec4 cs = textureCube(uGemCube, hd); n = cs.xyz;
+    // le plan exact de la facette (normale + point) corrige l'escalier des texels de la carte cubique, visible aux forts zooms
+    float dnr = dot(n, r);
+    if (abs(dnr) > 0.02) { float tp = dot(n, hd * cs.a - p) / dnr; if (tp > 0.0 && abs(tp - t) < 0.2 * max(cs.a, 1e-3)) { t = tp; q = p + r * t; } }
     // zonation : bandes de croissance + petits nuages d'inclusions, en espace objet (varie d'une facette à l'autre)
+    }
     float zf = 1.0 + uGemZone * ((gzN((p + r * t * 0.5) / uGemBase * 2.3) - 0.5) * 1.6 + (gzN((p + r * t * 0.5) / uGemBase * 7.0) - 0.5) * 0.6);
     od += sigma * zf * t * uGemScale;
     vec3 nin = -n;
@@ -289,6 +332,24 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
   return acc;
 }
 
+// Gros plan : pseudo-réflexions internes lisses (sans carte cubique) — quelques sorties de lumière dont la direction dépend de la facette,
+// moyennées : la pierre reste transparente et vivante, sans escaliers de texels.
+vec3 gemNear(vec3 nObj, vec3 sg) {
+  vec3 Iv = normalize(vGemPos - vGemCam);
+  vec3 rv = refract(Iv, nObj, 1.0 / uGemIor); if (dot(rv, rv) < 1e-4) rv = reflect(Iv, nObj);
+  vec3 t1 = normalize(cross(nObj, Iv) + 1e-4), t2 = cross(nObj, t1);
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    float a = 0.6 + 0.9 * float(i), k = 0.35 + 0.22 * float(i);
+    vec3 nb = normalize(-nObj + k * (cos(a) * t1 + sin(a) * t2));   // facette interne « virtuelle »
+    vec3 rb = reflect(rv, nb);
+    vec3 ro = refract(rb, normalize(-nb + 0.25 * t2), uGemIor); if (dot(ro, ro) < 1e-4) ro = rb;
+    ro = normalize(ro + (0.55 + 0.25 * float(i)) * (vGemPos - uGemCenter) / uGemBase); // parallaxe : le point de sortie change d'un pixel à l'autre
+    acc += gemEnv(ro) * exp(-sg * uGemBase * uGemScale * (1.6 + 0.9 * float(i)));
+  }
+  return mix(acc * 0.25, gemEnv(rv) * exp(-sg * uGemBase * uGemScale * 1.6), 0.25);
+}
+
 vec3 gemRadiance() {
   vec3 nObj = normalize(cross(dFdx(vGemPos), dFdy(vGemPos)));
   if (dot(nObj, vGemPos - uGemCenter) < 0.0) nObj = -nObj;
@@ -296,6 +357,12 @@ vec3 gemRadiance() {
   if (uGemMix > 1.5) sg = mix(uGemSigma, uGemSigma2, smoothstep(-0.15, 0.15, dot((vGemPos - uGemCenter) / uGemBase, normalize(vec3(0.62, 0.31, 0.72))))); // ametrine : deux moitiés
   else if (uGemMix > 0.5) sg = mix(uGemSigma, uGemSigma2, uGemWarm); // alexandrite : la lumière change la couleur
   vec3 c;
+  // Très gros plan : la carte cubique intérieure est agrandie jusqu'à ses texels (escaliers, bandes) → on coupe le tracé interne et on affiche
+  // une réfraction simple, lisse, facette par facette (normales exactes de l'écran). Fondu entre 7 et 3 rayons de pierre de distance.
+  float nearF = uGemPlN > 0 ? 0.0 : 1.0 - smoothstep(3.0, 7.0, length(vGemCam - uGemCenter) / uGemBase);
+  if (nearF > 0.999) {
+    c = gemNear(nObj, sg);
+  } else {
   if (uGemDisp > 1e-4) {
     // dispersion « spectrale » stochastique : chaque canal tire sa longueur d'onde dans sa bande (R : rouge, V : milieu, B : bleu), au hasard par pixel et
     // par image cumulée. Moyennées à l'arrêt, les franges deviennent des dégradés continus (plus de points colorés), sans rayon supplémentaire.
@@ -304,6 +371,10 @@ vec3 gemRadiance() {
     float h = uGemDisp;
     c = vec3(gemTrace(nObj, uGemIor + h * wR, sg).r, gemTrace(nObj, uGemIor + h * wG, sg).g, gemTrace(nObj, uGemIor + h * wB, sg).b);
   } else c = gemTrace(nObj, uGemIor, sg);
+  if (nearF > 0.0) {
+    c = mix(c, gemNear(nObj, sg), nearF);
+  }
+  }
   // pierre de couleur réelle : la teinte du corps est stable d'une facette à l'autre (la lumière y est piégée sur plusieurs trajets) et les facettes
   // restent lumineuses. On garde la structure de lumière (luminance) et on la teinte, plutôt que de laisser l'absorption seule la saturer en olive sombre.
   float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
