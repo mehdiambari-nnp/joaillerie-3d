@@ -17,7 +17,7 @@ export const gemFrame = { value: 0 };
 export const setGemLight = (w) => { gemLight.value = w; };
 export const GEM_PATTERNS = { lapis: 1, turquoise: 2, jade: 3, malachite: 4, tigereye: 5, carnelian: 6, charoite: 7, mottled: 8, banded: 9, opal: 10, labrador: 11, moonstone: 12 };
 export const GEM_MAX_BOUNCES = MOBILE ? 4 : 6;
-const GEM_NEWTON = MOBILE ? 6 : 8;
+const GEM_NEWTON = MOBILE ? 9 : 12;
 
 /** Construit (une fois) la carte cubique intérieure d'une pierre. Retourne null si le rendu est impossible. */
 export function buildGemData(renderer, mesh) {
@@ -268,7 +268,7 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
     for (int k = 0; k < ${GEM_NEWTON}; k++) {
       vec3 q = p + r * t; float R = max(length(q), 1e-5);
       float D = textureCube(uGemCube, q / R).a;
-      t += (D - R) / max(0.25, dot(q / R, r));
+      t += clamp((D - R) / max(0.25, dot(q / R, r)), -0.5 * R, 0.5 * R); // pas borné : évite les sauts sur les rayons rasants
     }
     t = max(t, 0.0);
     vec3 q = p + r * t; vec3 hd = q / max(length(q), 1e-5);
