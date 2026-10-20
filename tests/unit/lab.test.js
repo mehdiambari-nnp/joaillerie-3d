@@ -27,7 +27,7 @@ describe('Atelier d’or', () => {
     expect(isMaterialFor('metal', LAB)).toBe(true); expect(isMaterialFor('gem', LAB)).toBe(false);
     expect(normalizeAssignment('gem', { m: LAB, l: {} }).m).not.toBe(LAB);
     const r = resolveMetal({ m: LAB, l: { roughness: 0.3, tex: 'brushed' } });
-    expect(r.fin.roughness).toBe(0.3); expect(r.fin.brushed).toBe(true); expect(r.lab.gain).toBe(2);
+    expect(r.fin.roughness).toBe(0.3); expect(r.fin.brushed).toBe(true); expect(r.lab.gain).toBe(1.5);
   });
 
   it('bibliothèque partagée : enregistre, relit et supprime via le service de l’atelier', async () => {

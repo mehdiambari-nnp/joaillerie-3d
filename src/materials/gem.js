@@ -12,6 +12,8 @@ const CUBE = 256;
 const MOBILE = typeof navigator !== 'undefined' && /iPhone|iPad|Android/i.test(navigator.userAgent);
 // Lumière « chaude » (0 = jour, 1 = ampoule / coucher de soleil), partagée par toutes les pierres : l'alexandrite y change de couleur.
 export const gemLight = { value: 0 };
+// Numéro de l'image cumulée à l'arrêt (0 = image de mouvement) : sert à tirer la longueur d'onde de la dispersion au hasard, image après image.
+export const gemFrame = { value: 0 };
 export const setGemLight = (w) => { gemLight.value = w; };
 export const GEM_PATTERNS = { lapis: 1, turquoise: 2, jade: 3, malachite: 4, tigereye: 5, carnelian: 6, charoite: 7, mottled: 8, banded: 9, opal: 10, labrador: 11, moonstone: 12 };
 export const GEM_MAX_BOUNCES = MOBILE ? 4 : 6;
@@ -70,6 +72,7 @@ export function installGemShader(material, data) {
     uGemSigma2: { value: new THREE.Vector3(0, 0, 0) }, // 2e teinte (alexandrite à la lumière chaude, 2e moitié de l'ametrine)
     uGemMix: { value: 0 },        // 0 = une teinte, 1 = selon l'éclairage, 2 = bicolore
     uGemWarm: gemLight,
+    uGemFrame: gemFrame,
     uGemPat: { value: 0 },        // motif procédural des pierres opaques (GEM_PATTERNS)
     uGemDome: { value: 0 },       // pierres opaques = cabochons : normale bombée (0 = facettes plates, 1 = dôme)
     uGemBump: { value: 0.2 },    // relief fin déduit du motif
@@ -105,7 +108,7 @@ export function installGemShader(material, data) {
 
 const GEM_GLSL = /* glsl */`
 uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
-uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform float uGemAO; uniform float uGemBump; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
+uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemFrame; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform float uGemAO; uniform float uGemBump; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
 uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone;
 float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -246,7 +249,7 @@ vec3 gemPatGlow(vec3 n) {
 
 vec3 gemEnv(vec3 dirObj) {
   vec3 w = normalize(vGemM * dirObj);
-  return textureCubeUV(envMap, envMapRotation * w, 0.02).rgb * envMapIntensity;
+  return textureCubeUV(envMap, envMapRotation * w, 0.06).rgb * envMapIntensity;
 }
 
 // Un rayon (un indice de réfraction) : retourne la lumière sortante
@@ -291,8 +294,12 @@ vec3 gemRadiance() {
   else if (uGemMix > 0.5) sg = mix(uGemSigma, uGemSigma2, uGemWarm); // alexandrite : la lumière change la couleur
   vec3 c;
   if (uGemDisp > 1e-4) {
-    float h = 0.5 * uGemDisp;
-    c = vec3(gemTrace(nObj, uGemIor - h, sg).r, gemTrace(nObj, uGemIor, sg).g, gemTrace(nObj, uGemIor + h, sg).b);
+    // dispersion « spectrale » stochastique : chaque canal tire sa longueur d'onde dans sa bande (R : rouge, V : milieu, B : bleu), au hasard par pixel et
+    // par image cumulée. Moyennées à l'arrêt, les franges deviennent des dégradés continus (plus de points colorés), sans rayon supplémentaire.
+    vec3 hs = fract(sin(vec3(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + uGemFrame * 4.1, dot(gl_FragCoord.xy, vec2(39.346, 11.135)) + uGemFrame * 7.3, dot(gl_FragCoord.xy, vec2(73.156, 52.235)) + uGemFrame * 2.9)) * 43758.5453);
+    float wR = uGemFrame > 0.5 ? -0.5 + 0.34 * hs.x : -0.33, wG = uGemFrame > 0.5 ? -0.17 + 0.34 * hs.y : 0.0, wB = uGemFrame > 0.5 ? 0.17 + 0.33 * hs.z : 0.33;
+    float h = uGemDisp;
+    c = vec3(gemTrace(nObj, uGemIor + h * wR, sg).r, gemTrace(nObj, uGemIor + h * wG, sg).g, gemTrace(nObj, uGemIor + h * wB, sg).b);
   } else c = gemTrace(nObj, uGemIor, sg);
   return c * uGemGain;
 }
@@ -303,12 +310,12 @@ export function updateGemUniforms(material, g) {
   const U = material.userData.gemU; if (!U) return;
   U.uGemOn.value = g.opaque ? 0 : 1;
   U.uGemIor.value = Math.min(2.6, g.ior ?? 1.76);
-  U.uGemDisp.value = (g.dispersion ?? 0) * 0.11 * 1.5; // 0,4 → Δn ≈ 0,066 (diamant réel 0,044, légèrement amplifié pour le « feu »)
+  U.uGemDisp.value = (g.dispersion ?? 0) * 0.11 * 1.3; // 0,4 → Δn ≈ 0,066 (diamant réel 0,044, légèrement amplifié pour le « feu »)
   const att = new THREE.Color(g.att ?? '#ffffff');
   const d = Math.max(1e-3, g.attDist ?? 1e3);
   const s = (c) => -Math.log(Math.max(0.002, Math.min(1, c))) / d;
   U.uGemSigma.value.set(s(att.r), s(att.g), s(att.b));
-  U.uGemGain.value = g.sparkle ? 1.5 : 1.35;
+  U.uGemGain.value = g.sparkle ? 1.25 : 1.35;
   U.uGemZone.value = g.sparkle ? 0 : 0.3; // pierres de couleur : zonation / inclusions discrètes
   // 2e teinte (alexandrite, ametrine) et motif des pierres opaques
   U.uGemMix.value = g.change ? 1 : g.bicolor ? 2 : 0;

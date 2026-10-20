@@ -163,7 +163,7 @@ float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i
 }
 
 /** Paramètres cibles (sans créer de matériau) pour une affectation de métal. */
-const METAL_GAIN = 2.0;
+const METAL_GAIN = 1.5;
 
 export function metalParams(a) {
   const r = resolveMetal(a);

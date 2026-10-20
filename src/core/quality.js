@@ -11,7 +11,7 @@ export const QUALITY = {
   mobile: MOBILE,
   post: forced !== 'off',          // pipeline d'image (accumulation) ; faux = rendu direct d'origine
   motionPost: !MOBILE,             // pipeline actif aussi pendant le mouvement (anti-crénelage matériel, pas de saut à l'arrêt)
-  accumFrames: MOBILE ? 10 : 28,   // images cumulées à l'arrêt (anti-crénelage + stabilité du scintillement des pierres)
+  accumFrames: MOBILE ? 14 : 40,   // images cumulées à l'arrêt (anti-crénelage + stabilité du scintillement des pierres)
   msaa: MOBILE ? 0 : 2,            // anti-crénelage matériel pendant le mouvement
   dof: !MOBILE,
   contactShadow: true,
