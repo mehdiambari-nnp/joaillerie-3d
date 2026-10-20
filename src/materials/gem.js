@@ -292,6 +292,24 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
   return acc;
 }
 
+// Gros plan : pseudo-réflexions internes lisses (sans carte cubique) — quelques sorties de lumière dont la direction dépend de la facette,
+// moyennées : la pierre reste transparente et vivante, sans escaliers de texels.
+vec3 gemNear(vec3 nObj, vec3 sg) {
+  vec3 Iv = normalize(vGemPos - vGemCam);
+  vec3 rv = refract(Iv, nObj, 1.0 / uGemIor); if (dot(rv, rv) < 1e-4) rv = reflect(Iv, nObj);
+  vec3 t1 = normalize(cross(nObj, Iv) + 1e-4), t2 = cross(nObj, t1);
+  vec3 acc = vec3(0.0);
+  for (int i = 0; i < 4; i++) {
+    float a = 0.6 + 0.9 * float(i), k = 0.35 + 0.22 * float(i);
+    vec3 nb = normalize(-nObj + k * (cos(a) * t1 + sin(a) * t2));   // facette interne « virtuelle »
+    vec3 rb = reflect(rv, nb);
+    vec3 ro = refract(rb, normalize(-nb + 0.25 * t2), uGemIor); if (dot(ro, ro) < 1e-4) ro = rb;
+    ro = normalize(ro + (0.55 + 0.25 * float(i)) * (vGemPos - uGemCenter) / uGemBase); // parallaxe : le point de sortie change d'un pixel à l'autre
+    acc += gemEnv(ro) * exp(-sg * uGemBase * uGemScale * (1.6 + 0.9 * float(i)));
+  }
+  return mix(acc * 0.25, gemEnv(rv) * exp(-sg * uGemBase * uGemScale * 1.6), 0.25);
+}
+
 vec3 gemRadiance() {
   vec3 nObj = normalize(cross(dFdx(vGemPos), dFdy(vGemPos)));
   if (dot(nObj, vGemPos - uGemCenter) < 0.0) nObj = -nObj;
@@ -303,9 +321,7 @@ vec3 gemRadiance() {
   // une réfraction simple, lisse, facette par facette (normales exactes de l'écran). Fondu entre 7 et 3 rayons de pierre de distance.
   float nearF = 1.0 - smoothstep(3.0, 7.0, length(vGemCam - uGemCenter) / uGemBase);
   if (nearF > 0.999) {
-    vec3 Iv = normalize(vGemPos - vGemCam);
-    vec3 rv = refract(Iv, nObj, 1.0 / uGemIor); if (dot(rv, rv) < 1e-4) rv = reflect(Iv, nObj);
-    c = gemEnv(rv) * exp(-sg * uGemBase * uGemScale * 2.2);
+    c = gemNear(nObj, sg);
   } else {
   if (uGemDisp > 1e-4) {
     // dispersion « spectrale » stochastique : chaque canal tire sa longueur d'onde dans sa bande (R : rouge, V : milieu, B : bleu), au hasard par pixel et
@@ -316,9 +332,7 @@ vec3 gemRadiance() {
     c = vec3(gemTrace(nObj, uGemIor + h * wR, sg).r, gemTrace(nObj, uGemIor + h * wG, sg).g, gemTrace(nObj, uGemIor + h * wB, sg).b);
   } else c = gemTrace(nObj, uGemIor, sg);
   if (nearF > 0.0) {
-    vec3 Iv = normalize(vGemPos - vGemCam);
-    vec3 rv = refract(Iv, nObj, 1.0 / uGemIor); if (dot(rv, rv) < 1e-4) rv = reflect(Iv, nObj);
-    c = mix(c, gemEnv(rv) * exp(-sg * uGemBase * uGemScale * 2.2), nearF);
+    c = mix(c, gemNear(nObj, sg), nearF);
   }
   }
   // pierre de couleur réelle : la teinte du corps est stable d'une facette à l'autre (la lumière y est piégée sur plusieurs trajets) et les facettes
