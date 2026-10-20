@@ -8,7 +8,7 @@ export const LAB = 'lab';
 export const LAB_DEFAULT = Object.freeze({
   color: '#ffe399',      // couleur des reflets (réflectance à incidence normale, F0), sRGB
   gain: 1.5,             // luminosité propre du métal (×) : l'éclairage seul sous-éclaire l'or
-  metalness: 1, roughness: 0.12,
+  metalness: 1, roughness: 0.04,
   ior: 1.5, specular: 1, specularColor: '#ffffff',
   clearcoat: 0, clearcoatRoughness: 0.05,
   anisotropy: 0, anisotropyRot: 0,
