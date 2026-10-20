@@ -299,6 +299,14 @@ vec3 gemRadiance() {
   if (uGemMix > 1.5) sg = mix(uGemSigma, uGemSigma2, smoothstep(-0.15, 0.15, dot((vGemPos - uGemCenter) / uGemBase, normalize(vec3(0.62, 0.31, 0.72))))); // ametrine : deux moitiés
   else if (uGemMix > 0.5) sg = mix(uGemSigma, uGemSigma2, uGemWarm); // alexandrite : la lumière change la couleur
   vec3 c;
+  // Très gros plan : la carte cubique intérieure est agrandie jusqu'à ses texels (escaliers, bandes) → on coupe le tracé interne et on affiche
+  // une réfraction simple, lisse, facette par facette (normales exactes de l'écran). Fondu entre 7 et 3 rayons de pierre de distance.
+  float nearF = 1.0 - smoothstep(3.0, 7.0, length(vGemCam - uGemCenter) / uGemBase);
+  if (nearF > 0.999) {
+    vec3 Iv = normalize(vGemPos - vGemCam);
+    vec3 rv = refract(Iv, nObj, 1.0 / uGemIor); if (dot(rv, rv) < 1e-4) rv = reflect(Iv, nObj);
+    c = gemEnv(rv) * exp(-sg * uGemBase * uGemScale * 2.2);
+  } else {
   if (uGemDisp > 1e-4) {
     // dispersion « spectrale » stochastique : chaque canal tire sa longueur d'onde dans sa bande (R : rouge, V : milieu, B : bleu), au hasard par pixel et
     // par image cumulée. Moyennées à l'arrêt, les franges deviennent des dégradés continus (plus de points colorés), sans rayon supplémentaire.
@@ -307,6 +315,12 @@ vec3 gemRadiance() {
     float h = uGemDisp;
     c = vec3(gemTrace(nObj, uGemIor + h * wR, sg).r, gemTrace(nObj, uGemIor + h * wG, sg).g, gemTrace(nObj, uGemIor + h * wB, sg).b);
   } else c = gemTrace(nObj, uGemIor, sg);
+  if (nearF > 0.0) {
+    vec3 Iv = normalize(vGemPos - vGemCam);
+    vec3 rv = refract(Iv, nObj, 1.0 / uGemIor); if (dot(rv, rv) < 1e-4) rv = reflect(Iv, nObj);
+    c = mix(c, gemEnv(rv) * exp(-sg * uGemBase * uGemScale * 2.2), nearF);
+  }
+  }
   // pierre de couleur réelle : la teinte du corps est stable d'une facette à l'autre (la lumière y est piégée sur plusieurs trajets) et les facettes
   // restent lumineuses. On garde la structure de lumière (luminance) et on la teinte, plutôt que de laisser l'absorption seule la saturer en olive sombre.
   float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
