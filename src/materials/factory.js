@@ -259,7 +259,8 @@ function configureGem(m, g) {
   } else if (m.userData.gemU) {
     // ray-tracing interne (src/materials/gem.js) : plus de transmission écran, la pierre calcule sa réfraction
     m.transmission = 0; m.thickness = 0; m.ior = Math.min(2.333, g.ior);
-    m.specularIntensity = 1; m.iridescence = 0; m.clearcoat = 0;
+    m.specularIntensity = g.sparkle || g.change || g.bicolor ? 1 : 0.35; // pierres de couleur : le reflet blanc de la table ne doit pas délaver la teinte
+    m.iridescence = 0; m.clearcoat = 0;
   } else {
     m.transmission = 1;
     m.thickness = 6; // mm (scène en millimètres) : décale la réfraction, donne de la profondeur

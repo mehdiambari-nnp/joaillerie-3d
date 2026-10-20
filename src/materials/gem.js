@@ -67,6 +67,9 @@ export function installGemShader(material, data) {
     uGemDisp: { value: 0 },       // Δn entre rouge et bleu (physique : diamant ≈ 0,044)
     uGemScale: { value: data.scale },
     uGemGain: { value: 1.0 },
+    uGemLock: { value: 0 },        // « verrou de couleur » : ramène la pierre vers sa teinte propre (lumineuse, translucide) en gardant le jeu de lumière
+    uGemBody: { value: new THREE.Vector3(1, 1, 1) }, // teinte du corps de la pierre, normalisée en luminance
+    uGemLift: { value: 0 },        // lueur interne : plancher de luminosité (les facettes ne tombent jamais dans le noir)
     uGemZone: { value: 0 },        // zonation de croissance / inclusions : variation locale de l'absorption (pierres de couleur)
     uGemBase: { value: data.radius }, // trajet minimal : la lumière traverse déjà ~ un rayon avant la 1re facette de sortie
     uGemSigma2: { value: new THREE.Vector3(0, 0, 0) }, // 2e teinte (alexandrite à la lumière chaude, 2e moitié de l'ametrine)
@@ -109,7 +112,7 @@ export function installGemShader(material, data) {
 const GEM_GLSL = /* glsl */`
 uniform float uGemOn; uniform samplerCube uGemCube; uniform vec3 uGemCenter; uniform vec3 uGemSigma;
 uniform vec3 uGemSigma2; uniform float uGemMix; uniform float uGemWarm; uniform float uGemFrame; uniform float uGemPat; uniform float uGemDome; uniform float uGemSSS; uniform float uGemAO; uniform float uGemBump; uniform vec3 uPC1; uniform vec3 uPC2; uniform vec3 uPC3;
-uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone;
+uniform float uGemIor; uniform float uGemDisp; uniform float uGemScale; uniform float uGemGain; uniform float uGemBase; uniform float uGemZone; uniform float uGemLock; uniform vec3 uGemBody; uniform float uGemLift;
 float gzH(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
 float gzN(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
   return mix(mix(mix(gzH(i), gzH(i + vec3(1, 0, 0)), f.x), mix(gzH(i + vec3(0, 1, 0)), gzH(i + vec3(1, 1, 0)), f.x), f.y),
@@ -301,6 +304,11 @@ vec3 gemRadiance() {
     float h = uGemDisp;
     c = vec3(gemTrace(nObj, uGemIor + h * wR, sg).r, gemTrace(nObj, uGemIor + h * wG, sg).g, gemTrace(nObj, uGemIor + h * wB, sg).b);
   } else c = gemTrace(nObj, uGemIor, sg);
+  // pierre de couleur réelle : la teinte du corps est stable d'une facette à l'autre (la lumière y est piégée sur plusieurs trajets) et les facettes
+  // restent lumineuses. On garde la structure de lumière (luminance) et on la teinte, plutôt que de laisser l'absorption seule la saturer en olive sombre.
+  float lum = dot(c, vec3(0.2126, 0.7152, 0.0722));
+  lum = lum / (1.0 + 0.45 * lum * uGemLock); // épaule douce : les reflets vifs restent colorés au lieu de blanchir
+  c = mix(c, uGemBody * (lum + uGemLift), uGemLock);
   return c * uGemGain;
 }
 `;
@@ -315,8 +323,17 @@ export function updateGemUniforms(material, g) {
   const d = Math.max(1e-3, g.attDist ?? 1e3);
   const s = (c) => -Math.log(Math.max(0.002, Math.min(1, c))) / d;
   U.uGemSigma.value.set(s(att.r), s(att.g), s(att.b));
-  U.uGemGain.value = g.sparkle ? 1.25 : 1.35;
-  U.uGemZone.value = g.sparkle ? 0 : 0.3; // pierres de couleur : zonation / inclusions discrètes
+  U.uGemGain.value = g.sparkle ? 1.25 : 1.2;
+  const lock = g.sparkle || g.change || g.bicolor || g.opaque ? 0 : 0.95;
+  U.uGemLock.value = lock;
+  if (lock) {
+    const hsl = {}; new THREE.Color(g.hex ?? g.att ?? '#ffffff').getHSL(hsl);
+    const body = new THREE.Color(g.hex ?? g.att ?? '#ffffff').lerp(new THREE.Color("#ffffff"), 0.22);
+    const y = body.r * 0.2126 + body.g * 0.7152 + body.b * 0.0722;
+    U.uGemBody.value.set(body.r / y, body.g / y, body.b / y);
+    U.uGemLift.value = 0.14 * Math.min(1, Math.max(0, (hsl.l - 0.18) / 0.3)); // pierres sombres (grenat, noir) : pas de lueur ajoutée
+  }
+  U.uGemZone.value = g.sparkle ? 0 : 0.12; // pierres de couleur : zonation / inclusions discrètes
   // 2e teinte (alexandrite, ametrine) et motif des pierres opaques
   U.uGemMix.value = g.change ? 1 : g.bicolor ? 2 : 0;
   const att2 = new THREE.Color(g.att2 ?? g.att ?? '#ffffff');
