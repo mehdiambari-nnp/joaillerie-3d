@@ -7,7 +7,7 @@
 //     l'environnement (HDRI). La dispersion = 3 indices (R, V, B) à la sortie ; la teinte = loi de Beer-Lambert sur le trajet.
 import * as THREE from 'three';
 
-const CUBE = typeof navigator !== "undefined" && /iPhone|iPad|Android/i.test(navigator.userAgent) ? 384 : 512; // plus fin = arêtes de facettes sans escalier aux forts zooms
+const CUBE = 256;
 // iPhone / iPad : moins de rebonds et d'itérations (même rendu à l'œil, GPU mobile ménagé)
 const MOBILE = typeof navigator !== 'undefined' && /iPhone|iPad|Android/i.test(navigator.userAgent);
 // Lumière « chaude » (0 = jour, 1 = ampoule / coucher de soleil), partagée par toutes les pierres : l'alexandrite y change de couleur.
@@ -17,7 +17,7 @@ export const gemFrame = { value: 0 };
 export const setGemLight = (w) => { gemLight.value = w; };
 export const GEM_PATTERNS = { lapis: 1, turquoise: 2, jade: 3, malachite: 4, tigereye: 5, carnelian: 6, charoite: 7, mottled: 8, banded: 9, opal: 10, labrador: 11, moonstone: 12 };
 export const GEM_MAX_BOUNCES = MOBILE ? 4 : 6;
-const GEM_NEWTON = MOBILE ? 9 : 12;
+const GEM_NEWTON = MOBILE ? 6 : 8;
 
 
 const GEM_PLANES = 192;
@@ -50,7 +50,8 @@ export function buildGemData(renderer, mesh) {
     geo.computeBoundingBox(); geo.computeBoundingSphere();
     const center = geo.boundingBox.getCenter(new THREE.Vector3());
     const radius = geo.boundingSphere.radius * 1.02;
-    const rt = new THREE.WebGLCubeRenderTarget(CUBE, {
+    const planes = facetPlanes(geo, center, radius);
+    const rt = new THREE.WebGLCubeRenderTarget(planes ? 8 : CUBE, { // pierre à facettes planes : la carte cubique ne sert plus (repli seulement)
       type: THREE.HalfFloatType, generateMipmaps: false, minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
     });
     const depthMat = new THREE.ShaderMaterial({
@@ -73,7 +74,6 @@ export function buildGemData(renderer, mesh) {
     depthMat.dispose();
     mesh.updateWorldMatrix(true, false);
     const scale = new THREE.Vector3().setFromMatrixScale(mesh.matrixWorld).x || 1;
-    const planes = facetPlanes(geo, center, radius);
     return { cube: rt.texture, rt, center, radius, scale, planes };
   } catch (e) {
     console.warn('[gem] carte intérieure impossible, repli sur la transmission standard', e);
@@ -279,7 +279,7 @@ vec3 gemPatGlow(vec3 n) {
 
 vec3 gemEnv(vec3 dirObj) {
   vec3 w = normalize(vGemM * dirObj);
-  return textureCubeUV(envMap, envMapRotation * w, 0.14).rgb * envMapIntensity;
+  return textureCubeUV(envMap, envMapRotation * w, 0.06).rgb * envMapIntensity;
 }
 
 // Un rayon (un indice de réfraction) : retourne la lumière sortante
