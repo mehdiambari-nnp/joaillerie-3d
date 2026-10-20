@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader.js';
 
 export const ENVIRONMENTS = [
+  { id: 'joaillier', warm: 0.15, name: 'Studio joaillier', group: 'studio' },
   { id: 'studio', warm: 0.35, name: 'Atelier', group: 'studio' },
   { id: 'softbox', warm: 0.2, name: 'Softbox', group: 'studio' },
   { id: 'daylight', warm: 0, name: 'Jour', group: 'studio' },
@@ -89,6 +90,26 @@ function buildDaylight() {
   return s;
 }
 
+/**
+ * Studio joaillier (éclairage par défaut). Référence : rendus de bijoux « photo » : quelques GRANDES sources douces (dessus, deux côtés,
+ * bande de face) sur un pourtour sombre et neutre. L'or y reflète de larges bandes lisses séparées d'ombres brunes profondes (jamais
+ * un décor détaillé), et le diamant trouve du contraste net (sources franches / zones noires) pour ses facettes ; quelques points
+ * brillants très petits donnent l'éclair.
+ */
+function buildJeweller() {
+  const s = new THREE.Scene();
+  s.add(gradientSphere(new THREE.Color(0.3, 0.3, 0.32), new THREE.Color(0.5, 0.47, 0.43), new THREE.Color(0.05, 0.035, 0.02)));
+  const white = 0xffffff, warm = 0xfff0dc, cool = 0xeef3ff;
+  const top = light(30, 20, 3.6, white); top.position.set(0, 26, 0); top.rotation.x = Math.PI / 2; s.add(top);
+  const left = light(14, 30, 3.0, warm); left.position.set(-26, 6, 6); left.lookAt(0, 4, 0); s.add(left);
+  const right = light(11, 30, 2.4, cool); right.position.set(26, 5, -4); right.lookAt(0, 4, 0); s.add(right);
+  const front = light(38, 6, 1.8, white); front.position.set(0, 12, 28); front.lookAt(0, 6, 0); s.add(front);
+  const rim = light(30, 5, 2.0, warm); rim.position.set(0, 4, -28); rim.lookAt(0, 4, 0); s.add(rim);
+  const bounce = light(34, 34, 0.12, 0xfff0e0); bounce.position.set(0, -26, 0); bounce.rotation.x = Math.PI / 2; s.add(bounce); // carton de rebond : sous la bague, brun doux
+  [[-10, 20, 16, 38], [16, 16, 8, 30], [-3, 24, -14, 28]].forEach(([x, y, z, k]) => { const l = light(1.2, 1.2, k, white); l.position.set(x, y, z); l.lookAt(0, 0, 0); s.add(l); });
+  return s;
+}
+
 const cache = new Map(); // id -> { texture (PMREM pour l'éclairage), background (pour le fond 360°), equirect? }
 const pending = new Map();
 
@@ -130,7 +151,7 @@ export function getEnvironment(renderer, id) {
       } else rt = pmrem.fromEquirectangular(equirect);
       out = { texture: rt.texture, background: equirect, equirect: true };
     } else {
-      const scene = def.id === 'softbox' ? buildSoftbox() : def.id === 'daylight' ? buildDaylight() : buildStudio();
+      const scene = def.id === 'joaillier' ? buildJeweller() : def.id === 'softbox' ? buildSoftbox() : def.id === 'daylight' ? buildDaylight() : buildStudio();
       const rt = pmrem.fromScene(scene, 0.02);
       out = { texture: rt.texture, background: rt.texture, equirect: false };
     }

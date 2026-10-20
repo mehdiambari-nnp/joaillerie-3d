@@ -6,9 +6,9 @@ export const LAB = 'lab';
 
 /** Réglages par défaut = l'or jaune de l'application (mesuré sur une vidéo de bagues réelles, voir DECISIONS.md, itération 25). */
 export const LAB_DEFAULT = Object.freeze({
-  color: '#ffcb62',      // couleur des reflets (réflectance à incidence normale, F0), sRGB
-  gain: 2,               // luminosité propre du métal (×) : l'éclairage seul sous-éclaire l'or
-  metalness: 1, roughness: 0.18,
+  color: '#ffe399',      // couleur des reflets (réflectance à incidence normale, F0), sRGB
+  gain: 1.5,             // luminosité propre du métal (×) : l'éclairage seul sous-éclaire l'or
+  metalness: 1, roughness: 0.12,
   ior: 1.5, specular: 1, specularColor: '#ffffff',
   clearcoat: 0, clearcoatRoughness: 0.05,
   anisotropy: 0, anisotropyRot: 0,

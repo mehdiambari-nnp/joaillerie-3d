@@ -64,8 +64,8 @@ export class Viewer {
     this._ro = new ResizeObserver(() => this.resize());
     this._ro.observe(container);
     this.resize();
-    // reflets de base : studio immédiat, puis HDRI « ville, plein soleil » dès qu'il est chargé
-    this.setEnvironment('studio').then(() => this.setEnvironment('overpass')).catch(() => {});
+    // éclairage par défaut : « Studio joaillier » (procédural, immédiat, aucun téléchargement)
+    this.setEnvironment('joaillier').catch(() => {});
     matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener?.('change', () => this.bgMode === 'light' && this._applyBackground());
     this._loop = this._loop.bind(this);
     requestAnimationFrame(this._loop);

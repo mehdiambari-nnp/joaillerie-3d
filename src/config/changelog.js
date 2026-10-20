@@ -2,6 +2,17 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.10.1', date: '2026-10-20',
+    fr: [
+      'Rendu plus réaliste : nouvel éclairage « Studio joaillier » par défaut (grandes sources douces, ombres profondes), or jaune plus fidèle',
+      'Diamants plus propres : reflets adoucis, franges colorées lissées à l’arrêt, accumulation d’images plus longue',
+    ],
+    en: [
+      'More realistic rendering: new default “Jeweller studio” lighting (large soft sources, deep shadows), truer yellow gold',
+      'Cleaner diamonds: softer reflections, colour fringes smoothed when still, longer image accumulation',
+    ],
+  },
+  {
     version: '0.10.0', date: '2026-10-16',
     fr: [
       'Atelier d’or : créez votre propre texture de métal avec tous les réglages (couleur, luminosité, rugosité, vernis, anisotropie, irisation, voile, lueur, texture) et l’éclairage ambiant, puis enregistrez-la sous votre nom',

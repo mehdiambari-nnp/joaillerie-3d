@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { QUALITY } from './quality.js';
+import { gemFrame } from '../materials/gem.js';
 
 const halton = (i, b) => { let f = 1, r = 0; while (i > 0) { f /= b; r += f * (i % b); i = Math.floor(i / b); } return r; };
 const VERT = 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }';
@@ -134,6 +135,7 @@ export class Fx {
     const r = this.v.renderer;
     this._ensure();
     const first = this.n === 0 || !still;
+    gemFrame.value = still ? this.n + 1 : 0; // dispersion des pierres tirée au hasard à chaque image cumulée
     const jitter = still && this.n > 0;
     if (jitter) camera.setViewOffset(this.w, this.h, halton(this.n + 1, 2) - 0.5, halton(this.n + 1, 3) - 0.5, this.w, this.h);
 
