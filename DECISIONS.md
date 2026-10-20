@@ -287,3 +287,7 @@ Décisions de conception, par ordre chronologique (les premières ont été pris
 - Or : F0 `yellow` [1, 0.77, 0.32], `yellow-deep` [1, 0.64, 0.18], gain métal 1,5 (au lieu de 2), Poli : rugosité 0,12. Mesure de l'app après réglage : ombres (75,52,3), moyens (148,120,58), clairs (211,181,110) — cible (74,52,19), (170,142,76), (195,169,100). Texture « Atelier d'or » par défaut alignée (#ffe399, gain 1,5, rugosité 0,12).
 - Diamant : l'environnement est échantillonné avec un flou 0,06 (au lieu de 0,02) → moins de grésillement ; dispersion ×1,3 (au lieu de ×1,5) ; gain des diamants 1,25 (au lieu de 1,5) ; dispersion stochastique : chaque canal tire sa longueur d'onde dans sa bande, au hasard par pixel et par image cumulée (`gemFrame`, fourni par `fx.js`) → franges colorées lissées à l'arrêt, sans rayon supplémentaire.
 - Accumulation à l'arrêt (déjà présente dans `fx.js`) : 28 → 40 images (bureau), 10 → 14 (mobile).
+
+## Itération 29 — Or « miroir » (correctif)
+- Retour du joaillier : l'or paraissait satiné. Cause : j'avais relevé la rugosité du Poli (0,05 → 0,18 puis 0,12) pour adoucir les reflets pendant le recalage de la couleur ; la couleur tient grâce à l'éclairage et au gain, pas à la rugosité.
+- Poli : rugosité 0,04 (miroir) ; texture « Atelier d'or » par défaut idem. Couleur inchangée (ombres 73,50,2 · moyens 148,122,61 · clairs 209,179,109) ; reflets plus nets, bandes de softbox franches.
