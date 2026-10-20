@@ -30,7 +30,7 @@ jobs:
   deploy:
     needs: test
     runs-on: ubuntu-24.04
-    permissions: { contents: read, id-token: write }
+    permissions: { contents: read, id-token: write, pull-requests: write }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -42,9 +42,15 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
       - name: Déployer
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${{ github.event_name }}" = "push" ]; then
             npx firebase deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
           else
-            npx firebase hosting:channel:deploy pr-${{ github.event.number }} --expires 7d --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+            npx firebase hosting:channel:deploy pr-${{ github.event.number }} --expires 7d --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive --json > preview.json
+            URL=$(node -e "const r=require('./preview.json').result; console.log(Object.values(r)[0].url)")
+            echo "Aperçu : $URL"
+            echo "### Aperçu : $URL" >> "$GITHUB_STEP_SUMMARY"
+            gh pr comment ${{ github.event.number }} --body "🔗 **Aperçu de cette demande** (valable 7 jours) : $URL" || true
           fi
