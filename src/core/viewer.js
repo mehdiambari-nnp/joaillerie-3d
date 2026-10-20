@@ -224,11 +224,14 @@ export class Viewer {
     this.requestBake();
   }
 
+  /** Distance d'affichage par défaut : le zoom minimum (bague vue en entier, à une échelle proche de la réalité, comme sur un doigt). */
+  defaultDistance() { return this.controls.maxDistance * 0.92; }
+
   /** Oriente la caméra selon une direction (depuis la cible) en gardant la distance de cadrage. */
   setView(dir, animate = true, distance = null) {
     const d = new THREE.Vector3(...dir).normalize();
     const fov = (this.camera.fov * Math.PI) / 180;
-    const dist = distance ?? (this.radius / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2)) * 1.12;
+    const dist = distance ?? this.defaultDistance();
     const toPos = this.controls.target.clone().add(d.multiplyScalar(dist));
     if (!animate) { this.camera.position.copy(toPos); this.controls.update(); this.invalidate(); return; }
     this.anim = { from: this.camera.position.clone(), to: toPos, start: performance.now(), dur: 550 };
@@ -252,7 +255,7 @@ export class Viewer {
     const c = this.box.getCenter(new THREE.Vector3());
     const dir = this.camera.position.clone().sub(this.controls.target).normalize();
     const fov = (this.camera.fov * Math.PI) / 180;
-    const dist = (this.radius / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2)) * 1.12;
+    const dist = this.defaultDistance();
     this.anim = { from: this.camera.position.clone(), to: c.clone().add(dir.multiplyScalar(dist)), fromT: this.controls.target.clone(), toT: c, start: performance.now(), dur: 600 };
     this.invalidate();
   }

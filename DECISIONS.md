@@ -288,6 +288,9 @@ Décisions de conception, par ordre chronologique (les premières ont été pris
 - Diamant : l'environnement est échantillonné avec un flou 0,06 (au lieu de 0,02) → moins de grésillement ; dispersion ×1,3 (au lieu de ×1,5) ; gain des diamants 1,25 (au lieu de 1,5) ; dispersion stochastique : chaque canal tire sa longueur d'onde dans sa bande, au hasard par pixel et par image cumulée (`gemFrame`, fourni par `fx.js`) → franges colorées lissées à l'arrêt, sans rayon supplémentaire.
 - Accumulation à l'arrêt (déjà présente dans `fx.js`) : 28 → 40 images (bureau), 10 → 14 (mobile).
 
+## Itération 30 — Affichage par défaut au zoom minimum
+- Demande : afficher la bague « à l'échelle 1:1 », c.-à-d. au zoom minimum par défaut. Distance de cadrage par défaut = 0,92 × `maxDistance` (`viewer.defaultDistance()`), utilisée à l'ouverture d'un modèle, par les boutons de vue (Face, Dessus…) et par le retour à l'ensemble après désélection. La bague occupe ≈ un tiers de la largeur d'un téléphone (ordre de grandeur de sa taille réelle au doigt) ; on peut toujours zoomer.
+- Une vraie échelle 1:1 en millimètres n'est pas calculable : la densité physique de l'écran est inconnue du navigateur.
 ## Itération 29 — Or « miroir » (correctif)
 - Retour du joaillier : l'or paraissait satiné. Cause : j'avais relevé la rugosité du Poli (0,05 → 0,18 puis 0,12) pour adoucir les reflets pendant le recalage de la couleur ; la couleur tient grâce à l'éclairage et au gain, pas à la rugosité.
 - Poli : rugosité 0,04 (miroir) ; texture « Atelier d'or » par défaut idem. Couleur inchangée (ombres 73,50,2 · moyens 148,122,61 · clairs 209,179,109) ; reflets plus nets, bandes de softbox franches.
