@@ -7,7 +7,7 @@
 //     l'environnement (HDRI). La dispersion = 3 indices (R, V, B) à la sortie ; la teinte = loi de Beer-Lambert sur le trajet.
 import * as THREE from 'three';
 
-const CUBE = 256;
+const CUBE = typeof navigator !== "undefined" && /iPhone|iPad|Android/i.test(navigator.userAgent) ? 384 : 512; // plus fin = arêtes de facettes sans escalier aux forts zooms
 // iPhone / iPad : moins de rebonds et d'itérations (même rendu à l'œil, GPU mobile ménagé)
 const MOBILE = typeof navigator !== 'undefined' && /iPhone|iPad|Android/i.test(navigator.userAgent);
 // Lumière « chaude » (0 = jour, 1 = ampoule / coucher de soleil), partagée par toutes les pierres : l'alexandrite y change de couleur.
@@ -252,7 +252,7 @@ vec3 gemPatGlow(vec3 n) {
 
 vec3 gemEnv(vec3 dirObj) {
   vec3 w = normalize(vGemM * dirObj);
-  return textureCubeUV(envMap, envMapRotation * w, 0.06).rgb * envMapIntensity;
+  return textureCubeUV(envMap, envMapRotation * w, 0.14).rgb * envMapIntensity;
 }
 
 // Un rayon (un indice de réfraction) : retourne la lumière sortante
@@ -272,7 +272,10 @@ vec3 gemTrace(vec3 nObj, float ior, vec3 sigma) {
     }
     t = max(t, 0.0);
     vec3 q = p + r * t; vec3 hd = q / max(length(q), 1e-5);
-    vec3 n = textureCube(uGemCube, hd).xyz;
+    vec4 cs = textureCube(uGemCube, hd); vec3 n = cs.xyz;
+    // le plan exact de la facette (normale + point) corrige l'escalier des texels de la carte cubique, visible aux forts zooms
+    float dnr = dot(n, r);
+    if (abs(dnr) > 0.02) { float tp = dot(n, hd * cs.a - p) / dnr; if (tp > 0.0 && abs(tp - t) < 0.2 * max(cs.a, 1e-3)) { t = tp; q = p + r * t; } }
     // zonation : bandes de croissance + petits nuages d'inclusions, en espace objet (varie d'une facette à l'autre)
     float zf = 1.0 + uGemZone * ((gzN((p + r * t * 0.5) / uGemBase * 2.3) - 0.5) * 1.6 + (gzN((p + r * t * 0.5) / uGemBase * 7.0) - 0.5) * 0.6);
     od += sigma * zf * t * uGemScale;

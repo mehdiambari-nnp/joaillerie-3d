@@ -301,3 +301,7 @@ Décisions de conception, par ordre chronologique (les premières ont été pris
 - Décision : « verrou de couleur » dans gem.js (la luminance du tracé interne est conservée, teintée par la couleur du corps de la pierre, épaule douce pour ne pas blanchir, léger plancher de luminosité), reflet de surface réduit à 0,35 pour les pierres de couleur (la table ne délave plus la teinte), zonation 0,3 → 0,12 (moins de grain), gain 1,35 → 1,2. Alexandrite, améthyste-citrine, incolores et opaques inchangées.
 - Résultat mesuré : pixels sombres V 0,36 → 0,50, saturation médiane 0,82 → 0,51 (cible photo 0,53).
 - Rayures dans les pierres (retour du joaillier) : la recherche du point d'impact du rayon (Newton sur la carte de distance) divergeait sur les rayons rasants et laissait des hachures brunes. Pas borné à ±0,5·R et itérations 6/8 → 9/12 (mobile/bureau) : facettes nettes, sans rayures.
+
+## Itération 32 — Réflexions internes des pierres aux forts zooms
+- Constat (capture du joaillier, zoom extrême sur un diamant) : bandes plates, escaliers et grain dans les réflexions. Ce n'est pas le reflet spéculaire de surface mais le tracé interne : la carte cubique intérieure (256², filtrage au plus proche) donne des arêtes en escalier une fois agrandies.
+- Décision : point d'impact recalculé sur le plan exact de la facette (normale + point de la carte), carte cubique 512² (384² mobile), flou d'échantillonnage de l'environnement 0,06 → 0,14. Un reste de grain/escalier subsiste sur certaines arêtes au zoom maximal.
