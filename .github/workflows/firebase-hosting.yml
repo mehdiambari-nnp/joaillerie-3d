@@ -1,23 +1,56 @@
-# Déploiement Firebase Hosting : aperçu sur chaque pull request, production à chaque push sur main.
-# Secret requis : FIREBASE_SERVICE_ACCOUNT (clé JSON du compte de service). Variable de dépôt : FIREBASE_PROJECT_ID.
+# Contrôles rapides à chaque pull request et push sur main (audit, tests unitaires, règles Firestore, build) ; déploiement Firebase Hosting seulement si tout est vert :
+# aperçu sur chaque pull request, production à chaque push sur main.
+# Les tests de bout en bout (Chromium, ≈ 3 min en local, ≈ 10 min sur le runner) ne tournent PAS ici : ils sont lancés avant chaque push par le hook
+# .githooks/pre-push (`npm run verify`).
+# Authentification sans clé (Workload Identity Federation). Variables de dépôt : WIF_PROVIDER, WIF_SERVICE_ACCOUNT, FIREBASE_PROJECT_ID.
 name: Firebase Hosting
 on:
   push: { branches: [main] }
   pull_request: { branches: [main] }
 jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    permissions: { contents: read, pull-requests: write, checks: write }
+  test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - run: npm test
-      - run: npm run build:firebase
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Audit des dépendances de production (failles high et critiques)
+        run: npm audit --omit=dev --audit-level=high
+      - name: Tests unitaires
+        run: npm test
+      - uses: actions/setup-java@v5
+        with: { distribution: temurin, java-version: 21 }
+      - name: Règles de sécurité Firestore (émulateur)
+        run: npm run test:rules
+      - name: Build
+        run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions: { contents: read, id-token: write, pull-requests: write }
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm run build
+      - uses: google-github-actions/auth@v3
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: ${{ vars.FIREBASE_PROJECT_ID }}
-          channelId: ${{ github.event_name == 'push' && 'live' || '' }}
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
+      - name: Déployer
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            npx firebase deploy --only hosting --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive
+          else
+            npx firebase hosting:channel:deploy pr-${{ github.event.number }} --expires 7d --project ${{ vars.FIREBASE_PROJECT_ID }} --non-interactive --json > preview.json
+            URL=$(node -e "const r=require('./preview.json').result; console.log(Object.values(r)[0].url)")
+            echo "Aperçu : $URL"
+            echo "### Aperçu : $URL" >> "$GITHUB_STEP_SUMMARY"
+            gh pr comment ${{ github.event.number }} --body "🔗 **Aperçu de cette demande** (valable 7 jours) : $URL" || true
+          fi

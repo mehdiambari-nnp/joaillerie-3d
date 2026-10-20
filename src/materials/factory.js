@@ -163,15 +163,17 @@ float gD(float s) { float i = floor(s), f = fract(s); return (gH(i + 1.0) - gH(i
 }
 
 /** Paramètres cibles (sans créer de matériau) pour une affectation de métal. */
-const METAL_GAIN = 2.0;
+const METAL_GAIN = 1.5;
 
 export function metalParams(a) {
   const r = resolveMetal(a);
+  const L = r.lab ?? null; // texture sur mesure du joaillier (src/materials/lab.js) : tous les réglages PBR
+  const gain = L ? L.gain : METAL_GAIN;
   return {
-    // ×METAL_GAIN : l'environnement seul sous-éclaire l'or (mesuré sur une vidéo de bagues réelles) ; gain > 1 autorisé en linéaire
-    color: new THREE.Color().setRGB(r.rgb[0] * METAL_GAIN, r.rgb[1] * METAL_GAIN, r.rgb[2] * METAL_GAIN, THREE.LinearSRGBColorSpace),
+    // gain : l'environnement seul sous-éclaire l'or (mesuré sur une vidéo de bagues réelles) ; gain > 1 autorisé en linéaire
+    color: new THREE.Color().setRGB(r.rgb[0] * gain, r.rgb[1] * gain, r.rgb[2] * gain, THREE.LinearSRGBColorSpace),
     roughness: r.fin.roughness,
-    anisotropy: r.fin.anisotropy,
+    anisotropy: L ? L.anisotropy : r.fin.anisotropy,
     hammered: !!r.fin.hammered,
     brushed: !!r.fin.brushed,
     satin: !!r.fin.satin,
@@ -180,7 +182,31 @@ export function metalParams(a) {
     hamSize: r.fin.hamSize ?? 1.1,
     grainAngle: r.fin.grainAngle ?? 0,
     normalScale: r.fin.normalScale ?? 0.6,
+    lab: L,
   };
+}
+
+/** Réglages PBR avancés d'une texture sur mesure (valeurs neutres pour un métal ordinaire). */
+function applyLab(m, p) {
+  const L = p.lab;
+  m.metalness = L ? L.metalness : 1;
+  m.ior = L ? L.ior : 1.5;
+  m.specularIntensity = L ? L.specular : 1;
+  m.specularColor.set(L ? L.specularColor : '#ffffff');
+  m.clearcoat = L ? L.clearcoat : 0;
+  m.clearcoatRoughness = L ? L.clearcoatRoughness : 0;
+  m.anisotropyRotation = L ? (L.anisotropyRot * Math.PI) / 180 : 0;
+  m.iridescence = L ? L.iridescence : 0;
+  m.iridescenceIOR = L ? L.iridescenceIOR : 1.3;
+  m.iridescenceThicknessRange = [100, L ? L.iridescenceThickness : 400];
+  m.sheen = L ? L.sheen : 0;
+  m.sheenRoughness = L ? L.sheenRoughness : 0.5;
+  m.sheenColor.set(L ? L.sheenColor : '#000000');
+  m.emissive.set(L ? L.emissive : '#000000');
+  m.emissiveIntensity = L ? L.emissiveIntensity : 0;
+  // three ne recompile le programme que si une fonction s'active ou se désactive : on évite de le faire à chaque cran d'un curseur
+  const key = [m.clearcoat > 0, m.anisotropy > 0, m.iridescence > 0, m.sheen > 0, m.emissiveIntensity > 0, !!m.normalMap].join();
+  if (m.userData.labKey !== key) { m.userData.labKey = key; m.needsUpdate = true; }
 }
 
 export const gemParams = resolveGem;
@@ -210,6 +236,7 @@ export function createMaterial(kind, a, gemData = null) {
   m.anisotropy = p.anisotropy;
   m.normalMap = metalNormal(p);
   m.normalScale.set(p.normalScale, p.normalScale);
+  applyLab(m, p);
   return m;
 }
 
@@ -223,13 +250,17 @@ function configureGem(m, g) {
   m.metalness = g.sparkle ? 0.15 : 0;
   m.envMapIntensity = g.sparkle ? 2.2 : 1.6;
   if (g.opaque) {
+    if (g.metal) m.metalness = 0.92;   // hématite : éclat métallique
     m.transmission = 0; m.thickness = 0; m.ior = 1.5; m.dispersion = 0;
     m.iridescence = g.iridescence ?? 0; m.iridescenceIOR = 1.4;
-    m.clearcoat = 1; m.clearcoatRoughness = 0.03;
+    // la table plane d'une pierre opaque miroite l'éclairage : vernis doux pour que le motif et la couleur restent lisibles
+    m.clearcoat = g.pattern ? 0.5 : 0.6; m.clearcoatRoughness = 0.07; // cabochon poli : reflet doux et brillant
+    m.envMapIntensity = g.pattern ? 0.85 : 1.1;
   } else if (m.userData.gemU) {
     // ray-tracing interne (src/materials/gem.js) : plus de transmission écran, la pierre calcule sa réfraction
     m.transmission = 0; m.thickness = 0; m.ior = Math.min(2.333, g.ior);
-    m.specularIntensity = 1; m.iridescence = 0; m.clearcoat = 0;
+    m.specularIntensity = g.sparkle || g.change || g.bicolor ? 1 : 0.35; // pierres de couleur : le reflet blanc de la table ne doit pas délaver la teinte
+    m.iridescence = 0; m.clearcoat = 0;
   } else {
     m.transmission = 1;
     m.thickness = 6; // mm (scène en millimètres) : décale la réfraction, donne de la profondeur
@@ -262,7 +293,9 @@ export function transitionMaterial(material, kind, a, { duration = 200, onTick, 
     material.anisotropy = p.anisotropy;
     material.normalMap = metalNormal(p);
     material.normalScale.set(p.normalScale, p.normalScale);
-    material.needsUpdate = true;
+    applyLab(material, p);
+    if (!p.lab && !material.userData.wasLab) material.needsUpdate = true;
+    material.userData.wasLab = !!p.lab;
     toColor = p.color; toRough = p.roughness;
   }
   if (material.userData.tw) { cancelAnimationFrame(material.userData.tw.raf); tweens.delete(material.userData.tw); }

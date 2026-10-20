@@ -2,7 +2,11 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { getEnvironment, disposeEnvironments } from './environments.js';
+import { getEnvironment, disposeEnvironments, ENVIRONMENTS } from './environments.js';
+import { setGemLight } from '../materials/gem.js';
+import { Fx } from './fx.js';
+import { QUALITY } from './quality.js';
+import { ContactShadow } from './contactShadow.js';
 
 
 export class Viewer {
@@ -49,8 +53,10 @@ export class Viewer {
     this.root = null;
     this.radius = 20;
 
+    this.fx = QUALITY.post && Fx.supported(this.renderer) ? new Fx(this) : null; // accumulation d'images, profondeur de champ (voir fx.js)
     this._shadow = this._makeShadow();
     this.scene.add(this._shadow);
+    this.contact = QUALITY.contactShadow ? new ContactShadow(this, this._shadow) : null; // ombre de contact calculée (voir contactShadow.js)
 
     this.controls.addEventListener('start', () => { this.controls.autoRotate = false; this._autoRotateResume = Infinity; this.anim = null; });
     this.controls.addEventListener('end', () => { this._autoRotateResume = performance.now() + 4000; });
@@ -58,8 +64,8 @@ export class Viewer {
     this._ro = new ResizeObserver(() => this.resize());
     this._ro.observe(container);
     this.resize();
-    // reflets de base : studio immédiat, puis HDRI « ville, plein soleil » dès qu'il est chargé
-    this.setEnvironment('studio').then(() => this.setEnvironment('overpass')).catch(() => {});
+    // éclairage par défaut : « Studio joaillier » (procédural, immédiat, aucun téléchargement)
+    this.setEnvironment('joaillier').catch(() => {});
     matchMedia?.('(prefers-color-scheme: dark)')?.addEventListener?.('change', () => this.bgMode === 'light' && this._applyBackground());
     this._loop = this._loop.bind(this);
     requestAnimationFrame(this._loop);
@@ -102,6 +108,16 @@ export class Viewer {
 
   invalidate() { this.needsRender = true; }
 
+  /** Recalcule les éléments « cuits » (ombre de contact, sonde de reflets) peu après le dernier changement de la bague. */
+  requestBake(delay = 300) {
+    clearTimeout(this._bakeT);
+    this._bakeT = setTimeout(() => {
+      if (!this.root || this.paused) return;
+      try { this.contact?.bake(); } catch (e) { console.warn('[fx] ombre de contact', e); }
+      this.invalidate();
+    }, delay);
+  }
+
   /** Charge (si besoin) et applique un environnement ; renvoie une promesse (HDRI : téléchargement). */
   async setEnvironment(id) {
     if (this.envId === id) return;
@@ -109,6 +125,7 @@ export class Viewer {
     const env = await getEnvironment(this.renderer, id);
     if (token !== this._envToken) return; // une sélection plus récente a pris le relais
     this.envId = id;
+    setGemLight(ENVIRONMENTS.find((e) => e.id === id)?.warm ?? 0); // l'alexandrite change de couleur avec la chaleur de la lumière
     this.envTexture = env.texture;
     this.envBackground = env.background;
     this.scene.environment = env.texture;
@@ -174,6 +191,15 @@ export class Viewer {
 
   setExposure(v) { this.renderer.toneMappingExposure = v; this.invalidate(); }
 
+  /** Éclairage ambiant réglable : intensité de l'environnement (n) et exposition (x). */
+  getLight() { return { n: Math.round(this.scene.environmentIntensity * 100) / 100, x: Math.round(this.renderer.toneMappingExposure * 100) / 100 }; }
+  isLightCustom() { const l = this.getLight(); return l.n !== 1 || l.x !== 1; }
+  setLight({ n, x } = {}) {
+    if (Number.isFinite(n)) this.scene.environmentIntensity = Math.min(4, Math.max(0, n));
+    if (Number.isFinite(x)) this.renderer.toneMappingExposure = Math.min(2.5, Math.max(0.3, x));
+    this.invalidate();
+  }
+
   /** Place la bague dans la scène et cadre la caméra. */
   setModel(root, { views } = {}) {
     if (this.root) this.scene.remove(this.root);
@@ -195,13 +221,17 @@ export class Viewer {
     s.scale.setScalar(this.radius * 3.2);
     this.views = views || [];
     this.setView([0.62, 0.45, 0.64], false);
+    this.requestBake();
   }
+
+  /** Distance d'affichage par défaut : le zoom minimum (bague vue en entier, à une échelle proche de la réalité, comme sur un doigt). */
+  defaultDistance() { return this.controls.maxDistance * 0.92; }
 
   /** Oriente la caméra selon une direction (depuis la cible) en gardant la distance de cadrage. */
   setView(dir, animate = true, distance = null) {
     const d = new THREE.Vector3(...dir).normalize();
     const fov = (this.camera.fov * Math.PI) / 180;
-    const dist = distance ?? (this.radius / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2)) * 1.12;
+    const dist = distance ?? this.defaultDistance();
     const toPos = this.controls.target.clone().add(d.multiplyScalar(dist));
     if (!animate) { this.camera.position.copy(toPos); this.controls.update(); this.invalidate(); return; }
     this.anim = { from: this.camera.position.clone(), to: toPos, start: performance.now(), dur: 550 };
@@ -225,7 +255,7 @@ export class Viewer {
     const c = this.box.getCenter(new THREE.Vector3());
     const dir = this.camera.position.clone().sub(this.controls.target).normalize();
     const fov = (this.camera.fov * Math.PI) / 180;
-    const dist = (this.radius / Math.sin(Math.min(fov, fov * this.camera.aspect) / 2)) * 1.12;
+    const dist = this.defaultDistance();
     this.anim = { from: this.camera.position.clone(), to: c.clone().add(dir.multiplyScalar(dist)), fromT: this.controls.target.clone(), toT: c, start: performance.now(), dur: 600 };
     this.invalidate();
   }
@@ -325,13 +355,20 @@ export class Viewer {
     }
     const moved = this.controls.update();
     for (const f of this.onFrame) if (f(now)) this.needsRender = true;
+    const fx = this.fx;
     if (this.needsRender || moved || this.controls.autoRotate) {
       this.needsRender = false;
       if (this._hq) this._setHQ(false); // pendant le mouvement : résolution normale (fluidité, batterie)
       this._lastRender = now;
-      this.renderer.render(this.scene, this.camera);
-    } else if (!this._hq && !this.anim && now - this._lastRender > 400 && (window.devicePixelRatio || 1) > this.maxPixelRatio) {
-      this._setHQ(true); // à l'arrêt : une image fixe en pleine résolution de l'écran
+      if (fx && QUALITY.motionPost) { fx.updateDof(this.camera, this.controls.target, this.radius, false); fx.render(this.scene, this.camera, { still: false }); }
+      else { fx?.reset(); this.renderer.render(this.scene, this.camera); }
+    } else if (fx && !this.anim && fx.pending && now - this._lastRender > 120) {
+      // à l'arrêt : cumul d'images (anti-crénelage, pierres stables), mise au point progressive, pleine résolution de l'écran
+      if (!this._hq && (window.devicePixelRatio || 1) > this.maxPixelRatio && now - this._lastRender > 400) this._setHQ(true);
+      fx.updateDof(this.camera, this.controls.target, this.radius, true);
+      fx.render(this.scene, this.camera, { still: true });
+    } else if (!fx && !this._hq && !this.anim && now - this._lastRender > 400 && (window.devicePixelRatio || 1) > this.maxPixelRatio) {
+      this._setHQ(true); // sans pipeline : une image fixe en pleine résolution de l'écran
       this.renderer.render(this.scene, this.camera);
     }
   }
@@ -342,13 +379,20 @@ export class Viewer {
     this.renderer.setSize(this.container.clientWidth || 1, this.container.clientHeight || 1, false);
   }
 
-  /** Capture PNG (échelle ×k, fond transparent ou rempli). */
-  async capture({ scale = 2, background = null } = {}) {
+  /** Capture PNG (échelle ×k, fond transparent ou rempli). Avec le pipeline : images cumulées + mise au point, comme à l'arrêt. */
+  async capture({ scale = 2, background = null, view = null } = {}) {
+    // `view` (direction depuis la cible) : cadrage imposé le temps de la capture (ex. vignette en 3/4), caméra du joaillier restituée ensuite
+    const saved = view ? { pos: this.camera.position.clone(), target: this.controls.target.clone(), anim: this.anim } : null;
+    if (saved) { this.anim = null; this.controls.target.copy(this.box.getCenter(new THREE.Vector3())); this.setView(view, false); }
     const prevPR = this.renderer.getPixelRatio();
     const w = this.container.clientWidth, h = this.container.clientHeight;
     this.renderer.setPixelRatio(Math.min(scale, 3));
     this.renderer.setSize(w, h, false);
-    this.renderer.render(this.scene, this.camera);
+    if (this.fx) {
+      this.fx.reset();
+      this.fx.updateDof(this.camera, this.controls.target, this.radius, true, true);
+      for (let i = 0; i < (QUALITY.mobile ? 6 : 14); i++) this.fx.render(this.scene, this.camera, { still: true });
+    } else this.renderer.render(this.scene, this.camera);
     const out = document.createElement('canvas');
     out.width = this.canvas.width; out.height = this.canvas.height;
     const ctx = out.getContext('2d');
@@ -356,12 +400,16 @@ export class Viewer {
     ctx.drawImage(this.canvas, 0, 0);
     this.renderer.setPixelRatio(prevPR);
     this.renderer.setSize(w, h, false);
+    if (saved) { this.camera.position.copy(saved.pos); this.controls.target.copy(saved.target); this.anim = saved.anim; this.controls.update(); }
+    this.fx?.reset();
     this.invalidate();
     return new Promise((res) => out.toBlob(res, 'image/png'));
   }
 
   dispose() {
     this._ro.disconnect();
+    this.fx?.dispose();
+    this.contact?.dispose();
     disposeEnvironments();
     this.renderer.dispose();
   }

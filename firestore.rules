@@ -1,21 +1,202 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ---- Fonctions communes ----
+    // Compte réel (e-mail, Google) : exclut les comptes ANONYMES, que reçoit le client d'un lien suivi pour qu'on puisse mesurer sa
+    // consultation. Un anonyme ne peut rien créer d'autre que sa propre ligne de consultation (voir links/{id}/views).
+    function signedIn() { return request.auth != null && request.auth.token.firebase.sign_in_provider != 'anonymous'; }
+    function anyUser() { return request.auth != null; }
+    function isOwner(owner) { return signedIn() && request.auth.uid == owner; }
+    // Atelier partagé : l'atelier d'un joaillier = ses projets (users/{owner}/projects) ; les joailliers invités y sont listés dans
+    // workspaces/{owner}/members/{uid}. Un membre lit et écrit les projets de l'atelier ; seul le propriétaire invite et retire.
+    function isMember(owner) { return signedIn() && exists(/databases/$(database)/documents/workspaces/$(owner)/members/$(request.auth.uid)); }
+    function canWork(owner) { return isOwner(owner) || isMember(owner); }
+    // Invitation consommée par ce joaillier : valide avant l'écriture (émise par ce propriétaire, non utilisée, non expirée) ET marquée
+    // utilisée par lui DANS LE MÊME LOT d'écritures (getAfter). Sans cela, un lien pourrait servir à plusieurs personnes.
+    function consumesInvite(token, owner) {
+      return get(/databases/$(database)/documents/invites/$(token)).data.owner == owner
+        && get(/databases/$(database)/documents/invites/$(token)).data.used == false
+        && get(/databases/$(database)/documents/invites/$(token)).data.expires > request.time.toMillis()
+        && getAfter(/databases/$(database)/documents/invites/$(token)).data.used == true
+        && getAfter(/databases/$(database)/documents/invites/$(token)).data.usedBy == request.auth.uid;
+    }
+
     // Liens courts : lisibles par quiconque connaît l'identifiant (pas de listing), créés une fois par un joaillier connecté.
     match /shares/{id} {
       allow get: if true;
-      allow create: if request.auth != null && id.matches('[a-f0-9]{12}')
+      allow create: if signedIn() && id.matches('[a-f0-9]{12}')
         && request.resource.data.keys().hasOnly(['p', 'created'])
         && request.resource.data.p is string && request.resource.data.p.size() < 16000;
       allow update, delete: if false;
     }
 
-    // Projets d'un joaillier : lui seul les lit et les écrit.
+    // Droits d'un membre, fixés par le propriétaire dans workspaces/{owner}/members/{uid} :
+    //   projects : 'all' (tous les projets non privés, par défaut) | 'selected' (seulement ceux qui lui sont accordés un par un : `sharedWith`)
+    //   perms    : save (créer / modifier des projets, vrai par défaut), delete (supprimer, faux), createLinks (créer des liens clients, faux),
+    //              viewLinks (voir les liens clients de l'atelier et leurs statistiques, faux)
+    function md(owner) { return get(/databases/$(database)/documents/workspaces/$(owner)/members/$(request.auth.uid)).data; }
+    function can(owner, k, d) { return isMember(owner) && md(owner).get('perms', {}).get(k, d) == true; }
+    function seesAll(owner) { return md(owner).get('projects', 'all') == 'all'; }
+    // Un membre voit un projet s'il lui est accordé (`sharedWith`), ou s'il voit « tous » et que le projet n'est pas privé.
+    // res == null : document inexistant (lecture avant création).
+    function canSee(owner, res) { return res == null || request.auth.uid in res.data.get('sharedWith', []) || (seesAll(owner) && res.data.get('private', false) != true); }
     match /users/{uid}/projects/{pid} {
-      allow read, delete: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid
+      allow get: if isOwner(uid) || (isMember(uid) && canSee(uid, resource));
+      allow delete: if isOwner(uid) || (can(uid, 'delete', false) && canSee(uid, resource));
+      allow list: if isOwner(uid) || (isMember(uid) && ((seesAll(uid) && resource.data.private == false) || request.auth.uid in resource.data.sharedWith));
+      // un membre crée un projet visible de lui (sharedWith = lui) ; seul le propriétaire règle la visibilité et les accès
+      allow create: if projectOk() && (isOwner(uid) || (can(uid, 'save', true)
+        && request.resource.data.private == false && request.resource.data.get('sharedWith', []) == [request.auth.uid]));
+      allow update: if projectOk() && (isOwner(uid) || (can(uid, 'save', true) && canSee(uid, resource)
+        && request.resource.data.private == resource.data.get('private', false)
+        && request.resource.data.get('sharedWith', []) == resource.data.get('sharedWith', [])));
+    }
+    function projectOk() {
+      return request.resource.data.name is string && request.resource.data.name.size() <= 120
+        && request.resource.data.modelHash is string && request.resource.data.modelHash.matches('[a-f0-9]{32}')
+        && request.resource.data.private is bool && request.resource.data.archived is bool
+        && request.resource.data.get('sharedWith', []) is list && request.resource.data.get('sharedWith', []).size() <= 50;
+    }
+
+    // Ateliers que j'ai rejoints (index inverse, pour les lister) : je le lis ; je le crée en acceptant une invitation ;
+    // je le supprime en quittant, ou le propriétaire en me retirant.
+    match /users/{uid}/memberships/{owner} {
+      allow read: if isOwner(uid);
+      allow create: if isOwner(uid) && owner != uid
+        && request.resource.data.keys().hasOnly(['owner', 'ownerName', 'joined', 'invite'])
+        && request.resource.data.owner == owner
+        && request.resource.data.invite is string && request.resource.data.invite.matches('[a-f0-9]{32}')
+        && consumesInvite(request.resource.data.invite, owner);
+      allow delete: if isOwner(uid) || isOwner(owner);
+      allow update: if false;
+    }
+
+    // Membres d'un atelier.
+    match /workspaces/{owner}/members/{m} {
+      allow read: if canWork(owner);
+      allow create: if isOwner(m) && m != owner
+        && request.resource.data.keys().hasOnly(['uid', 'name', 'email', 'joined', 'invite'])
+        && request.resource.data.uid == m
         && request.resource.data.name is string && request.resource.data.name.size() <= 120
-        && request.resource.data.modelHash is string && request.resource.data.modelHash.matches('[a-f0-9]{32}');
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.invite is string && request.resource.data.invite.matches('[a-f0-9]{32}')
+        && consumesInvite(request.resource.data.invite, owner);
+      allow delete: if isOwner(owner) || isOwner(m);
+      // droits du membre : le propriétaire seul (jamais le membre lui-même, ni à l'arrivée : la création n'accepte pas ces champs)
+      allow update: if isOwner(owner)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['projects', 'perms'])
+        && request.resource.data.get('projects', 'all') in ['all', 'selected']
+        && request.resource.data.get('perms', {}) is map
+        && request.resource.data.get('perms', {}).keys().hasOnly(['save', 'delete', 'createLinks', 'viewLinks'])
+        && request.resource.data.get('perms', {}).get('save', true) is bool && request.resource.data.get('perms', {}).get('delete', false) is bool
+        && request.resource.data.get('perms', {}).get('createLinks', false) is bool && request.resource.data.get('perms', {}).get('viewLinks', false) is bool;
+    }
+
+    // Invitations : lien secret à usage unique, valable 7 jours. Lisible par qui détient le lien (pas de listing, sauf le propriétaire).
+    match /invites/{token} {
+      allow get: if signedIn() && token.matches('[a-f0-9]{32}');
+      allow list: if signedIn() && resource.data.owner == request.auth.uid;
+      allow create: if signedIn() && token.matches('[a-f0-9]{32}')
+        && request.resource.data.keys().hasOnly(['owner', 'ownerName', 'ownerEmail', 'email', 'created', 'expires', 'used'])
+        && request.resource.data.owner == request.auth.uid
+        && request.resource.data.used == false
+        && request.resource.data.email is string && request.resource.data.email.size() <= 200
+        && request.resource.data.expires is int
+        && request.resource.data.expires > request.time.toMillis()
+        && request.resource.data.expires <= request.time.toMillis() + 8 * 24 * 3600 * 1000;
+      // acceptation : une seule fois, par un autre joaillier, avant l'expiration ; seuls les champs d'usage changent
+      allow update: if signedIn() && resource.data.used == false && resource.data.expires > request.time.toMillis()
+        && request.auth.uid != resource.data.owner
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used', 'usedBy', 'usedAt'])
+        && request.resource.data.used == true && request.resource.data.usedBy == request.auth.uid;
+      allow delete: if signedIn() && resource.data.owner == request.auth.uid;
+    }
+
+    // ---- Liens clients suivis ----
+    // links/{id} : partie PUBLIQUE d'un lien (le client l'ouvre par son identifiant secret de 80 bits) : configuration, propriétaire,
+    // actif / désactivé, expiration. Pas de listing. Seul le propriétaire modifie, désactive ou supprime.
+    // users/{uid}/links/{id} : fiche PRIVÉE du joaillier (nom donné au lien, note, projet) ; links/{id}/views/{vid} : une ligne par
+    // consultation, écrite par le client (compte anonyme) et lisible par le seul propriétaire.
+    function linkOf(id) { return get(/databases/$(database)/documents/links/$(id)).data; }
+    // gère un lien : le propriétaire de l'atelier, ou le membre (createLinks) qui l'a créé
+    function manages(l) { return isOwner(l.owner) || (can(l.owner, 'createLinks', false) && l.get('by', '') == request.auth.uid); }
+    function linkOpen(id) { return linkOf(id).enabled == true && (linkOf(id).expires == null || linkOf(id).expires > request.time.toMillis()); }
+
+    match /links/{id} {
+      allow get: if id.matches('[a-f0-9]{20}');
+      // propriétaire de l'atelier, ou membre autorisé (createLinks) : le lien appartient alors à l'atelier (owner) et garde son auteur (by)
+      allow create: if signedIn() && id.matches('[a-f0-9]{20}')
+        && request.resource.data.keys().hasOnly(['p', 'owner', 'enabled', 'expires', 'created', 'by'])
+        && request.resource.data.get('by', request.auth.uid) == request.auth.uid
+        && (request.resource.data.owner == request.auth.uid || can(request.resource.data.owner, 'createLinks', false))
+        && request.resource.data.enabled == true
+        && request.resource.data.p is string && request.resource.data.p.size() < 16000
+        && request.resource.data.created is int
+        && (request.resource.data.expires == null || request.resource.data.expires is int);
+      allow update: if manages(resource.data)
+        && request.resource.data.keys().hasOnly(['p', 'owner', 'enabled', 'expires', 'created', 'by'])
+        && request.resource.data.owner == resource.data.owner && request.resource.data.created == resource.data.created
+        && request.resource.data.get('by', '') == resource.data.get('by', '')
+        && request.resource.data.enabled is bool
+        && request.resource.data.p is string && request.resource.data.p.size() < 16000
+        && (request.resource.data.expires == null || request.resource.data.expires is int);
+      allow delete: if manages(resource.data);
+
+      match /views/{vid} {
+        allow create: if anyUser() && vid.matches('[a-f0-9]{20}') && linkOpen(id)
+          && request.resource.data.keys().hasOnly(['owner', 'uid', 'at', 'last', 'seconds', 'opened', 'tryon', 'photo', 'taps', 'device', 'os', 'browser', 'lang', 'expireAt'])
+          && request.resource.data.owner == linkOf(id).owner && request.resource.data.uid == request.auth.uid
+          && request.resource.data.at is int && request.resource.data.at > request.time.toMillis() - 300000 && request.resource.data.at < request.time.toMillis() + 300000
+          && request.resource.data.last == request.resource.data.at
+          && request.resource.data.seconds == 0 && request.resource.data.tryon == 0 && request.resource.data.photo == 0 && request.resource.data.taps == 0
+          && request.resource.data.opened == false
+          // conservation limitée : suppression automatique (politique TTL Firestore sur expireAt), 13 mois au plus (400 j de marge)
+          && request.resource.data.expireAt is timestamp && request.resource.data.expireAt > request.time && request.resource.data.expireAt <= request.time + duration.value(400, 'd')
+          && request.resource.data.device in ['mobile', 'tablet', 'desktop']
+          && request.resource.data.os is string && request.resource.data.os.size() <= 20
+          && request.resource.data.browser is string && request.resource.data.browser.size() <= 20
+          && request.resource.data.lang is string && request.resource.data.lang.size() <= 10;
+        // mise à jour par le même visiteur : seuls les compteurs, qui ne reculent pas ; le temps ne peut dépasser le temps réel écoulé
+        allow update: if anyUser() && resource.data.uid == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['last', 'seconds', 'opened', 'tryon', 'photo', 'taps'])
+          && request.resource.data.seconds is int && request.resource.data.seconds >= resource.data.seconds
+          && request.resource.data.seconds <= (request.time.toMillis() - resource.data.at) / 1000 + 5
+          && request.resource.data.tryon is int && request.resource.data.tryon >= resource.data.tryon && request.resource.data.tryon <= 200
+          && request.resource.data.photo is int && request.resource.data.photo >= resource.data.photo && request.resource.data.photo <= 200
+          && request.resource.data.taps is int && request.resource.data.taps >= resource.data.taps && request.resource.data.taps <= 5000
+          && request.resource.data.opened is bool && request.resource.data.last is int;
+        allow read: if isOwner(resource.data.owner) || can(resource.data.owner, 'viewLinks', false) || (isMember(resource.data.owner) && linkOf(id).get('by', '') == request.auth.uid);
+        allow delete: if isOwner(resource.data.owner) || (can(resource.data.owner, 'createLinks', false) && linkOf(id).get('by', '') == request.auth.uid);
+      }
+    }
+    // requêtes sur toutes les consultations d'un joaillier (tableau de bord)
+    match /{path=**}/views/{vid} { allow read: if isOwner(resource.data.owner) || can(resource.data.owner, 'viewLinks', false); }
+
+    // textures d'or de l'atelier (Atelier d'or) : lisibles et utilisables par le propriétaire et tous les joailliers de l'atelier ;
+    // créer / modifier : propriétaire ou membre pouvant enregistrer ; supprimer : propriétaire ou membre autorisé à supprimer
+    match /users/{uid}/labs/{id} {
+      allow get, list: if canWork(uid);
+      allow create, update: if (isOwner(uid) || can(uid, 'save', true)) && id.matches('[a-z0-9]{3,24}')
+        && request.resource.data.keys().hasOnly(['name', 'l', 'light', 'by', 'byUid', 'updated'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() <= 40
+        && request.resource.data.l is string && request.resource.data.l.size() <= 3000
+        && (request.resource.data.get('light', null) == null || (request.resource.data.light is string && request.resource.data.light.size() <= 500))
+        && request.resource.data.get('byUid', request.auth.uid) == request.auth.uid;
+      allow delete: if isOwner(uid) || can(uid, 'delete', false);
+    }
+
+    // fiche privée : le propriétaire ; un membre voit toutes les fiches de l'atelier (viewLinks) ou celles qu'il a créées (createLinks)
+    match /users/{uid}/links/{id} {
+      allow get, list: if isOwner(uid) || (isMember(uid) && (can(uid, 'viewLinks', false) || resource.data.by == request.auth.uid));
+      allow create: if (isOwner(uid) || can(uid, 'createLinks', false)) && id.matches('[a-f0-9]{20}')
+        && request.resource.data.get('by', request.auth.uid) == request.auth.uid
+        && request.resource.data.label is string && request.resource.data.label.size() <= 120
+        && request.resource.data.note is string && request.resource.data.note.size() <= 1000;
+      allow update: if (isOwner(uid) || (can(uid, 'createLinks', false) && resource.data.get('by', '') == request.auth.uid)) && id.matches('[a-f0-9]{20}')
+        && request.resource.data.get('by', '') == resource.data.get('by', '')
+        && request.resource.data.label is string && request.resource.data.label.size() <= 120
+        && request.resource.data.note is string && request.resource.data.note.size() <= 1000;
+      allow delete: if isOwner(uid) || (can(uid, 'createLinks', false) && resource.data.get('by', '') == request.auth.uid);
     }
   }
 }

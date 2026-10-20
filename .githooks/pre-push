@@ -1,0 +1,10 @@
+#!/bin/sh
+# Avant chaque push : tests unitaires, build, vérification CSP et tests de bout en bout (≈ 3 min), seulement si le code de l'application a changé.
+# Ignorer ponctuellement : SKIP_VERIFY=1 git push   (la CI exécute quand même audit, tests unitaires, règles Firestore et build)
+[ -n "$SKIP_VERIFY" ] && { echo "pre-push : vérifications ignorées (SKIP_VERIFY)"; exit 0; }
+base=$(git merge-base HEAD origin/main 2>/dev/null) || base=""
+if [ -n "$base" ] && ! git diff --name-only "$base" HEAD | grep -qE '^(src/|public/|tests/|scripts/|config/|themes/|index\.html|vite\.config\.js|package(-lock)?\.json|firebase\.json)'; then
+  echo "pre-push : aucun fichier de l'application modifié, vérifications sautées"; exit 0
+fi
+echo "pre-push : npm run verify (tests unitaires, build, CSP, e2e)…"
+npm run verify || { echo "pre-push : échec — push annulé (SKIP_VERIFY=1 pour forcer)"; exit 1; }

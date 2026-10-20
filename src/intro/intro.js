@@ -1,5 +1,6 @@
 // Introduction : l'écrin de la marque est fermé au centre de la vue 3D ; au toucher, le couvercle se soulève, la bague
 // sort de son écrin, puis la boîte disparaît et le configurateur apparaît.
+import { emitTrack } from '../cloud/track.js';
 import * as THREE from 'three';
 import { buildBox } from './box.js';
 import { t } from '../ui/i18n.js';
@@ -8,16 +9,22 @@ const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 const clamp01 = (x) => Math.min(1, Math.max(0, x));
 const seg = (time, a, b) => clamp01((time - a) / (b - a));
 
-export function shouldPlayIntro(theme, params, dev) {
+/** L'ouverture de l'écrin est réservée à la vision client : elle ne se joue que sur un lien de partage (`hasShare`), jamais pour le joaillier. `?intro` la force (tests, captures). */
+export function shouldPlayIntro(theme, params, dev, hasShare = false) {
   if (!theme.intro?.enabled) return false;
+  if (!hasShare && !params.has('intro')) return false;
   if (params.has('nointro')) return false;
   if (dev && params.get('model') === 'gemv' && !params.has('intro')) return false; // tests E2E / captures
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
   return true;
 }
 
-/** Joue l'introduction. Résout quand le configurateur est de nouveau libre. */
+/** Joue l'introduction ; la sélection des parties reste bloquée tant que la bague est dans l'écrin (et se rétablit même en cas d'erreur). */
 export async function playIntro(app, ui, theme) {
+  try { return await playIntroInner(app, ui, theme); } finally { app.setPickBlocked(false); }
+}
+
+async function playIntroInner(app, ui, theme) {
   const viewer = app.viewer, model = app.model;
   if (!model) return;
   const root = model.root;
@@ -37,6 +44,7 @@ export async function playIntro(app, ui, theme) {
   const ringStartMinY = ringBox.min.y - L;
   box.group.position.set(c.x, ringStartMinY - box.floorY, c.z);
   viewer.scene.add(box.group);
+  app.setPickBlocked(true); // la bague est dans l'écrin : pas de sélection de ses parties tant qu'il est là
   root.visible = true; // la bague (masquée dès le chargement) n'apparaît que dans l'écrin fermé
   const KEY = 2.6; const key = new THREE.DirectionalLight(0xf6f0ff, KEY); key.position.set(-1, 1.6, 1.2).multiplyScalar(S).add(c); key.target.position.copy(c); viewer.scene.add(key, key.target); // faces de l'écrin bien distinctes
   if (window.__rc) window.__rc.introBox = box;
@@ -73,8 +81,9 @@ export async function playIntro(app, ui, theme) {
   let resolveDone; const done = new Promise((r) => { resolveDone = r; });
   let state = 'idle', t0 = 0, skipped = false;
 
-  const open = () => { if (state !== 'idle') return; state = 'anim'; t0 = performance.now(); hint.classList.add('gone'); startCam(); };
+  const open = () => { if (state !== 'idle') return; emitTrack('open'); state = 'anim'; t0 = performance.now(); hint.classList.add('gone'); startCam(); };
   const skip = () => { skipped = true; if (state === 'idle') state = 'anim'; t0 = performance.now() - 99999; hint.classList.add('gone'); };
+  ui.skipIntro = skip; // permet à l'interface d'interrompre l'introduction (ex. retour en mode Joaillier)
   // toucher la boîte (clic net, pas un glissé)
   let down = null;
   const pd = (e) => { down = { x: e.clientX, y: e.clientY }; };
@@ -131,12 +140,14 @@ export async function playIntro(app, ui, theme) {
     viewer.onFrame.splice(viewer.onFrame.indexOf(frameFn), 1);
     viewer.canvas.removeEventListener('pointerdown', pd); viewer.canvas.removeEventListener('pointerup', pu);
     viewer.scene.remove(box.group, key, key.target); box.dispose();
+    app.setPickBlocked(false);
     root.position.y = startY; root.rotation.y = 0;
     if (sh && shSave) { sh.position.copy(shSave.p); sh.scale.copy(shSave.s); sh.visible = shSave.v; }
     Object.assign(viewer.controls, { enabled: ctlSave.enabled, maxDistance: ctlSave.max, minDistance: ctlSave.min });
     viewer.autoRotateEnabled = autoSave;
     viewer.controls.target.copy(finalTarget); viewer.camera.position.copy(finalPos); viewer.controls.update();
     hint.remove();
+    ui.skipIntro = null;
     delete ui.el.dataset.intro;
     viewer.invalidate();
     resolveDone();

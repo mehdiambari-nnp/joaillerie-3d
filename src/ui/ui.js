@@ -1,5 +1,12 @@
 // Interface : mode Vitrine (acheteur / vendeur) et mode Atelier (designer). Mobile d'abord.
 import { t } from './i18n.js';
+import * as THREE from 'three';
+import { displayName } from '../cloud/name.js';
+import { emitTrack } from '../cloud/track.js';
+import { joinFlow } from './atelier.js';
+import { renderMenu, openSaveDialog, openNewProjectDialog } from './menu.js';
+import { openBackoffice } from './backoffice.js';
+import { shouldPlayIntro, playIntro } from '../intro/intro.js';
 import { FEATURES } from '../config/features.js';
 import { CHANGELOG, CURRENT_VERSION, unseenEntries } from '../config/changelog.js';
 import { LANG } from './i18n.js';
@@ -7,13 +14,15 @@ import theme, { brandHTML } from '../config/theme.js';
 import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
+import { LabPanel } from './lab-panel.js';
+import { LAB, listLabs, sanitizeLight, initLabs, refreshLabs } from '../materials/lab.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
 import { newId, thumbnail } from '../projects/projects.js';
 import { exportProjectGLB, download, shareOrDownload, recapRows, withoutHighlight } from '../export/exporters.js';
 import { prepareAR, buildARLauncher, qrDataUrl, isMobile, isChromeIOS } from '../ar/ar.js';
-import { TryOn } from '../tryon/tryon.js';
 import { frenchRingSize } from '../import/zones.js';
+import { fill } from './pages/util.js';
 
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -60,7 +69,15 @@ export class UI {
     this.build();
     this.bind();
     this.renderAll();
-    this.tryon = new TryOn(app, $('.viewport', root), { toast: (m) => this.toast(m) });
+    this.tryon = null; // chargé à la première ouverture de l'essayage (MediaPipe ≈ 150 Ko, inutile tant qu'on ne l'utilise pas)
+  }
+
+  async openTryOn() {
+    if (!this.tryon) {
+      const { TryOn } = await import('../tryon/tryon.js');
+      this.tryon ||= new TryOn(this.app, $('.viewport', this.root), { toast: (m) => this.toast(m) });
+    }
+    this.tryon.open();
   }
 
   // ---------- Squelette ----------
@@ -124,12 +141,15 @@ export class UI {
     this.mount = $('.viewer-mount', this.root);
     this.app.viewer.attachTo(this.mount);
     this.dlg = $('#dlg', this.root);
+    this.lab = new LabPanel(this);
+    Promise.resolve(this.svc?.cloud?.()).then((c) => initLabs(c)).then(() => this.renderAll?.()).catch(() => {}); // textures de l'atelier
     this.tooltip = $('.tooltip', this.root);
   }
 
   bind() {
     const app = this.app;
     this.root.addEventListener('click', (e) => this.onClick(e));
+    this.root.addEventListener('change', (e) => { if (e.target.matches?.('[data-r=ws]')) this.switchWorkshop(e.target.value); }); // sélecteur d'atelier
     this.root.addEventListener('pointerdown', (e) => this.onGaugeDown(e));
     this.root.addEventListener('input', (e) => this.onInput(e));
     this.root.addEventListener('change', (e) => this.onChange(e));
@@ -165,6 +185,23 @@ export class UI {
     el.className = 'toast'; el.textContent = msg; el.setAttribute('role', 'status');
     document.body.append(el);
     setTimeout(() => el.remove(), ms);
+  }
+
+  // Suppression « annulable » : l'élément est déjà masqué par l'appelant ; l'action réelle (commit) ne part qu'au bout de `ms`,
+  // à la fermeture de la page, ou jamais si l'utilisateur annule.
+  undoToast(msg, commit, onUndo, ms = 6000) {
+    const el = document.createElement('div');
+    el.className = 'toast toast-undo'; el.setAttribute('role', 'status');
+    const txt = document.createElement('span'); txt.textContent = msg;
+    const b = document.createElement('button'); b.type = 'button'; b.textContent = t('undo');
+    el.append(txt, b);
+    let done = false, tm = null;
+    const finish = (ok) => { if (done) return; done = true; clearTimeout(tm); removeEventListener('pagehide', flush); el.remove(); if (ok) commit(); else onUndo?.(); };
+    const flush = () => finish(true);
+    tm = setTimeout(flush, ms);
+    b.addEventListener('click', () => finish(false));
+    addEventListener('pagehide', flush);
+    document.body.append(el);
   }
 
   // ---------- Rendu ----------
@@ -279,9 +316,43 @@ export class UI {
     };
     const groups = GEM_GROUPS.map((g) => {
       const items = list.filter((x) => x.group === g.id);
-      return items.length ? `<div class="dots" role="group" aria-label="${esc(g.name)}">${items.map((x) => dot(x, x.id === sameM)).join('')}</div>` : '';
+      return items.length ? `<section class="gem-fam" data-fam="${g.id}"><h4>${esc(g.name)}</h4><div class="dots" role="group" aria-label="${esc(g.name)}">${items.map((x) => dot(x, x.id === sameM)).join('')}</div></section>` : '';
     }).join('');
     return groups;
+  }
+
+  /** Fiche de la pierre choisie : espèce, dureté (une bague s'use), indice de réfraction, repère visuel, autres variétés de la même espèce. */
+  gemInfo(id, list) {
+    const g = byId(GEMS, id); if (!g) return '';
+    const mohs = parseFloat(String(g.mohs ?? '').replace(',', '.'));
+    const soft = Number.isFinite(mohs) && mohs < 7;
+    const kin = list.filter((x) => x.mineral === g.mineral && x.id !== g.id);
+    const props = [g.mineral, g.mohs ? fill(t('gemMohs'), { n: g.mohs }) : '', g.ior ? fill(t('gemIor'), { n: String(g.ior).replace('.', ',') }) : g.id === 'diamond' ? fill(t('gemIor'), { n: '2,42' }) : ''].filter(Boolean);
+    return `<div class="gem-info" data-r="geminfo">
+      <p class="gi-props">${props.map(esc).join(' · ')}</p>
+      ${g.note ? `<p class="gi-note">${esc(g.note)}</p>` : ''}
+      ${soft ? `<p class="gi-warn" role="note">${esc(t('gemSoft'))}</p>` : ''}
+      ${kin.length ? `<div class="gi-kin"><span>${esc(t('gemSame'))}</span><div class="dots">${kin.map((x) => `<button class="dot" role="option" data-mat="${x.id}" aria-label="${esc(x.name)}" aria-pressed="false" title="${esc(x.name)}"><span class="gemic" style="--sw:${x.swatch ?? '#bbb'};--gem:${gemIconUrl(x.swatch)}"></span></button>`).join('')}</div></div>` : ''}
+    </div>`;
+  }
+
+  /** Recherche d'une pierre : masque les pastilles qui ne correspondent pas (nom, espèce, famille), sans reconstruire la feuille. */
+  applyGemFilter() {
+    const host = $('[data-r=palette]', this.root); if (!host) return;
+    const q = (this.gemQ || '').trim().toLowerCase();
+    const norm = (s) => String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const nq = norm(q);
+    let shown = 0;
+    host.querySelectorAll('.gem-fam').forEach((fam) => {
+      let n = 0;
+      fam.querySelectorAll('.dot[data-mat]').forEach((d) => {
+        const g = byId(GEMS, d.dataset.mat);
+        const ok = !nq || norm(`${g?.name} ${g?.mineral ?? ''} ${GEM_GROUPS.find((x) => x.id === g?.group)?.name ?? ''}`).includes(nq);
+        d.hidden = !ok; if (ok) n++;
+      });
+      fam.hidden = n === 0; shown += n;
+    });
+    const none = $('[data-r=gemnone]', this.root); if (none) none.hidden = !(nq && shown === 0);
   }
 
   /** Feuille « matière » : un accordéon (matière courante en en-tête) + un accordéon « teinte libre ». Rien sans sélection. */
@@ -303,16 +374,19 @@ export class UI {
     if (allowed) list = list.filter((x) => allowed.includes(x.id));
     const customOn = !allowed || allowed.includes(CUSTOM);
     const pal = kind === 'gem'
-      ? this.gemDots(list, sameM) + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
+      ? `<div class="gem-tools"><input type="search" data-r="gemq" value="${esc(this.gemQ || '')}" placeholder="${esc(t('gemSearch'))}" aria-label="${esc(t('gemSearch'))}" autocomplete="off" spellcheck="false"></div>`
+        + this.gemDots(list, sameM) + `<p class="gem-none" data-r="gemnone" hidden>${esc(t('gemNoMatch'))}</p>` + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
       : list.map((m) => this.ball(m, 'metals', m.id === sameM)).join('')
-        + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '');
+        + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '')
+        + (!allowed ? listLabs().map((p) => `<button class="ball" role="option" data-labpick="${p.id}" aria-label="${esc(p.name)}" aria-pressed="${sameM === LAB && assigns.every((x) => x.l?.n === p.name)}" title="${esc(p.name)}"><span class="b" style="--sw:${p.l.color}"></span><span class="n">${esc(p.name)}</span></button>`).join('')
+          + `<button class="ball" data-lab-open aria-label="${t('labOpen')}" title="${t('labOpen')}"><span class="b lab-b">✦</span><span class="n">${t('labOpen')}</span></button>` : '');
     const fin = kind === 'metal'
       ? `<div class="finish-seg" role="group" aria-label="${t('finishes')}">${FINISHES.map((f) => {
         const g = f.gauge && f.id === sameF && sameI != null; // le bouton actif devient un curseur d'intensité
         const hint = g ? ` · ${t('gauge_' + f.gauge)}` : '';
         return `<button class="pill${g ? ' gauge' : ''}" data-finish="${f.id}" aria-pressed="${f.id === sameF}"${g ? ` style="--g:${Math.round(sameI * 100)}%" role="slider" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(sameI * 100)}" aria-label="${esc(f.name + hint)}" title="${esc(t('gaugeHint'))}"` : ''}>${esc(f.name)}</button>`;
       }).join('')}</div>` : '';
-    const name = sameM ? describeAssignment({ m: sameM, f: sameF, c: sameC }, kind) : t('severalMaterials');
+    const name = sameM ? (sameM === LAB ? (assigns[0].l?.n || t('labOpen')) : describeAssignment({ m: sameM, f: sameF, c: sameC }, kind)) : t('severalMaterials');
     const sw = swatchOf(kind, assigns[0]);
     const cHex = (sameC ?? this.customHex[kind]).toUpperCase();
     const acc = (id, head, body) => `<section class="acc ${this.acc[id] ? 'open' : ''}" data-accsec="${id}">
@@ -324,7 +398,22 @@ export class UI {
       + (customOn ? acc('custom',
         `<i class="sw custom-sw" style="--sw:${sameC ?? this.customHex[kind]}"></i><span class="t"><small>${t('customColor')}</small><b class="hex">${cHex}</b></span>`,
         '<div class="custom" data-r="custom"></div>') : '');
+    if (kind === 'gem') {
+      this.applyGemFilter();
+      const info = sameM && sameM !== CUSTOM ? this.gemInfo(sameM, list) : '';
+      if (info) $('[data-r=palette]', this.root)?.insertAdjacentHTML('beforebegin', info);
+      this.stickGemTop(host);
+    }
     this.renderCustom(kind, customOn, sameM === CUSTOM ? sameC : null);
+  }
+
+  /** Pierres : en-tête (nom), fiche et recherche restent épinglés en haut de la feuille ; seule la liste des pierres défile. */
+  stickGemTop(host) {
+    const sec = host.querySelector('.acc[data-accsec=mat]'); if (!sec) return;
+    const top = document.createElement('div');
+    top.className = `gem-top${this.acc.mat ? ' open' : ''}`;
+    for (const el of [sec.querySelector('.acc-h'), host.querySelector('.gem-info'), host.querySelector('.gem-tools')]) if (el) top.appendChild(el);
+    host.insertBefore(top, host.firstChild);
   }
 
   /** Sélecteur de teinte libre : couleur native + code + teinte / intensité / clarté. */
@@ -431,6 +520,13 @@ export class UI {
   onClick(e) {
     const app = this.app;
     const tgt = e.target;
+    if (tgt.closest('[data-lab-open]')) { this.lab.open(); return; }
+    const lp = tgt.closest('[data-labpick]');
+    if (lp) {
+      const p = listLabs().find((x) => x.id === lp.dataset.labpick);
+      if (p) { app.applyToSelection({ m: LAB, l: { ...p.l, n: p.name } }); const lt = sanitizeLight(p.light); if (lt) this.lab.applyLight(lt); }
+      return;
+    }
     const fold = tgt.closest('[data-fold]');
     if (fold) { const k = fold.dataset.fold; this.subOpen ||= new Set(); this.subOpen.has(k) ? this.subOpen.delete(k) : this.subOpen.add(k); this.acc = { zones: true, mat: false, custom: false }; this.renderZones(); return; }
     const eyep = tgt.closest('[data-eyep]');
@@ -469,12 +565,13 @@ export class UI {
       this.acc = { zones: false, mat: false, custom: false }; this.acc[k] = open;
       this.root.querySelectorAll('.acc[data-accsec]').forEach((sec) => {
         const on = !!this.acc[sec.dataset.accsec];
-        sec.classList.toggle('open', on); sec.querySelector('.acc-h')?.setAttribute('aria-expanded', String(on));
+        sec.classList.toggle('open', on); this.root.querySelector(`[data-acc="${sec.dataset.accsec}"]`)?.setAttribute('aria-expanded', String(on));
       });
+      this.root.querySelector('.gem-top')?.classList.toggle('open', !!this.acc.mat);
       return;
     }
     const md = tgt.closest('.seg [data-mode]');
-    if (md) { this.setMode(md.dataset.mode); return; }
+    if (md) { this.userSetMode(md.dataset.mode); return; }
     const pb = tgt.closest('[data-pop-btn]');
     if (pb) { this.togglePop(pb.dataset.popBtn); return; }
     const vw = tgt.closest('[data-view]');
@@ -495,6 +592,7 @@ export class UI {
 
   onInput(e) {
     const r = e.target.dataset.r;
+    if (r === 'gemq') { this.gemQ = e.target.value; this.applyGemFilter(); return; }
     if (r === 'envrot') this.app.viewer.setEnvironmentRotation(+e.target.value);
     if (r === 'bgblur') this.app.viewer.setBackground('env', { blur: +e.target.value });
     if (r === 'exposure') this.app.viewer.setExposure(+e.target.value);
@@ -542,7 +640,7 @@ export class UI {
       case 'theme': this.toggleTheme(); break;
       case 'present': this.setPresent(this.el.dataset.present !== '1'); break;
       case 'present-exit': this.setPresent(false); break;
-      case 'exit-client': if (!this.locked) this.setMode(prefs.get('mode', 'vitrine') === 'atelier' ? 'atelier' : 'vitrine'); break;
+      case 'exit-client': if (!this.locked) { this.skipIntro?.(); this.setMode(prefs.get('mode', 'vitrine') === 'atelier' ? 'atelier' : 'vitrine'); } break;
       case 'dlg-close': this.dlg.close(); break;
       case 'zhide': { const z = app.zones.find((zz) => zz.pieceIds.some((id) => app.selection.has(id))); if (z) app.setHidden(z.pieceIds, !z.pieceIds.every((id) => app.hidden.has(id))); break; }
       case 'zsplit': { const z = app.zones.find((zz) => zz.pieceIds.some((id) => app.selection.has(id))); if (z) app.splitZone(z.id); break; }
@@ -554,17 +652,17 @@ export class UI {
       case 'variants': this.openVariants(); break;
       case 'share': this.openShare(); break;
       case 'projects': this.openProjects(); break;
-      case 'signout': (await this.svc.cloud()).auth.signOut().then(() => this.renderProjects()); break;
+      case 'signout': (await this.svc.cloud()).auth.signOut() /* le rechargement vers la page de connexion est déclenché par main.js */; break;
       case 'projects-close': this.closeProjects(); break;
-      case 'proj-save': this.saveCurrentProject(false); break;
-      case 'proj-save-new': this.saveCurrentProject(true); break;
-      case 'proj-open': this.svc.openProject?.(el.closest('[data-id]').dataset.id).then((ok) => { if (ok) this.closeProjects(); }); break;
-      case 'proj-del': this.removeProject(el.closest('[data-id]').dataset.id); break;
+      case 'menu-lab': this.closeProjects(); this.lab.open(); break;
+      case 'menu-save': this.closeProjects(); this.openSaveDialog(); break;
+      case 'menu-new': this.closeProjects(); this.openNewProject(() => this.openBackoffice('projects')); break;
+      case 'menu-nav': this.closeProjects(); this.openBackoffice(el.dataset.tab); break;
       case 'photo': this.takePhoto(); break;
       case 'whatsnew': this.changelog({ force: true }); break;
       case 'recap': this.openRecap(); break;
       case 'ar': this.openAR(); break;
-      case 'tryon': this.tryon.open(); break;
+      case 'tryon': emitTrack('tryon'); this.openTryOn(); break;
     }
   }
 
@@ -597,6 +695,33 @@ export class UI {
     if (on && canFs) document.documentElement.requestFullscreen().catch(() => {});
     if (!on && document.fullscreenElement) document.exitFullscreen?.();
     for (const d of [50, 250]) setTimeout(() => this.app.viewer.resize(), d);
+  }
+
+  /**
+   * Bascule demandée par le joaillier (bouton Client / Joaillier). Vers « Client », l'écrin s'ouvre comme pour le client réel
+   * (vue d'accueil, bague assemblée, sans sélection) : le joaillier juge ainsi l'expérience complète. Retour au mode Joaillier : l'intro s'interrompt.
+   * `setMode` reste sans animation (appel programmatique, tests, ouverture d'un lien client).
+   */
+  userSetMode(m) {
+    if (m !== 'client') this.skipIntro?.();
+    const toClient = m === 'client' && this.mode !== 'client' && !this.locked;
+    this.setMode(m);
+    if (toClient) this.playClientIntro();
+  }
+
+  async playClientIntro() {
+    const app = this.app;
+    // demande explicite du joaillier : seul `?nointro` et la préférence « réduire les animations » l'écartent (pas la règle des captures de test)
+    const params = new URLSearchParams(); if (new URLSearchParams(location.search).has('nointro')) params.set('nointro', '1');
+    if (!app.model || this.introPlaying || !shouldPlayIntro(theme, params, false, true)) return;
+    this.introPlaying = true;
+    try {
+      app.exploder?.assembleNow?.(); app.clearSelection();                   // ce que voit le client : bague assemblée, rien de sélectionné
+      const v = app.viewer;
+      v.anim = null; v.controls.target.copy(v.box.getCenter(new THREE.Vector3())); v.setView([0.62, 0.45, 0.64], false); // vue d'accueil
+      await playIntro(app, this, theme);
+    } catch (e) { console.warn('Aperçu client : intro ignorée', e); }
+    finally { this.introPlaying = false; app.model && (app.model.root.visible = true); }
   }
 
   setMode(m) {
@@ -637,7 +762,7 @@ export class UI {
     if (/face|front/i.test(n)) return t('viewFront');
     if (/dessus|top/i.test(n)) return t('viewTop');
     if (/droite|right/i.test(n)) return t('viewRight');
-    if (/gauche|left/i.test(n)) return 'Gauche';
+    if (/gauche|left/i.test(n)) return t('viewLeft');
     if (/persp/i.test(n)) return t('view34') + ' (CAO)';
     return n;
   }
@@ -646,7 +771,7 @@ export class UI {
     const v = this.app.model?.views ?? [];
     const std = [[t('view34'), [0.62, 0.45, 0.64]], [t('viewFront'), [0, 0, 1]], [t('viewTop'), [0, 1, 0]], [t('viewSide'), [1, 0, 0]]];
     const fromFile = v.map((x) => [this.viewLabel(x.name), x.dir]);
-    $('[data-pop=views]', this.root).innerHTML = `<h4>${t('views')}</h4><div class="row">${[...std, ...fromFile].map(([n, d]) => `<button class="btn small" data-view='${JSON.stringify(d)}'>${esc(n)}</button>`).join('')}</div>`;
+    $('[data-pop=views]', this.root).innerHTML = `<h4>${t('views')}</h4><div class="row">${[...std, ...fromFile].map(([n, d]) => `<button class="btn small" data-view="${esc(JSON.stringify([...d].slice(0, 3).map(Number)))}">${esc(n)}</button>`).join('')}</div>`;
   }
 
   renderEnvPop() {
@@ -680,59 +805,37 @@ export class UI {
     const a = this.app;
     return buildShareUrl(location.origin + location.pathname, {
       client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden],
-      env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI),
+      env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI), light: a.viewer.getLight(),
     });
   }
 
   // ---------- Projets (menu burger) ----------
-  async openProjects() {
+  async openProjects() { // action « projects » du burger : ouvre le menu
     const dr = $('[data-r=drawer]', this.root), sc = $('.scrim', this.root);
     dr.hidden = sc.hidden = false;
     requestAnimationFrame(() => this.el.dataset.drawer = '1');
-    await this.renderProjects();
+    await this.renderMenu();
   }
   closeProjects() {
     this.el.dataset.drawer = '0';
     setTimeout(() => { if (this.el.dataset.drawer !== '1') { $('[data-r=drawer]', this.root).hidden = true; $('.scrim', this.root).hidden = true; } }, 250);
   }
-  async renderProjects() {
-    const dr = $('[data-r=drawer]', this.root);
-    const cloud = await this.svc.cloud();
-    if (cloud.auth.enabled && !cloud.auth.user) { // compte requis : projets et modèles partagés sont liés au joaillier
-      dr.replaceChildren(this.html(`<div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div><p class="muted tiny">${t('signInWhy')}</p>`), this.authForm(() => this.renderProjects()));
-      return;
-    }
-    let list = [], failed = false;
-    try { list = await cloud.projects.list(); } catch (e) { failed = true; console.warn(e); }
-    const cur = list.find((p) => p.id === this.svc.projectId);
-    const fmt = (d) => new Date(d).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-    dr.innerHTML = `
-      <div class="dr-h"><h2>${t('projects')}</h2><button class="icon-btn" data-a="projects-close" aria-label="${t('close')}">✕</button></div>
-      <div class="dr-save">
-        <input type="text" data-r="projname" maxlength="60" placeholder="${esc(t('projectName'))}" value="${esc(cur?.name ?? '')}" aria-label="${esc(t('projectName'))}">
-        <div class="row">
-          <button class="btn primary" data-a="${cur ? 'proj-save' : 'proj-save-new'}">${cur ? t('projectUpdate') : t('projectSave')}</button>
-          ${cur ? `<button class="btn" data-a="proj-save-new">${t('projectSaveNew')}</button>` : ''}
-        </div>
-      </div>
-      <p class="palette-title">${t('projectsList')}</p>
-      ${failed ? `<p class="muted tiny">${t('projectsUnavailable')}</p>` : !list.length ? `<p class="muted tiny">${t('projectsEmpty')}</p>` : ''}
-      <ul class="proj-list">${list.map((p) => `<li data-id="${esc(p.id)}" class="${p.id === this.svc.projectId ? 'on' : ''}">
-        <button class="proj-open" data-a="proj-open">${p.thumb ? `<img src="${p.thumb}" alt="" width="64" height="48">` : '<span class="ph"></span>'}
-          <span><b>${esc(p.name)}</b><small>${esc(p.modelName)} · ${fmt(p.updated)}</small></span></button>
-        <button class="icon-btn" data-a="proj-del" aria-label="${t('delete')}" title="${t('delete')}">✕</button></li>`).join('')}</ul>
-      <p class="muted tiny">${cloud.auth.enabled ? t('projectsNoteCloud') : t('projectsNote')}</p>
-      ${cloud.auth.enabled ? `<p class="muted tiny acct">${esc(cloud.auth.user.email || '')} · <button class="link" data-a="signout">${t('signOut')}</button></p>` : ''}`;
-  }
+  renderMenu() { return renderMenu(this); }                       // contenu du menu : voir menu.js
+  openSaveDialog(onDone) { openSaveDialog(this, onDone); }
+  openNewProject(onDone) { openNewProjectDialog(this, onDone); }
+  openBackoffice(tab, params) { return openBackoffice(this, tab, params); } // pages : voir backoffice.js et pages/
+
 
   /** Formulaire de connexion / création de compte (Firebase Auth). `done` est appelé une fois connecté. */
   authForm(done) {
     const d = this.html(`<form class="auth" novalidate>
-      <input type="email" name="email" autocomplete="email" placeholder="${esc(t('email'))}" aria-label="${esc(t('email'))}" required>
-      <input type="password" name="pw" autocomplete="current-password" placeholder="${esc(t('password'))}" aria-label="${esc(t('password'))}" required>
-      <p class="auth-err muted tiny" role="alert" hidden></p>
-      <div class="row"><button class="btn primary" type="submit" data-k="in">${t('signIn')}</button><button class="btn" type="button" data-k="up">${t('signUp')}</button></div>
-      <div class="row"><button class="btn" type="button" data-k="google">${t('signInGoogle')}</button><button class="link" type="button" data-k="reset">${t('forgotPw')}</button></div></form>`);
+      <label class="fld"><span>${t('email')}</span><input type="email" name="email" autocomplete="email" required></label>
+      <label class="fld"><span>${t('password')}</span><input type="password" name="pw" autocomplete="current-password" required></label>
+      <p class="auth-err" role="alert" hidden></p>
+      <button class="btn primary wide" type="submit" data-k="in">${t('signIn')}</button>
+      <div class="auth-or" aria-hidden="true"><span>${t('or')}</span></div>
+      <button class="btn wide" type="button" data-k="google">${t('signInGoogle')}</button>
+      <div class="auth-links"><button class="link" type="button" data-k="up">${t('signUp')}</button><button class="link" type="button" data-k="reset">${t('forgotPw')}</button></div></form>`);
     const form = $('form', d), err = $('.auth-err', d);
     const run = async (fn, okMsg) => {
       err.hidden = true;
@@ -748,29 +851,37 @@ export class UI {
     });
     return d;
   }
-  async saveCurrentProject(asNew) {
+  /** Enregistre la bague (nouveau projet ou mise à jour du projet ouvert). Le nom vient de la boîte « Enregistrer » (menu.js). */
+  async saveCurrentProject(asNew, name) {
     const app = this.app, s = this.svc;
     if (!app.model || !s.last) return;
-    const name = ($('[data-r=projname]', this.root).value || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
+    name = String(name || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
     try {
-      let thumb = null;
-      try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 1, background: BG[this.bg] })); }); } catch { /* vignette facultative */ }
+      let thumb = null; // vignette toujours en 3/4, quel que soit l'angle de la caméra du joaillier
+      try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 2, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
       const id = asNew || !s.projectId ? newId() : s.projectId;
       await (await s.cloud()).projects.save({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
-      s.projectId = id;
+      s.projectId = id; s.projectName = name;
       this.toast(t('projectSaved'));
-      await this.renderProjects();
     } catch (e) { console.warn(e); this.toast(t('projectsUnavailable')); }
   }
-  async removeProject(id) {
-    if (!confirm(t('projectDeleteAsk'))) return;
-    try { await (await this.svc.cloud()).projects.remove(id); if (this.svc.projectId === id) this.svc.projectId = null; await this.renderProjects(); } catch (e) { console.warn(e); }
+
+  /** Atelier : changement d'atelier depuis le menu. */
+  async switchWorkshop(owner) {
+    const c = await this.svc.cloud(); c.workspaces?.setActive(owner);
+    this.svc.projectId = null; await this.renderMenu(); this.backoffice?.reload();
+    refreshLabs().then(() => this.renderAll());
+  }
+  /** Lien d'invitation (#i=) ouvert : propose de rejoindre l'atelier ; on arrive sur la page Projets de l'atelier rejoint. */
+  async joinWorkshop(token) {
+    const c = await this.svc.cloud();
+    await joinFlow(this, c, token, () => { this.svc.projectId = null; this.openBackoffice('projects'); });
   }
 
   /** Lien court (#s=<12 caractères>) : la configuration est déposée sur le serveur. Repli : lien long si le dépôt échoue. */
   async shortShareUrl(client, remote) {
     const a = this.app, base = location.origin + location.pathname;
-    const opts = { client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI) };
+    const opts = { client, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI), light: a.viewer.getLight() };
     try {
       const json = JSON.stringify(sharePayload(opts)), id = await shareId(json);
       await (await this.svc.cloud()).shares.put(id, json);
@@ -800,25 +911,36 @@ export class UI {
     let remote = null, hostFailed = false;
     const cloud = await this.svc.cloud();
     if (cloud.auth.enabled && !cloud.auth.user && this.svc.isHostable?.() && !this.svc.last?.remote) { // héberger le modèle exige un compte joaillier
-      const d = this.html(`<p class="muted tiny">${t('signInShare')}</p>`); d.append(this.authForm(() => this.openShare()));
+      const d = this.html(`<p class="auth-intro">${t('signInShare')}</p>`); d.append(this.authForm(() => this.openShare()));
       this.openDialog(t('share'), d);
       return;
     }
     if (this.svc.isHostable?.() && !this.svc.last?.remote) {
       const wait = this.html(`<p class="muted">${t('sharePrep')}</p><div class="progress-inline"><i></i></div>`);
       this.openDialog(t('share'), wait);
-      try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.width = Math.round(p * 100) + '%'; }); }
+      try { remote = await this.hostModel((p) => { const i = $('.progress-inline i', wait); if (i) i.style.transform = `scaleX(${Math.max(0.08, p)})`; }); }
       catch (e) { console.warn('Hébergement du modèle impossible', e); hostFailed = true; }
     } else remote = await this.hostModel().catch(() => null);
-    const urls = { client: await this.shortShareUrl(true, remote), jeweler: await this.shortShareUrl(false, remote) };
+    const rights = await Promise.resolve(cloud.workspaces?.rights?.()).catch(() => null);
+    const noClient = !!rights && !rights.createLinks; // le propriétaire de l'atelier n'a pas donné le droit de créer des liens clients
+    const tracked = !!cloud.links && !!cloud.auth.user; // Firebase : lien client SUIVI (un par envoi) ; sinon lien classique
+    const urls = { client: tracked ? null : await this.shortShareUrl(true, remote), jeweler: await this.shortShareUrl(false, remote) };
     const field = (k, label) => `<p class="palette-title">${label}</p>
       <input type="url" readonly value="${esc(urls[k])}" data-r="shareurl-${k}" aria-label="${esc(label)}">
       <div class="row"><button class="btn ${k === 'client' ? 'primary' : ''}" data-s="copy" data-k="${k}">${t('copyLink')}</button>
         ${navigator.share ? `<button class="btn" data-s="native" data-k="${k}">${t('share')}…</button>` : ''}</div>`;
+    const clientBlock = noClient ? `<p class="palette-title">${t('clientLink')}</p><p class="muted tiny">${t('noRightLinks')}</p>` : tracked ? `<p class="palette-title">${t('clientLink')}</p>
+      <div data-r="linkform"><p class="muted tiny">${t('trackedNote')}</p>
+        <label class="fld"><span>${t('linkLabel')}</span><input type="text" data-r="linklabel" maxlength="120" placeholder="${esc(t('linkLabelHint'))}"></label>
+        <button class="btn primary" data-s="mklink">${t('linkCreate')}</button></div>
+      <div data-r="linkmade" hidden>
+        <input type="url" readonly value="" data-r="shareurl-client" aria-label="${esc(t('clientLink'))}">
+        <div class="row"><button class="btn primary" data-s="copy" data-k="client">${t('copyLink')}</button>${navigator.share ? `<button class="btn" data-s="native" data-k="client">${t('share')}…</button>` : ''}<button class="btn" data-s="mylinks">${t('linksFollow')}</button></div>
+        <img class="qr" alt="QR" width="180" height="180"></div>`
+      : `${field('client', t('clientLink'))}\n      <img class="qr" alt="QR" width="180" height="180">`;
     const d = this.html(`
       <p class="muted tiny">${t('clientNote')}</p>
-      ${field('client', t('clientLink'))}
-      <img class="qr" alt="QR" width="180" height="180">
+      ${clientBlock}
       ${field('jeweler', t('jewelerLink'))}
       <p class="muted tiny">${hostFailed ? t('shareNoHost') : remote ? t('shareHosted') : t('shareNote')}</p>
       <div class="row"><button class="btn" data-s="project">${t('exportProject')}</button></div>`);
@@ -828,10 +950,36 @@ export class UI {
       if (s === 'copy') { try { await navigator.clipboard.writeText(url); this.toast(t('linkCopied')); } catch { $(`[data-r=shareurl-${b.dataset.k}]`, d).select(); } }
       if (s === 'native') { try { await navigator.share({ url, title: t('app') }); } catch { /* annulé */ } }
       if (s === 'project') this.exportProject();
+      if (s === 'mylinks') { this.dlg.close(); this.openLinks(); }
+      if (s === 'mklink') {
+        b.disabled = true;
+        try {
+          const made = await this.createTrackedLink($('[data-r=linklabel]', d).value, remote);
+          urls.client = made.url;
+          $('[data-r=linkform]', d).hidden = true; $('[data-r=linkmade]', d).hidden = false; $('[data-r=shareurl-client]', d).value = made.url;
+          qrDataUrl(made.url).then((q) => { $('img.qr', d).src = q; }).catch(() => {});
+        } catch (ex) { console.warn(ex); this.toast(t('errorGeneric')); b.disabled = false; }
+      }
     });
     this.openDialog(t('share'), d);
-    qrDataUrl(urls.client).then((u) => { $('img.qr', d).src = u; }).catch(() => {});
+    if (urls.client) qrDataUrl(urls.client).then((u) => { $('img.qr', d).src = u; }).catch(() => {});
   }
+
+  /** Configuration d'un lien client (JSON), modèle hébergé si besoin : sert à créer un lien suivi et à le mettre à jour. */
+  async clientPayloadJson(remote) {
+    const a = this.app;
+    if (remote === undefined) remote = await this.hostModel().catch(() => null);
+    return JSON.stringify(sharePayload({ client: true, remote, modelId: a.modelId, assign: a.assign, hidden: [...a.hidden], env: a.viewer.envId, envRot: Math.round((a.viewer.scene.environmentRotation.y * 180) / Math.PI), light: a.viewer.getLight() }));
+  }
+  /** Crée un lien client suivi : nom donné par le joaillier, vignette 3/4, configuration actuelle. */
+  async createTrackedLink(label, remote) {
+    const a = this.app, c = await this.svc.cloud();
+    let thumb = null;
+    try { await withoutHighlight(a, async () => { thumb = await thumbnail(await a.viewer.capture({ scale: 2, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
+    return c.links.create({ json: await this.clientPayloadJson(remote), label, modelName: (a.model.meta.fileName || '').replace(/\.[^.]+$/, ''), modelId: a.modelId, thumb });
+  }
+  /** Backoffice « Liens clients » (suivi des consultations). */
+  openLinks() { return this.openBackoffice('links'); }
 
   async exportProject() {
     try {
@@ -842,7 +990,7 @@ export class UI {
   }
 
   async takePhoto() {
-    const app = this.app;
+    const app = this.app; emitTrack('photo');
     await withoutHighlight(app, async () => {
       const blob = await app.viewer.capture({ scale: 2, background: BG[this.bg] });
       const how = await shareOrDownload(blob, 'bague.png', t('app'));
@@ -866,7 +1014,7 @@ export class UI {
     const d = this.html('');
     const draw = () => {
       d.innerHTML = `<div class="row"><input type="text" data-r="vname" placeholder="${t('variantName')}" maxlength="40"><button class="btn primary" data-s="save">${t('saveVariant')}</button></div>
-        <ul style="list-style:none;padding:0">${app.variants.map((v) => `<li class="row"><strong style="flex:1">${esc(v.name)}</strong><button class="btn small" data-s="apply" data-id="${v.id}">${t('apply')}</button><button class="btn small" data-s="del" data-id="${v.id}">${t('delete')}</button></li>`).join('')}</ul>`;
+        <ul style="list-style:none;padding:0">${app.variants.map((v) => `<li class="row"><strong style="flex:1">${esc(v.name)}</strong><button class="btn small" data-s="apply" data-id="${esc(v.id)}">${t('apply')}</button><button class="btn small" data-s="del" data-id="${esc(v.id)}">${t('delete')}</button></li>`).join('')}</ul>`;
     };
     draw();
     d.addEventListener('click', (e) => {
@@ -918,7 +1066,7 @@ export class UI {
   progress(pct, label) {
     const p = $('.progress', this.root);
     p.hidden = pct >= 100;
-    $('.bar i', p).style.width = pct + '%';
+    $('.bar i', p).style.transform = `scaleX(${Math.max(0, Math.min(100, pct)) / 100})`;
     $('span', p).textContent = label || '';
   }
 
@@ -951,8 +1099,15 @@ export class UI {
     this.openDialog(t('whatsNew'), d);
   }
 
-  /** Génère les billes (WebGL temporaire) puis rafraîchit la palette. */
+  /**
+   * Génère les billes de métaux et de finitions (second contexte WebGL temporaire : plusieurs centaines de ms de calcul) puis rafraîchit la palette.
+   * Inutile pour un client (interface épurée, sans palette) ; pour le joaillier, différé au moment où le navigateur est au repos,
+   * pour ne pas retarder l'affichage de la bague. D'ici là, les pastilles de couleur CSS servent de repli.
+   */
   loadThumbnails() {
-    setTimeout(() => { try { this.thumbs = renderThumbnails(112); } catch { /* repli : pastilles de couleur CSS */ } this.renderPalette(); }, 60);
+    if (this.locked) return;
+    const run = () => { try { this.thumbs = renderThumbnails(112); } catch { /* repli : pastilles de couleur CSS */ } this.renderPalette(); };
+    if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 4000 });
+    else setTimeout(run, 1500);
   }
 }

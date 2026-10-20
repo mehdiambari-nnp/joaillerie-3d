@@ -30,6 +30,31 @@ export async function saveProject(meta, buffer) {
   return meta.id;
 }
 
+/** Modifie le nom ou l'archivage d'un projet (sans le fichier ni la date de modification). */
+export async function updateProject(id, patch) {
+  const db = await open();
+  try {
+    const tx = db.transaction('projects', 'readwrite'), st = tx.objectStore('projects'), cur = await req(st.get(id));
+    if (cur) st.put({ ...cur, ...Object.fromEntries(Object.entries(patch).filter(([k]) => ['name', 'archived'].includes(k))) });
+    await done(tx);
+  } finally { db.close(); }
+}
+
+/** Copie un projet (fichier compris). */
+export async function duplicateProject(id, name) {
+  const db = await open();
+  try {
+    const tx = db.transaction(['projects', 'buffers'], 'readwrite');
+    const [meta, buf] = await Promise.all([req(tx.objectStore('projects').get(id)), req(tx.objectStore('buffers').get(id))]);
+    if (!meta) throw new Error('projet introuvable');
+    const nid = newId(), now = Date.now();
+    tx.objectStore('projects').put({ ...meta, id: nid, name: name || meta.name, created: now, updated: now, archived: false });
+    if (buf) tx.objectStore('buffers').put(buf.slice ? buf.slice(0) : buf, nid);
+    await done(tx);
+    return nid;
+  } finally { db.close(); }
+}
+
 /** Projets, du plus récent au plus ancien (sans les fichiers). */
 export async function listProjects() {
   const db = await open();
@@ -52,11 +77,15 @@ export async function deleteProject(id) {
   finally { db.close(); }
 }
 
-/** Vignette JPEG réduite (data URL) à partir d'une image PNG. */
-export async function thumbnail(blob, width = 220) {
+/** Vignette JPEG réduite (data URL) à partir d'une image PNG. 560 px de large : net sur les cartes (≈ 300 px CSS) des écrans Retina, ~30–50 Ko. */
+export async function thumbnail(blob, width = 560) {
   const bmp = await createImageBitmap(blob);
-  const c = document.createElement('canvas'); c.width = width; c.height = Math.round((width * bmp.height) / bmp.width);
-  const g = c.getContext('2d'); g.fillStyle = '#e9e0d0'; g.fillRect(0, 0, c.width, c.height); g.drawImage(bmp, 0, 0, c.width, c.height);
+  const w = Math.min(width, bmp.width), h = Math.round((w * bmp.height) / bmp.width);
+  // réduction en deux temps (moitié, puis taille finale) : un seul grand saut donne une image crénelée
+  let src = bmp, sw = bmp.width, sh = bmp.height;
+  const step = (tw, th) => { const k = document.createElement('canvas'); k.width = tw; k.height = th; const g = k.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.fillStyle = '#e9e0d0'; g.fillRect(0, 0, tw, th); g.drawImage(src, 0, 0, sw, sh, 0, 0, tw, th); src = k; sw = tw; sh = th; return k; };
+  while (sw / 2 > w) step(Math.round(sw / 2), Math.round(sh / 2));
+  const c = step(w, h);
   bmp.close?.();
-  return c.toDataURL('image/jpeg', 0.8);
+  return c.toDataURL('image/jpeg', 0.86);
 }

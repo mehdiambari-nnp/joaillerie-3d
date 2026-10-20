@@ -3,9 +3,9 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 import fs from 'node:fs';
 import path from 'node:path';
 import themePlugin from './config/vite-theme.js';
-import { handleApi, memoryStore } from './netlify/lib/api.mjs';
+import { handleApi, memoryStore } from './dev/local-api.mjs';
 
-// Dev / preview local : même API d'hébergement des modèles que la fonction Netlify, avec un stockage en mémoire.
+// Dev / preview local : API d'hébergement locale (mode `offline`, tests) avec un stockage en mémoire.
 const modelsApi = () => {
   const store = memoryStore();
   const mw = async (req, res, next) => {
@@ -45,7 +45,7 @@ export default defineConfig(({ command }) => ({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules/three/')) return 'three';
-          if (id.includes('@mediapipe/tasks-vision')) return 'mediapipe';
+          // (MediaPipe : pas de chunk manuel — rangé avec l'essayage, il emportait l'assistant d'import dynamique et se chargeait partout)
         },
       },
     },

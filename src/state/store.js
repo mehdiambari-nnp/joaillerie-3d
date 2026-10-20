@@ -1,5 +1,6 @@
 // État de configuration, historique undo/redo (50 actions) et lien de partage compressé.
 import LZString from 'lz-string';
+import { LAB, labPack, labUnpack, sanitizeLight } from '../materials/lab.js';
 
 /** Mini store pub/sub. */
 export class Store {
@@ -43,7 +44,9 @@ export class History {
  */
 export function packAssign(assign) {
   const groups = new Map();
+  const labs = new Map(); // textures sur mesure : regroupées par contenu, forme compacte dans la 4e case
   for (const [id, a] of Object.entries(assign)) {
+    if (a.m === LAB) { const p = labPack(a.l); labs.has(p) ? labs.get(p).push(id) : labs.set(p, [id]); continue; }
     const k = `${a.m}|${a.f ?? ''}|${a.c ?? ''}|${a.i != null ? Math.round(a.i * 100) : ''}`;
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(id);
@@ -51,11 +54,11 @@ export function packAssign(assign) {
   return [...groups.entries()].map(([k, ids]) => {
     const [m, f, c, i] = k.split('|');
     return i !== '' ? [ids, m, f || 0, c || 0, Number(i)] : c ? [ids, m, f || 0, c] : f ? [ids, m, f] : [ids, m];
-  });
+  }).concat([...labs.entries()].map(([p, ids]) => [ids, LAB, 0, p]));
 }
 export function unpackAssign(packed) {
   const out = {};
-  for (const [ids, m, f, c, i] of packed) for (const id of ids) out[id] = { m, ...(f ? { f } : {}), ...(c ? { c } : {}), ...(Number.isFinite(i) ? { i: i / 100 } : {}) };
+  for (const [ids, m, f, c, i] of packed) for (const id of ids) out[id] = m === LAB ? { m, l: labUnpack(c) } : { m, ...(f ? { f } : {}), ...(c ? { c } : {}), ...(Number.isFinite(i) ? { i: i / 100 } : {}) };
   return out;
 }
 
@@ -67,8 +70,9 @@ export function decodeShare(str) {
 }
 
 /** Contenu d'un partage (ce qu'encode le lien). */
-export function sharePayload({ modelId, assign, env, envRot, hidden, client = false, remote = null }) {
-  return { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden, ...(client ? { k: 1 } : {}), ...(remote ? { u: remote } : {}) };
+export function sharePayload({ modelId, assign, env, envRot, hidden, light = null, client = false, remote = null }) {
+  const lt = light && (light.n !== 1 || light.x !== 1) ? [light.n, light.x] : null; // éclairage ambiant : seulement s'il a été modifié
+  return { v: 1, model: modelId, a: packAssign(assign), e: env, r: envRot, h: hidden, ...(lt ? { i: lt } : {}), ...(client ? { k: 1 } : {}), ...(remote ? { u: remote } : {}) };
 }
 
 /** Lien long : toute la configuration est dans l'adresse (#c=). Sert de repli quand le lien court est impossible. */
@@ -84,7 +88,7 @@ export async function shareId(json) {
 
 function fromPayload(p) {
   if (!p || p.v !== 1) return null;
-  return { modelId: p.model, assign: unpackAssign(p.a || []), env: p.e, envRot: p.r, hidden: p.h || [], client: !!p.k, remote: typeof p.u === 'string' && /^[a-f0-9]{32}$/.test(p.u) ? p.u : null };
+  return { modelId: p.model, assign: unpackAssign(p.a || []), env: p.e, envRot: p.r, hidden: p.h || [], light: Array.isArray(p.i) ? sanitizeLight({ n: p.i[0], x: p.i[1] }) : null, client: !!p.k, remote: typeof p.u === 'string' && /^[a-f0-9]{32}$/.test(p.u) ? p.u : null };
 }
 
 /** Lien long (#c=) : lecture immédiate. */
@@ -100,6 +104,24 @@ export const shortShareRef = (hash) => /[#&]s=([a-f0-9]{12})(?:&|$)/.exec(hash |
 export function parseShareJson(json) {
   try { return fromPayload(JSON.parse(json)); } catch { return null; }
 }
+
+/** Invitation dans un atelier : lien `#i=<jeton de 32 caractères hexadécimaux>` (le jeton est secret et à usage unique). */
+export const parseInviteHash = (hash) => /[#&]i=([a-f0-9]{32})/.exec(hash || '')?.[1] ?? null;
+export const inviteUrl = (token, base = location.origin + location.pathname) => `${base}#i=${token}`;
+
+/** Lien client SUIVI : `#l=<20 caractères hexadécimaux>` (identifiant secret, désactivable par le joaillier). */
+export const trackedLinkRef = (hash) => /[#&]l=([a-f0-9]{20})(?:&|$)/.exec(hash || '')?.[1] ?? null;
+
+/** Variantes issues d'un fichier ou d'un projet (donnée non fiable) : forme vérifiée, identifiant réduit à [\w-]. */
+export function cleanVariants(v) {
+  if (!Array.isArray(v)) return [];
+  return v.filter((x) => x && typeof x.id === 'string' && typeof x.name === 'string' && x.snap && typeof x.snap === 'object')
+    .map((x) => ({ id: x.id.replace(/[^\w-]/g, '').slice(0, 40), name: x.name.slice(0, 40), snap: x.snap }))
+    .filter((x) => x.id);
+}
+
+/** Porte d'entrée : seul un lien CLIENT valide s'ouvre sans compte ; adresse nue, lien joaillier ou lien illisible exigent la connexion. */
+export const needsLogin = (pending, authEnabled) => !!authEnabled && !pending?.client;
 
 /** Préférences par viewer (jamais bloquant si le stockage est indisponible : mode privé iOS, etc.). */
 export const prefs = {

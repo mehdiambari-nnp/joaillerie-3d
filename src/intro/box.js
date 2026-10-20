@@ -1,4 +1,4 @@
-// Écrin de la marque, d'après la charte (Storez Studio) : boîte carrée en laque bordeaux, couvercle à pans coupés
+// Écrin de la marque, d'après la charte (Storez Studio) : boîte carrée en laque mate bordeaux, couvercle à pans coupés
 // (dessus plat plus sombre), intérieur en suédine noire, logo marqué à chaud or (Kurtz 232) sous le couvercle.
 // Dimensions proportionnelles à S (côté de la boîte, en unités de la scène = mm).
 import * as THREE from 'three';
@@ -23,9 +23,9 @@ function suede(color, sheen, side = THREE.FrontSide, env = 0.5, sheenAmt = 0.45)
   return new THREE.MeshPhysicalMaterial({ color, roughness: 1, metalness: 0, sheen: sheenAmt, sheenColor: new THREE.Color(sheen), sheenRoughness: 0.5, bumpMap: pile(), bumpScale: 0.5, side, envMap: ENV, envMapIntensity: env });
 }
 
-/** Laque brillante (charte V3 : coffret bordeaux laqué) : base lisse + vernis, reflets de l'environnement. */
-function lacquer(color, env = 0.75) {
-  return new THREE.MeshPhysicalMaterial({ color, roughness: 0.32, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, reflectivity: 0.5, envMap: ENV, envMapIntensity: env });
+/** Laque mate (charte : coffret bordeaux) : surface poudrée sans vernis, reflets de l'environnement très atténués. */
+function matte(color, env = 0.75) {
+  return new THREE.MeshPhysicalMaterial({ color, roughness: 0.72, metalness: 0, clearcoat: 0, reflectivity: 0.25, envMap: ENV, envMapIntensity: env * 0.45 });
 }
 
 /** SVG du logo en or → texture (canvas) ; `svg` utilise currentColor. */
@@ -130,7 +130,7 @@ export async function buildBox(S, { logoSvg = null, logoRatio = 4.2, env = null 
   const floorY = 0.62 * hb;                                                      // fond de l'écrin (coussin noir)
   const mats = []; const geos = [];
   const M = (m) => { mats.push(m); return m; }; const G = (g) => { geos.push(g); return g; };
-  const bord = M(lacquer(COL.lac)), bordTop = M(lacquer('#3a0711', 0.03)), bordRim = M(lacquer(COL.lacRim));
+  const bord = M(matte(COL.lac)), bordTop = M(matte('#3a0711', 0.03)), bordRim = M(matte(COL.lacRim));
   const blk = M(suede(COL.black, COL.blackSheen, THREE.FrontSide, 0.03, 0.08)), blkIn = M(suede(COL.black, COL.blackSheen, THREE.BackSide, 0.03, 0.08));
   const group = new THREE.Group();
   const add = (parent, geo, mat, y = 0, rx = 0) => { const m = new THREE.Mesh(G(geo), mat); m.position.y = y; m.rotation.x = rx; parent.add(m); return m; };
@@ -146,7 +146,7 @@ export async function buildBox(S, { logoSvg = null, logoRatio = 4.2, env = null 
   // ----- Couvercle laqué (origine = centre du bas du couvercle, posé sur l'épaulement) -----
   const lid = new THREE.Group(); lid.position.y = hb; group.add(lid);
   const lg = lidGeometries(S, 0.2 * S, lidH, 0.42 * S);
-  add(lid, lg.wall, bord); add(lid, lg.slope, M(lacquer('#34060f', 0.1))); add(lid, lg.top, bordTop); add(lid, lg.bottom, bord);
+  add(lid, lg.wall, bord); add(lid, lg.slope, M(matte('#34060f', 0.1))); add(lid, lg.top, bordTop); add(lid, lg.bottom, bord);
   // dessous du couvercle : plafond noir encadré d'une tranche laquée
   add(lid, squareRing(S - 2 * t, 0), blk, -0.02, Math.PI / 2);
 
