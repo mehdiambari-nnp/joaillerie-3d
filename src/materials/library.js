@@ -19,7 +19,7 @@ export const METALS = [
 ];
 
 export const FINISHES = [
-  { id: 'polish', name: 'Poli', roughness: 0.12, anisotropy: 0 },
+  { id: 'polish', name: 'Poli', roughness: 0.04, anisotropy: 0 },
   // Réglées d'après des pièces réelles : satiné = reflet doux + stries fines ; brossé = mat uniforme à grain très fin ; martelé = facettes brillantes.
   // `i0` = intensité par défaut (0..1) ; le curseur du bouton la règle : satiné = degré de satinage, brossé = orientation (0–90°), martelé = taille des coups.
   { id: 'satin', name: 'Satiné', roughness: 0.4, anisotropy: 0, i0: 0.62, gauge: 'satin' },

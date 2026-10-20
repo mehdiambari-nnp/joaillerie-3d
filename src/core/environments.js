@@ -98,11 +98,11 @@ function buildDaylight() {
  */
 function buildJeweller() {
   const s = new THREE.Scene();
-  s.add(gradientSphere(new THREE.Color(0.3, 0.3, 0.32), new THREE.Color(0.5, 0.47, 0.43), new THREE.Color(0.05, 0.035, 0.02)));
+  s.add(gradientSphere(new THREE.Color(0.3, 0.3, 0.32), new THREE.Color(0.5, 0.47, 0.43), new THREE.Color(0.06, 0.045, 0.03)));
   const white = 0xffffff, warm = 0xfff0dc, cool = 0xeef3ff;
-  const top = light(30, 20, 3.6, white); top.position.set(0, 26, 0); top.rotation.x = Math.PI / 2; s.add(top);
-  const left = light(14, 30, 3.0, warm); left.position.set(-26, 6, 6); left.lookAt(0, 4, 0); s.add(left);
-  const right = light(11, 30, 2.4, cool); right.position.set(26, 5, -4); right.lookAt(0, 4, 0); s.add(right);
+  const top = light(34, 24, 5.0, white); top.position.set(0, 26, 0); top.rotation.x = Math.PI / 2; s.add(top);
+  const left = light(18, 32, 4.4, warm); left.position.set(-26, 6, 6); left.lookAt(0, 4, 0); s.add(left);
+  const right = light(14, 32, 3.4, cool); right.position.set(26, 5, -4); right.lookAt(0, 4, 0); s.add(right);
   const front = light(38, 6, 1.8, white); front.position.set(0, 12, 28); front.lookAt(0, 6, 0); s.add(front);
   const rim = light(30, 5, 2.0, warm); rim.position.set(0, 4, -28); rim.lookAt(0, 4, 0); s.add(rim);
   const bounce = light(34, 34, 0.12, 0xfff0e0); bounce.position.set(0, -26, 0); bounce.rotation.x = Math.PI / 2; s.add(bounce); // carton de rebond : sous la bague, brun doux
