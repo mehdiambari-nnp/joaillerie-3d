@@ -5,9 +5,9 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { METALS, FINISHES, DEFAULT_METAL } from './library.js';
 import { createMaterial } from './factory.js';
 
-/** Retourne { metals:{id:url}, finishes:{id:url}, gems:{id:url} }. */
-export function renderThumbnails(size = 112) {
-  const out = { metals: {}, finishes: {}, gems: {} };
+/** Retourne { metals:{id:url}, finishes:{id:url}, gems:{id:url}, labs:{id:url} }. `only` : ne rend que les textures `labs`. */
+export function renderThumbnails(size = 112, labs = null, only = false) {
+  const out = { metals: {}, finishes: {}, gems: {}, labs: {} };
   let renderer;
   try {
     const canvas = document.createElement('canvas');
@@ -51,6 +51,9 @@ export function renderThumbnails(size = 112) {
   const ball = new THREE.Mesh(sphere);
   ball.rotation.x = 0.4;
 
+  // textures de l'Atelier d'or : même bille que les métaux, avec tous leurs réglages ; clé = id de la texture
+  for (const p of labs || []) { try { out.labs[p.id] = shoot(ball, createMaterial('metal', { m: 'lab', l: p.l }), false); } catch { /* repli : pastille de couleur */ } }
+  if (only) { env.dispose(); pmrem.dispose(); sphere.dispose(); bg.dispose(); renderer.forceContextLoss(); renderer.dispose(); return out; }
   for (const m of METALS) out.metals[m.id] = shoot(ball, createMaterial('metal', { m: m.id, f: 'polish' }), false);
   for (const f of FINISHES) out.finishes[f.id] = shoot(ball, createMaterial('metal', { m: DEFAULT_METAL.m, f: f.id }), false);
   // pierres : pastilles SVG (gemicon.js), plus de vignettes 3D (le catalogue compte une cinquantaine de pierres)
