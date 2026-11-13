@@ -30,7 +30,7 @@ export async function openBackoffice(ui, tab = 'dashboard', params = {}) {
   ui.root.append(el);
   document.documentElement.classList.add('has-bo');
 
-  let cur = null, back = null, page = null, token = 0, pushed = false;
+  let cur = null, back = null, page = null, token = 0, pushed = false, closed = false;
   // adresse propre : #bo=<page> (partageable, et le retour du navigateur ferme le backoffice)
   const sync = (id) => { try { const u = `#bo=${id}`; if (!pushed && !location.hash.startsWith('#bo=')) { history.pushState({ bo: id }, '', u); pushed = true; } else history.replaceState(history.state, '', u); } catch { /* hors navigateur */ } };
   const pageEl = el.querySelector('[data-r=page]');
@@ -52,7 +52,8 @@ export async function openBackoffice(ui, tab = 'dashboard', params = {}) {
       } catch (e) { console.warn('Page indisponible', e); if (my === token) pageEl.innerHTML = `<div class="bo-body"><p class="proj-empty">${esc(t('linksError'))}</p></div>`; }
     },
     reload() { return api.go(cur, {}); },
-    close(fromPop = false) { page?.destroy?.(); document.removeEventListener('keydown', onKey); removeEventListener('popstate', onPop);
+    close(fromPop = false) { if (closed) return; closed = true; // une seule fois : un 2e history.back() quitterait le site
+      page?.destroy?.(); document.removeEventListener('keydown', onKey); removeEventListener('popstate', onPop);
       if (!fromPop) { try { if (pushed) history.back(); else history.replaceState(null, '', location.pathname + location.search); } catch { /* ignoré */ } }
       el.remove(); document.documentElement.classList.remove('has-bo'); ui.backoffice = null; prevFocus?.focus?.(); ui.renderMenu?.(); },
   };

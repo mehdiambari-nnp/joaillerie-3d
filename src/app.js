@@ -315,6 +315,13 @@ export class Configurator extends Emitter {
     this.history.push(this.snapshot());
     this.emit('history');
   }
+  /** Remplace la configuration d'une variante par l'état actuel (modifs faites après l'avoir appliquée). */
+  updateVariant(id) {
+    const v = this.variants.find((x) => x.id === id);
+    if (!v) return;
+    v.snap = JSON.parse(JSON.stringify(this.snapshot()));
+    this.emit('variants');
+  }
   deleteVariant(id) { this.variants = this.variants.filter((v) => v.id !== id); this.emit('variants'); }
 
   /** Configuration complète sérialisable (projet GLB / partage). */
