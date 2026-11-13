@@ -520,6 +520,7 @@ export class UI {
   onClick(e) {
     const app = this.app;
     const tgt = e.target;
+    if (tgt.closest('.bo')) return; // le backoffice gère ses propres clics (ses data-a="open"/"share"… ne sont pas ceux de l'éditeur)
     if (tgt.closest('[data-lab-open]')) { this.lab.open(); return; }
     const lp = tgt.closest('[data-labpick]');
     if (lp) {
@@ -1014,14 +1015,17 @@ export class UI {
     const d = this.html('');
     const draw = () => {
       d.innerHTML = `<div class="row"><input type="text" data-r="vname" placeholder="${t('variantName')}" maxlength="40"><button class="btn primary" data-s="save">${t('saveVariant')}</button></div>
-        <ul style="list-style:none;padding:0">${app.variants.map((v) => `<li class="row"><strong style="flex:1">${esc(v.name)}</strong><button class="btn small" data-s="apply" data-id="${esc(v.id)}">${t('apply')}</button><button class="btn small" data-s="del" data-id="${esc(v.id)}">${t('delete')}</button></li>`).join('')}</ul>`;
+        <ul style="list-style:none;padding:0">${app.variants.map((v) => `<li class="row"><strong style="flex:1">${esc(v.name)}</strong><button class="btn small" data-s="apply" data-id="${esc(v.id)}">${t('apply')}</button><button class="btn small" data-s="upd" data-id="${esc(v.id)}">${t('updateVariant')}</button><button class="btn small" data-s="del" data-id="${esc(v.id)}">${t('delete')}</button></li>`).join('')}</ul>`;
     };
     draw();
+    // Un projet ouvert est réenregistré aussitôt : les variantes ne sont conservées qu'avec le projet.
+    const persist = () => { if (this.svc.projectId) this.saveCurrentProject(false, this.svc.projectName); };
     d.addEventListener('click', (e) => {
       const b = e.target.closest('[data-s]'); if (!b) return;
-      if (b.dataset.s === 'save') { app.saveVariant($('[data-r=vname]', d).value.trim() || `Variante ${app.variants.length + 1}`); draw(); }
+      if (b.dataset.s === 'save') { app.saveVariant($('[data-r=vname]', d).value.trim() || `Variante ${app.variants.length + 1}`); draw(); persist(); }
+      if (b.dataset.s === 'upd') { app.updateVariant(b.dataset.id); draw(); persist(); }
       if (b.dataset.s === 'apply') { app.applyVariant(b.dataset.id); this.dlg.close(); }
-      if (b.dataset.s === 'del') { app.deleteVariant(b.dataset.id); draw(); }
+      if (b.dataset.s === 'del') { app.deleteVariant(b.dataset.id); draw(); persist(); }
     });
     this.openDialog(t('variants'), d);
   }

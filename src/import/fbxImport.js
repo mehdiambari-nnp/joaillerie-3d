@@ -8,6 +8,7 @@ import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {
   describeGeometry, generateBoxUV, detectFingerAxis, buildNormalizationMatrix, measureHole,
 } from './analysis.js';
+import { gunzip } from '../share/remote.js';
 import {
   norm, classifyKind, detectZones, findDuplicates, frenchRingSize, guessUnitToMM, UNIT_FACTORS,
 } from './zones.js';
@@ -18,6 +19,7 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 export function sniffFormat(buffer, fileName = '') {
   const head = new Uint8Array(buffer, 0, Math.min(32, buffer.byteLength));
   const ascii = String.fromCharCode(...head);
+  if (head[0] === 0x1f && head[1] === 0x8b) return 'gzip'; // fichier compressé (ex. FBX .gz renommé en .fbx) : décompressé au chargement
   if (ascii.startsWith('Kaydara FBX Binary')) return 'fbx';
   if (ascii.startsWith('; FBX')) return 'fbx';
   if (ascii.startsWith('glTF')) return 'glb';
@@ -43,8 +45,12 @@ function splitByGroups(geometry, materials) {
 
 /** Lecture brute : retourne les meshes (géométrie « cuite » dans le repère monde du fichier) et les vues de caméra. */
 export async function loadRaw(buffer, fileName) {
-  const fmt = sniffFormat(buffer, fileName);
-  if (!fmt) throw new Error('Format non reconnu. Formats acceptés : FBX, GLB/GLTF, OBJ.');
+  let fmt = sniffFormat(buffer, fileName);
+  if (fmt === 'gzip') {
+    buffer = await gunzip(buffer);
+    fmt = sniffFormat(buffer, fileName.replace(/\.gz$/i, ''));
+  }
+  if (!fmt || fmt === 'gzip') throw new Error('Format non reconnu. Formats acceptés : FBX, GLB/GLTF, OBJ.');
   let root, project = null;
   if (fmt === 'fbx') {
     root = new FBXLoader().parse(buffer, '');
