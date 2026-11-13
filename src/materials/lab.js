@@ -20,22 +20,25 @@ export const LAB_DEFAULT = Object.freeze({
 
 export const LAB_LIGHT_DEFAULT = Object.freeze({ env: null, envRot: null, n: 1, x: 1 });
 
-/** Description des réglages : groupes, bornes, libellés [FR, EN]. Source unique pour l'interface et la validation. */
+/** Description des réglages : groupes, bornes, libellés [FR, EN]. Source unique pour l'interface et la validation.
+ *  `hide: true` : réglage conservé (valeurs des textures déjà enregistrées, bornes) mais retiré de l'interface car sans effet visible sur un métal :
+ *  spéculaire / IOR sont ignorés par three.js quand la métallicité vaut 1 (le reflet prend la couleur du métal), et métallicité, voile, lueur,
+ *  rugosité du vernis, indice du film et relief ne servent pas à un bijou. */
 export const LAB_GROUPS = [
   { id: 'base', title: ['Couleur et métal', 'Colour and metal'], fields: [
     { k: 'color', type: 'color', label: ['Couleur des reflets', 'Reflection colour'] },
     { k: 'gain', min: 0.4, max: 4, step: 0.05, label: ['Luminosité du métal', 'Metal brightness'] },
-    { k: 'metalness', min: 0, max: 1, step: 0.01, label: ['Métallicité', 'Metalness'] },
+    { k: 'metalness', hide: true, min: 0, max: 1, step: 0.01, label: ['Métallicité', 'Metalness'] },
     { k: 'roughness', min: 0, max: 1, step: 0.01, label: ['Rugosité (reflets nets → diffus)', 'Roughness (sharp → diffuse)'] },
   ] },
   { id: 'spec', title: ['Reflets', 'Specular'], fields: [
-    { k: 'specular', min: 0, max: 1, step: 0.01, label: ['Intensité des reflets', 'Specular intensity'] },
-    { k: 'specularColor', type: 'color', label: ['Couleur des reflets secondaires', 'Specular colour'] },
-    { k: 'ior', min: 1, max: 2.5, step: 0.01, label: ['Indice de réfraction (IOR)', 'Index of refraction (IOR)'] },
+    { k: 'specular', hide: true, min: 0, max: 1, step: 0.01, label: ['Intensité des reflets', 'Specular intensity'] },
+    { k: 'specularColor', hide: true, type: 'color', label: ['Couleur des reflets secondaires', 'Specular colour'] },
+    { k: 'ior', hide: true, min: 1, max: 2.5, step: 0.01, label: ['Indice de réfraction (IOR)', 'Index of refraction (IOR)'] },
   ] },
   { id: 'coat', title: ['Vernis (clearcoat)', 'Clearcoat'], fields: [
     { k: 'clearcoat', min: 0, max: 1, step: 0.01, label: ['Épaisseur du vernis', 'Clearcoat'] },
-    { k: 'clearcoatRoughness', min: 0, max: 1, step: 0.01, label: ['Rugosité du vernis', 'Clearcoat roughness'] },
+    { k: 'clearcoatRoughness', hide: true, min: 0, max: 1, step: 0.01, label: ['Rugosité du vernis', 'Clearcoat roughness'] },
   ] },
   { id: 'aniso', title: ['Anisotropie (brossage)', 'Anisotropy'], fields: [
     { k: 'anisotropy', min: 0, max: 1, step: 0.01, label: ['Force', 'Strength'] },
@@ -43,22 +46,22 @@ export const LAB_GROUPS = [
   ] },
   { id: 'iri', title: ['Irisation', 'Iridescence'], fields: [
     { k: 'iridescence', min: 0, max: 1, step: 0.01, label: ['Intensité', 'Intensity'] },
-    { k: 'iridescenceIOR', min: 1, max: 2.5, step: 0.01, label: ['Indice du film', 'Film IOR'] },
+    { k: 'iridescenceIOR', hide: true, min: 1, max: 2.5, step: 0.01, label: ['Indice du film', 'Film IOR'] },
     { k: 'iridescenceThickness', min: 100, max: 800, step: 5, label: ['Épaisseur du film (nm)', 'Film thickness (nm)'] },
   ] },
   { id: 'sheen', title: ['Voile (sheen)', 'Sheen'], fields: [
-    { k: 'sheen', min: 0, max: 1, step: 0.01, label: ['Intensité', 'Intensity'] },
-    { k: 'sheenRoughness', min: 0, max: 1, step: 0.01, label: ['Rugosité', 'Roughness'] },
-    { k: 'sheenColor', type: 'color', label: ['Couleur du voile', 'Sheen colour'] },
+    { k: 'sheen', hide: true, min: 0, max: 1, step: 0.01, label: ['Intensité', 'Intensity'] },
+    { k: 'sheenRoughness', hide: true, min: 0, max: 1, step: 0.01, label: ['Rugosité', 'Roughness'] },
+    { k: 'sheenColor', hide: true, type: 'color', label: ['Couleur du voile', 'Sheen colour'] },
   ] },
   { id: 'glow', title: ['Lueur propre', 'Emission'], fields: [
-    { k: 'emissive', type: 'color', label: ['Couleur', 'Colour'] },
-    { k: 'emissiveIntensity', min: 0, max: 1, step: 0.01, label: ['Intensité', 'Intensity'] },
+    { k: 'emissive', hide: true, type: 'color', label: ['Couleur', 'Colour'] },
+    { k: 'emissiveIntensity', hide: true, min: 0, max: 1, step: 0.01, label: ['Intensité', 'Intensity'] },
   ] },
   { id: 'tex', title: ['Surface', 'Surface'], fields: [
     { k: 'tex', type: 'select', options: [['none', ['Lisse', 'Smooth']], ['satin', ['Satiné', 'Satin']], ['brushed', ['Brossé', 'Brushed']], ['hammered', ['Martelé', 'Hammered']]], label: ['Texture', 'Texture'] },
     { k: 'texI', min: 0, max: 1, step: 0.01, label: ['Intensité de la texture', 'Texture intensity'] },
-    { k: 'relief', min: 0, max: 2, step: 0.05, label: ['Relief', 'Relief'] },
+    { k: 'relief', hide: true, min: 0, max: 2, step: 0.05, label: ['Relief', 'Relief'] },
   ] },
 ];
 export const LAB_LIGHT_GROUP = { id: 'light', title: ['Éclairage ambiant', 'Ambient light'], fields: [
@@ -66,6 +69,9 @@ export const LAB_LIGHT_GROUP = { id: 'light', title: ['Éclairage ambiant', 'Amb
   { k: 'x', min: 0.3, max: 2.5, step: 0.05, label: ['Exposition', 'Exposure'] },
   { k: 'envRot', min: 0, max: 360, step: 1, label: ['Rotation des reflets (°)', 'Reflection rotation (°)'] },
 ] };
+
+/** Réglages affichés dans l'interface (hors `hide`) ; un groupe sans réglage visible n'est pas affiché. */
+export const visibleFields = (g) => g.fields.filter((f) => !f.hide);
 
 const FIELD = new Map(LAB_GROUPS.flatMap((g) => g.fields).map((f) => [f.k, f]));
 const hex = (v, d) => (typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : d);

@@ -1,6 +1,6 @@
 // Atelier d'or : feuille de réglages PBR + éclairage ambiant, appliquée en direct aux métaux sélectionnés (ou à tous les métaux).
 // Le joaillier règle, voit la bague changer, puis enregistre sa texture sous son propre nom (bibliothèque de l'appareil).
-import { LAB, LAB_DEFAULT, LAB_GROUPS, LAB_LIGHT_GROUP, sanitizeLab, sanitizeLight, listLabs, saveLab, deleteLab, refreshLabs } from '../materials/lab.js';
+import { LAB, LAB_DEFAULT, LAB_GROUPS, LAB_LIGHT_GROUP, visibleFields, sanitizeLab, sanitizeLight, listLabs, saveLab, deleteLab, refreshLabs } from '../materials/lab.js';
 import { resolveMetal, rgbToHex, FINISHES } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { LANG } from './i18n.js';
@@ -114,7 +114,7 @@ export class LabPanel {
         </div>
         <label class="lab-chk"><input type="checkbox" data-lwl ${this.withLight ? 'checked' : ''}> ${tx('withLight')}</label>
         <div class="lab-mine"><h4>${tx('mine')}</h4>${labs.length ? labs.map((p) => `<div class="lab-row"><i style="--sw:${p.l.color}"></i><span>${esc(p.name)}${p.by ? `<small>${esc(p.by)}</small>` : ''}</span><button class="btn small" data-lab-a="load" data-id="${p.id}">${tx('load')}</button><button class="icon-btn small" data-lab-a="del" data-id="${p.id}" aria-label="${tx('del')}" title="${tx('del')}">🗑</button></div>`).join('') : `<p class="lab-empty">${tx('none')}</p>`}</div>
-        ${LAB_GROUPS.map((g) => group(g, g.fields.map((f) => this.fieldHtml(f, this.l[f.k])).join(''))).join('')}
+        ${LAB_GROUPS.filter((g) => visibleFields(g).length).map((g) => group(g, visibleFields(g).map((f) => this.fieldHtml(f, this.l[f.k])).join(''))).join('')}
         ${group(LAB_LIGHT_GROUP, `<div class="lab-envs">${ENVIRONMENTS.map((e) => `<button class="btn small ${vw.envId === e.id ? 'primary' : ''}" data-lab-a="env" data-lenv="${e.id}">${esc(e.name)}</button>`).join('')}</div>`
           + LAB_LIGHT_GROUP.fields.map((f) => this.fieldHtml(f, lightVals[f.k], 'L:')).join(''))}
         <button class="btn small lab-reset" data-lab-a="reset">${tx('reset')}</button>
