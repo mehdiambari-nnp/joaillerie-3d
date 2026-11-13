@@ -15,7 +15,7 @@ import { gemIconUrl } from '../materials/gemicon.js';
 import { METALS, FINISHES, GEMS, GEM_GROUPS, CUSTOM, byId, describeAssignment, swatchOf, hexToHsl, hslToHex, validHex } from '../materials/library.js';
 import { ENVIRONMENTS } from '../core/environments.js';
 import { LabPanel } from './lab-panel.js';
-import { LAB, listLabs, sanitizeLight, initLabs, refreshLabs } from '../materials/lab.js';
+import { LAB, labPack, listLabs, sanitizeLight, initLabs, refreshLabs } from '../materials/lab.js';
 import { renderThumbnails } from '../materials/thumbnails.js';
 import { prefs, buildShareUrl, sharePayload, shareId } from '../state/store.js';
 import { newId, thumbnail } from '../projects/projects.js';
@@ -309,6 +309,18 @@ export class UI {
       <span class="b" style="--sw:${item.swatch ?? '#bbb'};${url ? `--img:url(${url})` : ''}"></span><span class="n">${esc(item.name)}</span></button>`;
   }
 
+  /** Bille 3D d'une texture de l'Atelier d'or (rendue à la demande, mise en cache tant que ses réglages ne changent pas). */
+  labThumb(p) {
+    const key = p.id + labPack(p.l), c = (this._labThumbs ||= new Map());
+    if (!c.has(key)) {
+      const k = (x) => x.id + labPack(x.l);
+      const todo = listLabs().filter((x) => !c.has(k(x))); // toutes les textures encore sans bille : un seul contexte WebGL
+      for (const x of todo) c.set(k(x), ''); // évite de réessayer en boucle si le rendu échoue
+      try { const out = renderThumbnails(112, todo, true).labs; for (const x of todo) if (out[x.id]) c.set(k(x), out[x.id]); } catch { /* repli : pastille de couleur */ }
+    }
+    return c.get(key) || '';
+  }
+
   /** Pierres : pastilles de couleur groupées par famille, sans nom d'espèce. */
   gemDots(list, sameM) {
     const dot = (item, pressed, extra = '') => {
@@ -378,7 +390,7 @@ export class UI {
         + this.gemDots(list, sameM) + `<p class="gem-none" data-r="gemnone" hidden>${esc(t('gemNoMatch'))}</p>` + (customOn ? `<button class="dot custom-dot" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span></span></button>` : '')
       : list.map((m) => this.ball(m, 'metals', m.id === sameM)).join('')
         + (customOn ? `<button class="ball" role="option" data-mat="${CUSTOM}" aria-label="${t('customColor')}" aria-pressed="${sameM === CUSTOM}" title="${t('customColor')}"><span class="b custom-b"></span><span class="n">${t('customColor')}</span></button>` : '')
-        + (!allowed ? listLabs().map((p) => `<button class="ball" role="option" data-labpick="${p.id}" aria-label="${esc(p.name)}" aria-pressed="${sameM === LAB && assigns.every((x) => x.l?.n === p.name)}" title="${esc(p.name)}"><span class="b" style="--sw:${p.l.color}"></span><span class="n">${esc(p.name)}</span></button>`).join('')
+        + (!allowed ? listLabs().map((p) => `<button class="ball" role="option" data-labpick="${p.id}" aria-label="${esc(p.name)}" aria-pressed="${sameM === LAB && assigns.every((x) => x.l?.n === p.name)}" title="${esc(p.name)}"><span class="b" style="--sw:${p.l.color};${this.labThumb(p) ? `--img:url(${this.labThumb(p)})` : ''}"></span><span class="n">${esc(p.name)}</span></button>`).join('')
           + `<button class="ball" data-lab-open aria-label="${t('labOpen')}" title="${t('labOpen')}"><span class="b lab-b">✦</span><span class="n">${t('labOpen')}</span></button>` : '');
     const fin = kind === 'metal'
       ? `<div class="finish-seg" role="group" aria-label="${t('finishes')}">${FINISHES.map((f) => {
