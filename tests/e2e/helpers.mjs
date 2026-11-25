@@ -3,7 +3,15 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-export const CHROMIUM = fs.existsSync('/opt/pw-browsers/chromium-1194/chrome-linux/chrome') ? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' : undefined;
+// Binaire Chromium : PW_CHROMIUM (si défini) puis chemins connus des conteneurs (CI, Claude cloud).
+// Aucun trouvé → undefined : Playwright utilise son propre navigateur (npx playwright install).
+const CHROMIUM_CANDIDATES = [
+  process.env.PW_CHROMIUM,
+  '/opt/pw-browsers/chromium',
+  '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+].filter(Boolean);
+export const CHROMIUM = CHROMIUM_CANDIDATES.find((p) => { try { return fs.statSync(p).isFile(); } catch { return false; } });
+if (process.env.PW_CHROMIUM && CHROMIUM !== process.env.PW_CHROMIUM) console.warn(`PW_CHROMIUM introuvable (${process.env.PW_CHROMIUM}), repli sur ${CHROMIUM ?? 'le navigateur Playwright'}`);
 
 export async function startServer(port = 5199) {
   process.env.E2E = '1';

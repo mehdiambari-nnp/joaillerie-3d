@@ -39,15 +39,19 @@ export class Picker {
     return piece ? { piece, point: hit.point } : null;
   }
 
-  _down(e) { this.down = { x: e.clientX, y: e.clientY, t: performance.now(), id: e.pointerId }; }
+  // Horodatage de l'événement (moment réel de l'appui) plutôt que l'heure de traitement : si une image lourde
+  // occupe le fil principal (GPU lent), l'événement attend et un appui bref passerait sinon pour un appui long.
+  _t(e) { return e.timeStamp > 0 ? e.timeStamp : performance.now(); }
+
+  _down(e) { this.down = { x: e.clientX, y: e.clientY, t: this._t(e), id: e.pointerId }; }
 
   _up(e) {
     if (!this.down) return;
     const d = this.down; this.down = null;
     const moved = Math.hypot(e.clientX - d.x, e.clientY - d.y);
-    if (moved > 7 || performance.now() - d.t > 600) return; // glisser = rotation, pas un clic
+    if (moved > 7 || this._t(e) - d.t > 600) return; // glisser = rotation, pas un clic
     const hit = this.pick(e.clientX, e.clientY);
-    const now = performance.now();
+    const now = this._t(e);
     const dbl = now - this.lastTap.t < 320 && Math.hypot(e.clientX - this.lastTap.x, e.clientY - this.lastTap.y) < 22;
     this.lastTap = { t: now, x: e.clientX, y: e.clientY };
     if (dbl && hit) { this.h.onFocus?.(hit.piece.id); return; }

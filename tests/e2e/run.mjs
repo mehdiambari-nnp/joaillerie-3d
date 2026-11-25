@@ -82,8 +82,14 @@ const target = await page.evaluate(() => {
   const n = best.project(cam); const r = v.renderer.domElement.getBoundingClientRect();
   return { x: r.left + (n.x + 1) / 2 * r.width, y: r.top + (1 - n.y) / 2 * r.height };
 });
+// Rendu suspendu le temps du clic : sous SwiftShader, chaque image de cumul (anti-crénelage à l'arrêt) occupe le fil
+// principal ~0,7 s ; Playwright n'envoie `up` qu'une fois `down` traité, l'appui dépasserait alors le seuil d'appui long
+// (600 ms) du Picker. Le picking (raycast BVH sur CPU) ne dépend pas du rendu.
+await page.evaluate(() => __rc.app.viewer.setPaused(true));
+await page.waitForTimeout(100); // laisse finir l'image éventuellement en cours
 await page.mouse.move(target.x, target.y);
 await page.mouse.down(); await page.mouse.up();
+await page.evaluate(() => __rc.app.viewer.setPaused(false));
 await page.waitForTimeout(500);
 picked = await page.evaluate(() => __rc.app.selection.size > 0);
 }
@@ -232,7 +238,8 @@ if (photo) {
   await page.goto(url + q);
   await waitModel(page);
   await page.evaluate(() => document.querySelector('button[data-a=tryon]').click());
-  await page.waitForSelector('.tryon-intro [data-a=start], [data-a=start]', { timeout: 10000 });
+  // 60 s : sous SwiftShader (DPR 2), les images de cumul à l'arrêt retardent le chargement du module d'essayage (~20 s mesurées).
+  await page.waitForSelector('.tryon-intro [data-a=start], [data-a=start]', { timeout: 60000 });
   await page.evaluate(() => document.querySelector('[data-a=start]').click());
   let found = false;
   try {
