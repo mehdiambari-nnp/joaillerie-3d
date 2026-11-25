@@ -91,7 +91,7 @@ export function create(config) {
       const d = doc(col(), id), old = await getDoc(d), o = old.exists() ? old.data() : null;
       const me = auth.currentUser;
       await setDoc(d, {
-        ...rest, modelHash, options: JSON.stringify(options || {}), config: JSON.stringify(config || {}),
+        ...rest, thumb: rest.thumb || o?.thumb || null, modelHash, // capture impossible : l'ancienne vignette est conservée options: JSON.stringify(options || {}), config: JSON.stringify(config || {}),
         created: o ? o.created : Date.now(), updated: Date.now(),
         by: displayName({ name: me.displayName, email: me.email }), byUid: me.uid,
         private: o ? o.private === true : false, archived: o ? o.archived === true : false, // visibilité et archivage conservés à la mise à jour

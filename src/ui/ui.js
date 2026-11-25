@@ -869,6 +869,7 @@ export class UI {
     const app = this.app, s = this.svc;
     if (!app.model || !s.last) return;
     name = String(name || '').trim() || (app.model.meta.fileName || t('projectDefault')).replace(/\.[^.]+$/, '');
+    this.toast(t('projectSaving'), 1600); // capture HD + envoi : quelques secondes
     try {
       let thumb = null; // vignette toujours en 3/4, quel que soit l'angle de la caméra du joaillier
       try { await withoutHighlight(app, async () => { thumb = await thumbnail(await app.viewer.capture({ scale: 2, background: BG[this.bg], view: [0.62, 0.45, 0.64] })); }); } catch { /* vignette facultative */ }
@@ -876,6 +877,8 @@ export class UI {
       await (await s.cloud()).projects.save({ id, name, modelName: s.last.name, modelId: app.modelId, options: s.options || {}, config: app.config(), env: app.viewer.envId, envRot: Math.round((app.viewer.scene.environmentRotation.y * 180) / Math.PI), thumb }, s.last.buffer);
       s.projectId = id; s.projectName = name;
       this.toast(t('projectSaved'));
+      // pages du backoffice ouvertes (Projets, tableau de bord, joailliers) : rechargées avec la nouvelle vignette, même ouvertes pendant l'enregistrement
+      document.dispatchEvent(new CustomEvent('rc:project-saved', { detail: { id } }));
     } catch (e) { console.warn(e); this.toast(t('projectsUnavailable')); }
   }
 

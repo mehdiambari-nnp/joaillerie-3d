@@ -114,5 +114,7 @@ export async function mount(ctx) {
   ctx.setBack(null);
   render();
   await load();
-  return { destroy() { el.removeEventListener('click', onClick); } };
+  const onSaved = () => load(); // projet enregistré (ou mis à jour) : liste et vignettes à jour
+  document.addEventListener('rc:project-saved', onSaved);
+  return { destroy() { document.removeEventListener('rc:project-saved', onSaved); el.removeEventListener('click', onClick); } };
 }
