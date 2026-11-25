@@ -83,7 +83,11 @@ const target = await page.evaluate(() => {
   return { x: r.left + (n.x + 1) / 2 * r.width, y: r.top + (1 - n.y) / 2 * r.height };
 });
 await page.mouse.move(target.x, target.y);
+// rendu suspendu le temps du clic : en WebGL logiciel une image peut durer plus de 600 ms entre l'appui et le relâchement,
+// et le sélecteur prendrait alors le clic pour un glisser (la détection de la pièce n'a pas besoin du rendu)
+await page.evaluate(() => __rc.app.viewer.setPaused(true));
 await page.mouse.down(); await page.mouse.up();
+await page.evaluate(() => __rc.app.viewer.setPaused(false));
 await page.waitForTimeout(500);
 picked = await page.evaluate(() => __rc.app.selection.size > 0);
 }
@@ -232,7 +236,7 @@ if (photo) {
   await page.goto(url + q);
   await waitModel(page);
   await page.evaluate(() => document.querySelector('button[data-a=tryon]').click());
-  await page.waitForSelector('.tryon-intro [data-a=start], [data-a=start]', { timeout: 10000 });
+  await page.waitForSelector('.tryon-intro [data-a=start], [data-a=start]', { timeout: 60000 }); // module d'essayage chargé à la demande : lent en WebGL logiciel
   await page.evaluate(() => document.querySelector('[data-a=start]').click());
   let found = false;
   try {
