@@ -76,7 +76,7 @@ export async function mount(ctx) {
   const onClick = async (e) => {
     const b = e.target.closest('[data-a]'); if (!b) return;
     const a = b.dataset.a, id = b.closest('[data-id]')?.dataset.id;
-    if (a === 'save') ui.openSaveDialog(() => load());
+    if (a === 'save') ui.openSaveDialog();
     else if (a === 'new') ui.openNewProject(() => ctx.go('projects'));
     else if (a === 'share') { ctx.close(); ui.openShare(); }
     else if (a === 'go-projects') ctx.go('projects');
@@ -88,5 +88,7 @@ export async function mount(ctx) {
   ctx.setBack(null);
   render();
   await load();
-  return { destroy() { el.removeEventListener('click', onClick); } };
+  const onSaved = () => load(); // projet enregistré (ou mis à jour) : liste et vignettes à jour
+  document.addEventListener('rc:project-saved', onSaved);
+  return { destroy() { document.removeEventListener('rc:project-saved', onSaved); el.removeEventListener('click', onClick); } };
 }

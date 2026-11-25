@@ -2,6 +2,15 @@
 // À chaque nouvelle version : ajouter une entrée ici (la fenêtre « Nouveautés » s'affiche une fois par visiteur).
 export const CHANGELOG = [
   {
+    version: '0.10.2', date: '2026-11-25',
+    fr: [
+      'Mise à jour d’un projet : la vignette est renouvelée partout (Projets, tableau de bord, joailliers), même si la page était ouverte pendant l’enregistrement ; « Enregistrement du projet… » s’affiche le temps de l’envoi',
+    ],
+    en: [
+      'Updating a project refreshes its thumbnail everywhere (Projects, dashboard, jewellers), even if the page was open while saving; “Saving project…” shows while it uploads',
+    ],
+  },
+  {
     version: '0.10.1', date: '2026-10-20',
     fr: [
       'Rendu plus réaliste : nouvel éclairage « Studio joaillier » par défaut (grandes sources douces, ombres profondes), or jaune plus fidèle',

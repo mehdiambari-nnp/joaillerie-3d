@@ -72,7 +72,7 @@ export async function mount(ctx) {
     if (!b) { if (S.menu && !e.target.closest('.pmenu')) { S.menu = null; render(); } return; }
     const a = b.dataset.a, id = idOf(b), p = S.list.find((x) => x.id === id);
     if (a === 'filter') { S.filter = b.dataset.k; S.menu = null; render(); }
-    else if (a === 'save') ui.openSaveDialog(() => load());
+    else if (a === 'save') ui.openSaveDialog();
     else if (a === 'new') ui.openNewProject(() => ctx.go('projects'))
     else if (a === 'menu') { S.menu = S.menu === id ? null : id; render(); }
     else if (a === 'open') { const ok = await ui.svc.openProject?.(id); if (ok) ctx.close(); }
@@ -96,5 +96,7 @@ export async function mount(ctx) {
   ctx.setBack(null);
   render();
   await load();
-  return { destroy() { el.removeEventListener('click', onClick); el.removeEventListener('input', onInput); el.removeEventListener('change', onChange); el.removeEventListener('keydown', onKey); } };
+  const onSaved = () => load(); // projet enregistré (ou mis à jour) : liste et vignettes à jour
+  document.addEventListener('rc:project-saved', onSaved);
+  return { destroy() { document.removeEventListener('rc:project-saved', onSaved); el.removeEventListener('click', onClick); el.removeEventListener('input', onInput); el.removeEventListener('change', onChange); el.removeEventListener('keydown', onKey); } };
 }

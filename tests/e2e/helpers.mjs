@@ -3,7 +3,10 @@ import { createServer } from 'vite';
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
-export const CHROMIUM = fs.existsSync('/opt/pw-browsers/chromium-1194/chrome-linux/chrome') ? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' : undefined;
+// Chromium à utiliser : PW_CHROMIUM si fourni, sinon le premier navigateur préinstallé trouvé (environnements cloud), sinon celui de Playwright.
+// Le lien /opt/pw-browsers/chromium suit la version installée ; l'ancien chemin versionné reste en repli.
+const CANDIDATES = [process.env.PW_CHROMIUM, '/opt/pw-browsers/chromium', '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'];
+export const CHROMIUM = CANDIDATES.find((p) => p && fs.existsSync(p));
 
 export async function startServer(port = 5199) {
   process.env.E2E = '1';

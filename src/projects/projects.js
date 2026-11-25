@@ -23,7 +23,7 @@ export async function saveProject(meta, buffer) {
   try {
     const tx = db.transaction(['projects', 'buffers'], 'readwrite');
     const old = await req(tx.objectStore('projects').get(meta.id));
-    tx.objectStore('projects').put({ ...meta, created: old?.created ?? Date.now(), updated: Date.now() });
+    tx.objectStore('projects').put({ ...meta, thumb: meta.thumb || old?.thumb || null, created: old?.created ?? Date.now(), updated: Date.now() });
     if (buffer) tx.objectStore('buffers').put(buffer, meta.id);
     await done(tx);
   } finally { db.close(); }
